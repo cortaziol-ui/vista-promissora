@@ -166,7 +166,7 @@ const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [vendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
-  const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes));
+  const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes, validateCliente));
   const metaMensalGlobal = 450000;
 
   const saveClientes = useCallback((updated: Cliente[]) => {
