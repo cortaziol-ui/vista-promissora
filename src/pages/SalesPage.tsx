@@ -31,7 +31,7 @@ export default function SalesPage() {
   const dailySales = useMemo(() => {
     const byDay: Record<string, number> = {};
     filteredClientes.forEach(c => {
-      const day = c.data.split('/')[0];
+      const day = (c.data || '').split('/')[0];
       byDay[day] = (byDay[day] || 0) + (c.entrada || 0);
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, value]) => ({ day, value }));
