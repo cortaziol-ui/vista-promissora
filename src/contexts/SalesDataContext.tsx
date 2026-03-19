@@ -113,21 +113,49 @@ const defaultClientes: Cliente[] = [
   { id: 40, data: "19/03/2026", nome: "IVONE MARIA ROSA", cpf: "037.467.829-45", nascimento: "05/04/1978", email: "rodriguesrosaconfeccoes@hotmail.com", telefone: "(44) 99765-6491", servico: "LIMPA NOME", vendedor: "Lucas", entrada: 179, parcela1: { valor: 250, status: "AGUARDANDO" }, parcela2: { valor: 250, status: "AGUARDANDO" }, situacao: "ENVIADO - AGUARDANDO LIMPAR", valorTotal: 679 },
 ];
 
-const STORAGE_KEY_CLIENTES = 'salesData_clientes';
-const STORAGE_KEY_VENDEDORES = 'salesData_vendedores';
+const STORAGE_KEY_CLIENTES = 'salesData_v2_clientes';
+const STORAGE_KEY_VENDEDORES = 'salesData_v2_vendedores';
 
-function loadFromStorage<T>(key: string, fallback: T): T {
+function validateCliente(c: unknown): c is Cliente {
+  if (!c || typeof c !== 'object') return false;
+  const obj = c as Record<string, unknown>;
+  return (
+    typeof obj.id === 'number' &&
+    typeof obj.data === 'string' && obj.data.length > 0 &&
+    typeof obj.nome === 'string' && obj.nome.length > 0 &&
+    typeof obj.entrada === 'number' &&
+    obj.parcela1 != null && typeof obj.parcela1 === 'object' &&
+    obj.parcela2 != null && typeof obj.parcela2 === 'object'
+  );
+}
+
+function loadFromStorage<T>(key: string, fallback: T, validator?: (item: unknown) => boolean): T {
   try {
     const saved = localStorage.getItem(key);
     if (!saved) return fallback;
     const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return fallback;
+    if (!Array.isArray(parsed)) {
+      localStorage.removeItem(key);
+      return fallback;
+    }
+    // If a validator is provided, check every item — discard all if any fails
+    if (validator && !parsed.every(validator)) {
+      console.warn(`[SalesData] Corrupted data in "${key}", resetting to defaults.`);
+      localStorage.removeItem(key);
+      return fallback;
+    }
     return parsed as T;
   } catch {
     localStorage.removeItem(key);
     return fallback;
   }
 }
+
+// Clean up old storage keys from previous versions
+try {
+  localStorage.removeItem('salesData_clientes');
+  localStorage.removeItem('salesData_vendedores');
+} catch { /* ignore */ }
 
 function parseDate(d: string) {
   const [day, month, year] = d.split('/');
@@ -138,7 +166,7 @@ const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [vendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
-  const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes));
+  const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes, validateCliente));
   const metaMensalGlobal = 450000;
 
   const saveClientes = useCallback((updated: Cliente[]) => {
