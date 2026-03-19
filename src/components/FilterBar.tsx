@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { users } from '@/data/mockData';
+import { useSalesData } from '@/contexts/SalesDataContext';
 
 interface FilterBarProps {
   selectedYear: number;
@@ -18,7 +18,7 @@ const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 
 export function FilterBar({ selectedYear, selectedMonth, selectedSeller, onYearChange, onMonthChange, onSellerChange, showSellerFilter = true }: FilterBarProps) {
   const now = new Date();
-  const sellers = useMemo(() => users.filter(u => u.role === 'seller' && u.status === 'active'), []);
+  const { vendedores } = useSalesData();
 
   return (
     <div className="flex flex-wrap gap-3 items-center">
@@ -50,8 +50,8 @@ export function FilterBar({ selectedYear, selectedMonth, selectedSeller, onYearC
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos vendedores</SelectItem>
-            {sellers.map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+            {vendedores.map((v) => (
+              <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
             ))}
           </SelectContent>
         </Select>
