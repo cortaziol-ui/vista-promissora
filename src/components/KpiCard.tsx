@@ -1,0 +1,39 @@
+import { ReactNode } from 'react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+
+interface KpiCardProps {
+  title: string;
+  value: string;
+  change?: number;
+  icon: ReactNode;
+  glowClass: string;
+  colorClass: string;
+  subtitle?: string;
+  delay?: number;
+}
+
+export function KpiCard({ title, value, change, icon, glowClass, colorClass, subtitle, delay = 0 }: KpiCardProps) {
+  return (
+    <div
+      className={`glass-card p-5 hover-lift ${glowClass} animate-in`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClass} bg-opacity-15`}>
+          {icon}
+        </div>
+        {change !== undefined && (
+          <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+            change >= 0 ? 'text-kpi-success bg-kpi-success/10' : 'text-kpi-error bg-kpi-error/10'
+          }`}>
+            {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+          </div>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground mb-1">{title}</p>
+      <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+      {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+    </div>
+  );
+}
