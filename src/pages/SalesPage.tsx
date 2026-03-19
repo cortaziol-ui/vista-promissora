@@ -1,79 +1,75 @@
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
-import { FilterBar } from '@/components/FilterBar';
 import { ProgressBar } from '@/components/ProgressBar';
-import { useAuth } from '@/contexts/AuthContext';
-import { sales, getAllSellerStats, getMonthlyTotals } from '@/data/mockData';
+import { useSalesData } from '@/contexts/SalesDataContext';
 import { DollarSign, Target, Receipt, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
 
 export default function SalesPage() {
-  const now = new Date();
-  const { user, isSeller } = useAuth();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
-  const [seller, setSeller] = useState('all');
+  const { clientes, vendedores, vendedorStats, metaMensalGlobal } = useSalesData();
+  const [filterVendedor, setFilterVendedor] = useState('all');
 
-  const totals = useMemo(() => getMonthlyTotals(year, month), [year, month]);
-  const stats = useMemo(() => getAllSellerStats(year, month), [year, month]);
+  const filteredClientes = useMemo(() => {
+    if (filterVendedor === 'all') return clientes;
+    return clientes.filter(c => c.vendedor === filterVendedor);
+  }, [clientes, filterVendedor]);
 
   const filteredStats = useMemo(() => {
-    if (isSeller && user) return stats.filter(s => s.user.id === user.id);
-    if (seller !== 'all') return stats.filter(s => s.user.id === seller);
-    return stats;
-  }, [stats, seller, isSeller, user]);
+    if (filterVendedor === 'all') return vendedorStats;
+    return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
+  }, [vendedorStats, filterVendedor]);
 
-  const ticketByDay = useMemo(() => {
-    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const filtered = isSeller && user
-      ? sales.filter(s => s.date.startsWith(prefix) && s.userId === user.id)
-      : seller !== 'all'
-        ? sales.filter(s => s.date.startsWith(prefix) && s.userId === seller)
-        : sales.filter(s => s.date.startsWith(prefix));
-
-    const byDay: Record<string, { total: number; count: number }> = {};
-    filtered.forEach(s => {
-      const day = s.date.split('-')[2];
-      if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += s.value;
-      byDay[day].count++;
-    });
-    return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, d]) => ({
-      day, ticket: d.count > 0 ? d.total / d.count : 0,
-    }));
-  }, [year, month, seller, isSeller, user]);
+  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + c.valorTotal, 0), [filteredClientes]);
+  const totalVendas = filteredClientes.length;
+  const ticketMedio = totalVendas > 0 ? faturamento / totalVendas : 0;
+  const pctMeta = (faturamento / metaMensalGlobal) * 100;
 
   const dailySales = useMemo(() => {
-    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const filtered = isSeller && user
-      ? sales.filter(s => s.date.startsWith(prefix) && s.userId === user.id)
-      : seller !== 'all'
-        ? sales.filter(s => s.date.startsWith(prefix) && s.userId === seller)
-        : sales.filter(s => s.date.startsWith(prefix));
     const byDay: Record<string, number> = {};
-    filtered.forEach(s => { const d = s.date.split('-')[2]; byDay[d] = (byDay[d] || 0) + s.value; });
+    filteredClientes.forEach(c => {
+      const day = c.data.split('/')[0];
+      byDay[day] = (byDay[day] || 0) + c.valorTotal;
+    });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, value]) => ({ day, value }));
-  }, [year, month, seller, isSeller, user]);
+  }, [filteredClientes]);
+
+  const ticketByDay = useMemo(() => {
+    const byDay: Record<string, { total: number; count: number }> = {};
+    filteredClientes.forEach(c => {
+      const day = c.data.split('/')[0];
+      if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
+      byDay[day].total += c.valorTotal;
+      byDay[day].count++;
+    });
+    return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, d]) => ({ day, ticket: d.count > 0 ? d.total / d.count : 0 }));
+  }, [filteredClientes]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard de Vendas</h1>
-          <p className="text-muted-foreground text-sm">Análise detalhada de performance</p>
+          <p className="text-muted-foreground text-sm">Análise detalhada de performance — Março/2026</p>
         </div>
-        <FilterBar selectedYear={year} selectedMonth={month} selectedSeller={seller} onYearChange={setYear} onMonthChange={setMonth} onSellerChange={setSeller} showSellerFilter={!isSeller} />
+        <Select value={filterVendedor} onValueChange={setFilterVendedor}>
+          <SelectTrigger className="w-[180px] bg-secondary border-border/50"><SelectValue placeholder="Todos vendedores" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos vendedores</SelectItem>
+            {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard title="Faturamento" value={fmtFull(totals.totalRevenue)} change={totals.revenueChange} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        <KpiCard title="Meta Mensal" value={fmtFull(totals.companyGoal)} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-        <KpiCard title="% da Meta" value={`${totals.goalPct.toFixed(1)}%`} subtitle={`Faltam ${fmtFull(Math.max(0, totals.companyGoal - totals.totalRevenue))}`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
-        <KpiCard title="Ticket Médio" value={fmtFull(totals.avgTicket)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
-        <KpiCard title="Total Vendas" value={String(totals.totalCount)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
+        <KpiCard title="Faturamento" value={fmtFull(faturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+        <KpiCard title="Meta Mensal" value={fmtFull(metaMensalGlobal)} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+        <KpiCard title="% da Meta" value={`${pctMeta.toFixed(1)}%`} subtitle={`Faltam ${fmtFull(Math.max(0, metaMensalGlobal - faturamento))}`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
+        <KpiCard title="Ticket Médio" value={fmtFull(ticketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
+        <KpiCard title="Total Vendas" value={String(totalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -132,25 +128,25 @@ export default function SalesPage() {
             </thead>
             <tbody>
               {filteredStats.map((stat, i) => (
-                <tr key={stat.user.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
+                <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
                   <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
                     {i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}
                   </td>
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-3">
-                      <img src={stat.user.avatar} alt={stat.user.name} className="w-8 h-8 rounded-full bg-secondary" />
+                      <span className="text-2xl">{stat.vendedor.avatar}</span>
                       <div>
-                        <p className="font-medium text-foreground">{stat.user.name}</p>
-                        <p className="text-xs text-muted-foreground">{stat.user.position}</p>
+                        <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
+                        <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-2 text-right text-kpi-goal font-medium">{fmtFull(stat.monthlyGoal)}</td>
-                  <td className="py-3 px-2 text-right font-semibold text-foreground">{fmtFull(stat.totalRevenue)}</td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.remaining)}</td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{stat.totalSalesCount}</td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.avgTicket)}</td>
-                  <td className="py-3 px-2"><ProgressBar value={stat.goalPct} /></td>
+                  <td className="py-3 px-2 text-right text-kpi-goal font-medium">{fmtFull(stat.vendedor.meta)}</td>
+                  <td className="py-3 px-2 text-right font-semibold text-foreground">{fmtFull(stat.faturamento)}</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faltam)}</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground">{stat.vendas}</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>
+                  <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
                 </tr>
               ))}
             </tbody>
