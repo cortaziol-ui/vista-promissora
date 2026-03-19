@@ -23,7 +23,7 @@ export default function SalesPage() {
     return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
   }, [vendedorStats, filterVendedor]);
 
-  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + c.valorTotal, 0), [filteredClientes]);
+  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + (c.entrada || 0), 0), [filteredClientes]);
   const totalVendas = filteredClientes.length;
   const ticketMedio = totalVendas > 0 ? faturamento / totalVendas : 0;
   const pctMeta = (faturamento / metaMensalGlobal) * 100;
