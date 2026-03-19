@@ -14,7 +14,7 @@ export default function FinancialPage() {
 
   const filteredFat = useMemo(() => {
     if (filterVendedor === 'all') return faturamento;
-    return clientes.filter(c => c.vendedor === filterVendedor).reduce((s, c) => s + c.valorTotal, 0);
+    return clientes.filter(c => c.vendedor === filterVendedor).reduce((s, c) => s + (c.entrada || 0), 0);
   }, [clientes, filterVendedor, faturamento]);
 
   const filteredStats = useMemo(() => {

@@ -42,7 +42,7 @@ export default function SalesPage() {
     filteredClientes.forEach(c => {
       const day = c.data.split('/')[0];
       if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += c.valorTotal;
+      byDay[day].total += (c.entrada || 0);
       byDay[day].count++;
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, d]) => ({ day, ticket: d.count > 0 ? d.total / d.count : 0 }));
