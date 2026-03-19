@@ -40,7 +40,7 @@ export default function SalesPage() {
   const ticketByDay = useMemo(() => {
     const byDay: Record<string, { total: number; count: number }> = {};
     filteredClientes.forEach(c => {
-      const day = c.data.split('/')[0];
+      const day = (c.data || '').split('/')[0];
       if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
       byDay[day].total += (c.entrada || 0);
       byDay[day].count++;
