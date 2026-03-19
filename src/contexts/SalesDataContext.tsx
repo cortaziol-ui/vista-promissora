@@ -119,8 +119,12 @@ const STORAGE_KEY_VENDEDORES = 'salesData_vendedores';
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return fallback;
+    return parsed as T;
   } catch {
+    localStorage.removeItem(key);
     return fallback;
   }
 }
