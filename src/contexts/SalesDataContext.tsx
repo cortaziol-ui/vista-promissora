@@ -171,7 +171,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const faturamento = useMemo(() => clientes.reduce((s, c) => s + c.valorTotal, 0), [clientes]);
+  const faturamento = useMemo(() => clientes.reduce((s, c) => s + (c.entrada || 0), 0), [clientes]);
   const totalVendas = clientes.length;
   const ticketMedio = useMemo(() => totalVendas > 0 ? faturamento / totalVendas : 0, [faturamento, totalVendas]);
   const pctMeta = useMemo(() => (faturamento / metaMensalGlobal) * 100, [faturamento, metaMensalGlobal]);
