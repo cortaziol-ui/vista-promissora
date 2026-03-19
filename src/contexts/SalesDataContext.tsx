@@ -185,7 +185,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const vendedorStats = useMemo<VendedorStats[]>(() => {
     return vendedores.map(v => {
       const cv = clientes.filter(c => c.vendedor === v.nome);
-      const fat = cv.reduce((s, c) => s + c.valorTotal, 0);
+      const fat = cv.reduce((s, c) => s + (c.entrada || 0), 0);
       const vendas = cv.length;
       const ticket = vendas > 0 ? fat / vendas : 0;
       const pct = v.meta > 0 ? (fat / v.meta) * 100 : 0;
