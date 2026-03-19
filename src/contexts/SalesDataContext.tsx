@@ -197,9 +197,9 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const dailyEvolution = useMemo(() => {
     const byDay: Record<string, { fat: number; dataFull: string }> = {};
     clientes.forEach(c => {
-      const day = c.data.split('/')[0];
+      const day = c.data?.split('/')[0] || '00';
       if (!byDay[day]) byDay[day] = { fat: 0, dataFull: c.data };
-      byDay[day].fat += c.valorTotal;
+      byDay[day].fat += (c.entrada || 0);
     });
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -209,9 +209,9 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const ticketPorDia = useMemo(() => {
     const byDay: Record<string, { total: number; count: number }> = {};
     clientes.forEach(c => {
-      const day = c.data.split('/')[0];
+      const day = c.data?.split('/')[0] || '00';
       if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += c.valorTotal;
+      byDay[day].total += (c.entrada || 0);
       byDay[day].count++;
     });
     return Object.entries(byDay)
