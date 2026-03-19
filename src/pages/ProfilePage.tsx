@@ -36,16 +36,8 @@ export default function ProfilePage() {
           {user.role === 'seller' && (
             <>
               <div>
-                <p className="text-xs text-muted-foreground">Meta Mensal</p>
-                <p className="text-sm text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(user.monthlyGoal)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Meta Semanal</p>
-                <p className="text-sm text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(user.weeklyGoal)}
-                </p>
+                <p className="text-xs text-muted-foreground">Cargo</p>
+                <p className="text-sm text-foreground">{user.position}</p>
               </div>
             </>
           )}
