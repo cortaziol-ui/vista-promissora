@@ -14,7 +14,7 @@ export default function FinancialPage() {
 
   const filteredFat = useMemo(() => {
     if (filterVendedor === 'all') return faturamento;
-    return clientes.filter(c => c.vendedor === filterVendedor).reduce((s, c) => s + c.valorTotal, 0);
+    return clientes.filter(c => c.vendedor === filterVendedor).reduce((s, c) => s + (c.entrada || 0), 0);
   }, [clientes, filterVendedor, faturamento]);
 
   const filteredStats = useMemo(() => {
@@ -46,7 +46,7 @@ export default function FinancialPage() {
         <KpiCard title="Faturamento Mensal" value={fmtFull(filteredFat)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="Projeção" value={fmtFull(projecao)} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
         <KpiCard title="Vendedores Ativos" value={String(vendedores.length)} icon={<TrendingUp className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
-        <KpiCard title="Ticket Médio Geral" value={fmtFull(filteredFat / Math.max(1, clientes.filter(c => filterVendedor === 'all' || c.vendedor === filterVendedor).length))} icon={<ArrowUpDown className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
+        <KpiCard title="Ticket Médio Geral" value={fmtFull((() => { const fc = clientes.filter(c => filterVendedor === 'all' || c.vendedor === filterVendedor); return fc.length > 0 ? fc.reduce((s, c) => s + (c.entrada || 0), 0) / fc.length : 0; })())} icon={<ArrowUpDown className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
       </div>
 
       <div className="glass-card p-5">

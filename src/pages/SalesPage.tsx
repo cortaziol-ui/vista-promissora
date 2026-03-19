@@ -23,7 +23,7 @@ export default function SalesPage() {
     return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
   }, [vendedorStats, filterVendedor]);
 
-  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + c.valorTotal, 0), [filteredClientes]);
+  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + (c.entrada || 0), 0), [filteredClientes]);
   const totalVendas = filteredClientes.length;
   const ticketMedio = totalVendas > 0 ? faturamento / totalVendas : 0;
   const pctMeta = (faturamento / metaMensalGlobal) * 100;
@@ -32,7 +32,7 @@ export default function SalesPage() {
     const byDay: Record<string, number> = {};
     filteredClientes.forEach(c => {
       const day = c.data.split('/')[0];
-      byDay[day] = (byDay[day] || 0) + c.valorTotal;
+      byDay[day] = (byDay[day] || 0) + (c.entrada || 0);
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, value]) => ({ day, value }));
   }, [filteredClientes]);
@@ -42,7 +42,7 @@ export default function SalesPage() {
     filteredClientes.forEach(c => {
       const day = c.data.split('/')[0];
       if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += c.valorTotal;
+      byDay[day].total += (c.entrada || 0);
       byDay[day].count++;
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, d]) => ({ day, ticket: d.count > 0 ? d.total / d.count : 0 }));
