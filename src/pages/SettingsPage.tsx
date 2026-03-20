@@ -3,8 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Trash2, UserPlus } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -14,10 +13,37 @@ const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency
 
 export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
-  const { vendedores, metaMensalGlobal } = useSalesData();
+  const { vendedores, metaMensalGlobal, setMetaMensalGlobal, updateVendedor } = useSalesData();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'seller' as string, monthlyGoal: 50000 });
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'seller', monthlyGoal: 50000 });
+
+  // Inline editing state
+  const [editingMetaGlobal, setEditingMetaGlobal] = useState(false);
+  const [metaGlobalDraft, setMetaGlobalDraft] = useState(metaMensalGlobal);
+  const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
+  const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
+
+  const handleSaveMetaGlobal = () => {
+    if (metaGlobalDraft > 0) {
+      setMetaMensalGlobal(metaGlobalDraft);
+      toast({ title: 'Meta atualizada', description: `Meta da empresa alterada para ${fmtFull(metaGlobalDraft)}` });
+    }
+    setEditingMetaGlobal(false);
+  };
+
+  const handleStartEditVendor = (id: number, currentMeta: number) => {
+    setEditingVendorId(id);
+    setVendorMetaDraft(currentMeta);
+  };
+
+  const handleSaveVendorMeta = (id: number, nome: string) => {
+    if (vendorMetaDraft >= 0) {
+      updateVendedor(id, { meta: vendorMetaDraft });
+      toast({ title: 'Meta atualizada', description: `Meta de ${nome} alterada para ${fmtFull(vendorMetaDraft)}` });
+    }
+    setEditingVendorId(null);
+  };
 
   const handleAddUser = () => {
     toast({ title: 'Vendedor adicionado', description: `${newUser.name} foi adicionado ao sistema.` });
@@ -40,8 +66,36 @@ export default function SettingsPage() {
       {isAdmin && (
         <div className="glass-card p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">Meta da Empresa</h2>
-          <p className="text-sm text-muted-foreground mb-2">Meta Mensal Global</p>
-          <p className="text-2xl font-bold text-foreground">{fmtFull(metaMensalGlobal)}</p>
+          <p className="text-sm text-muted-foreground mb-2">Meta Mensal Global (independente das metas individuais)</p>
+          {editingMetaGlobal ? (
+            <div className="flex items-center gap-3">
+              <span className="text-muted-foreground">R$</span>
+              <Input
+                type="number"
+                value={metaGlobalDraft}
+                onChange={e => setMetaGlobalDraft(Number(e.target.value))}
+                className="bg-secondary border-border/50 w-48"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleSaveMetaGlobal()}
+              />
+              <Button size="sm" variant="ghost" onClick={handleSaveMetaGlobal}>
+                <Check className="w-4 h-4 text-green-500" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditingMetaGlobal(false)}>
+                <X className="w-4 h-4 text-red-400" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <p className="text-2xl font-bold text-foreground">{fmtFull(metaMensalGlobal)}</p>
+              <Button size="sm" variant="ghost" onClick={() => { setMetaGlobalDraft(metaMensalGlobal); setEditingMetaGlobal(true); }}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-2">
+            Soma das metas individuais: {fmtFull(vendedores.reduce((s, v) => s + v.meta, 0))}
+          </p>
         </div>
       )}
 
@@ -95,10 +149,32 @@ export default function SettingsPage() {
                     </div>
                   </td>
                   <td className="py-3 px-2 text-muted-foreground">{v.cargo}</td>
-                  <td className="py-3 px-2 text-right text-foreground">{fmtFull(v.meta)}</td>
+                  <td className="py-3 px-2 text-right">
+                    {editingVendorId === v.id ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-muted-foreground text-xs">R$</span>
+                        <Input
+                          type="number"
+                          value={vendorMetaDraft}
+                          onChange={e => setVendorMetaDraft(Number(e.target.value))}
+                          className="bg-secondary border-border/50 w-32 text-right"
+                          autoFocus
+                          onKeyDown={e => e.key === 'Enter' && handleSaveVendorMeta(v.id, v.nome)}
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => handleSaveVendorMeta(v.id, v.nome)}>
+                          <Check className="w-3.5 h-3.5 text-green-500" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingVendorId(null)}>
+                          <X className="w-3.5 h-3.5 text-red-400" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-foreground">{fmtFull(v.meta)}</span>
+                    )}
+                  </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => toast({ title: 'Editar', description: `Editando ${v.nome}` })}>
+                      <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id, v.meta)}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       {isAdmin && (

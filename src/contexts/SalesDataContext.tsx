@@ -42,7 +42,9 @@ export interface VendedorStats {
 
 interface SalesDataContextType {
   metaMensalGlobal: number;
+  setMetaMensalGlobal: (v: number) => void;
   vendedores: Vendedor[];
+  updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
   clientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
@@ -115,6 +117,7 @@ const defaultClientes: Cliente[] = [
 
 const STORAGE_KEY_CLIENTES = 'salesData_v2_clientes';
 const STORAGE_KEY_VENDEDORES = 'salesData_v2_vendedores';
+const STORAGE_KEY_META = 'salesData_v2_meta';
 
 function validateCliente(c: unknown): c is Cliente {
   if (!c || typeof c !== 'object') return false;
@@ -165,9 +168,27 @@ function parseDate(d: string) {
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
-  const [vendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
+  const [vendedores, setVendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
   const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes, validateCliente));
-  const metaMensalGlobal = 450000;
+  const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_META);
+      return saved ? Number(JSON.parse(saved)) || 450000 : 450000;
+    } catch { return 450000; }
+  });
+
+  const setMetaMensalGlobal = useCallback((v: number) => {
+    setMetaMensalGlobalState(v);
+    localStorage.setItem(STORAGE_KEY_META, JSON.stringify(v));
+  }, []);
+
+  const updateVendedor = useCallback((id: number, partial: Partial<Vendedor>) => {
+    setVendedores(prev => {
+      const updated = prev.map(v => v.id === id ? { ...v, ...partial } : v);
+      localStorage.setItem(STORAGE_KEY_VENDEDORES, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const saveClientes = useCallback((updated: Cliente[]) => {
     setClientes(updated);
@@ -249,7 +270,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <SalesDataContext.Provider value={{
-      metaMensalGlobal, vendedores, clientes,
+      metaMensalGlobal, setMetaMensalGlobal, vendedores, updateVendedor, clientes,
       addCliente, updateCliente, deleteCliente,
       faturamento, totalVendas, ticketMedio, pctMeta, projecao,
       vendedorStats, dailyEvolution, ticketPorDia,
