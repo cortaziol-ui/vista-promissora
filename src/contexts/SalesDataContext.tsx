@@ -270,7 +270,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <SalesDataContext.Provider value={{
-      metaMensalGlobal, vendedores, clientes,
+      metaMensalGlobal, setMetaMensalGlobal, vendedores, updateVendedor, clientes,
       addCliente, updateCliente, deleteCliente,
       faturamento, totalVendas, ticketMedio, pctMeta, projecao,
       vendedorStats, dailyEvolution, ticketPorDia,
