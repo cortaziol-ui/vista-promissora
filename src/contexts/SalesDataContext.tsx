@@ -168,9 +168,27 @@ function parseDate(d: string) {
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
-  const [vendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
+  const [vendedores, setVendedores] = useState<Vendedor[]>(() => loadFromStorage(STORAGE_KEY_VENDEDORES, defaultVendedores));
   const [clientes, setClientes] = useState<Cliente[]>(() => loadFromStorage(STORAGE_KEY_CLIENTES, defaultClientes, validateCliente));
-  const metaMensalGlobal = 450000;
+  const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_META);
+      return saved ? Number(JSON.parse(saved)) || 450000 : 450000;
+    } catch { return 450000; }
+  });
+
+  const setMetaMensalGlobal = useCallback((v: number) => {
+    setMetaMensalGlobalState(v);
+    localStorage.setItem(STORAGE_KEY_META, JSON.stringify(v));
+  }, []);
+
+  const updateVendedor = useCallback((id: number, partial: Partial<Vendedor>) => {
+    setVendedores(prev => {
+      const updated = prev.map(v => v.id === id ? { ...v, ...partial } : v);
+      localStorage.setItem(STORAGE_KEY_VENDEDORES, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const saveClientes = useCallback((updated: Cliente[]) => {
     setClientes(updated);
