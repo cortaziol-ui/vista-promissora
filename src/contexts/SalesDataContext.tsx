@@ -117,6 +117,7 @@ const defaultClientes: Cliente[] = [
 
 const STORAGE_KEY_CLIENTES = 'salesData_v2_clientes';
 const STORAGE_KEY_VENDEDORES = 'salesData_v2_vendedores';
+const STORAGE_KEY_META = 'salesData_v2_meta';
 
 function validateCliente(c: unknown): c is Cliente {
   if (!c || typeof c !== 'object') return false;
