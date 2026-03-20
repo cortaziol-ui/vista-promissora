@@ -42,7 +42,9 @@ export interface VendedorStats {
 
 interface SalesDataContextType {
   metaMensalGlobal: number;
+  setMetaMensalGlobal: (v: number) => void;
   vendedores: Vendedor[];
+  updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
   clientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
