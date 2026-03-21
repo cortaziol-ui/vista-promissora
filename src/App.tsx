@@ -16,6 +16,7 @@ import FinancialPage from "./pages/FinancialPage";
 import PlanilhaPage from "./pages/PlanilhaPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
+import RoletaPage from "./pages/RoletaPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
