@@ -16,6 +16,7 @@ const navItems = [
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift },
 ];
 
 const adminItems = [

@@ -80,6 +80,7 @@ function AppRoutes() {
       <Route path="/planilha" element={<ProtectedRoute><PlanilhaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="/roleta" element={<ProtectedRoute><RoletaPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
