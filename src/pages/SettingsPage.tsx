@@ -1,22 +1,44 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Check, X, Sparkles, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
+const MESES = [
+  { value: '01', label: 'Janeiro' },
+  { value: '02', label: 'Fevereiro' },
+  { value: '03', label: 'Março' },
+  { value: '04', label: 'Abril' },
+  { value: '05', label: 'Maio' },
+  { value: '06', label: 'Junho' },
+  { value: '07', label: 'Julho' },
+  { value: '08', label: 'Agosto' },
+  { value: '09', label: 'Setembro' },
+  { value: '10', label: 'Outubro' },
+  { value: '11', label: 'Novembro' },
+  { value: '12', label: 'Dezembro' },
+];
+
 export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
-  const { vendedores, metaMensalGlobal, setMetaMensalGlobal, updateVendedor } = useSalesData();
+  const { vendedores, metaMensalGlobal, setMetaMensalGlobal, updateVendedor, clientes } = useSalesData();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'seller', monthlyGoal: 50000 });
+
+  // Month selector
+  const currentMonth = new Date().toISOString().slice(5, 7);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   // Inline editing state
   const [editingMetaGlobal, setEditingMetaGlobal] = useState(false);
@@ -24,10 +46,41 @@ export default function SettingsPage() {
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
 
+  // Suggested goals state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestedGoals, setSuggestedGoals] = useState<Record<number, number>>({});
+
+  // Calculate proportional suggested goals (+20% buffer)
+  const calculateSuggestedGoals = useMemo(() => {
+    const totalFaturamento = vendedores.reduce((sum, v) => {
+      const vendorClientes = clientes.filter(c => c.vendedor === v.nome);
+      return sum + vendorClientes.reduce((s, c) => s + (c.entrada || 0), 0);
+    }, 0);
+
+    if (totalFaturamento === 0) {
+      // Equal distribution when no sales data
+      const equalShare = (metaMensalGlobal * 1.2) / vendedores.length;
+      return vendedores.reduce((acc, v) => {
+        acc[v.id] = Math.round(equalShare);
+        return acc;
+      }, {} as Record<number, number>);
+    }
+
+    // Proportional based on sales performance, total = meta * 1.2
+    const targetTotal = metaMensalGlobal * 1.2;
+    return vendedores.reduce((acc, v) => {
+      const vendorClientes = clientes.filter(c => c.vendedor === v.nome);
+      const vendorFat = vendorClientes.reduce((s, c) => s + (c.entrada || 0), 0);
+      const proportion = vendorFat / totalFaturamento;
+      acc[v.id] = Math.round(targetTotal * proportion);
+      return acc;
+    }, {} as Record<number, number>);
+  }, [vendedores, clientes, metaMensalGlobal]);
+
   const handleSaveMetaGlobal = () => {
     if (metaGlobalDraft > 0) {
       setMetaMensalGlobal(metaGlobalDraft);
-      toast({ title: 'Meta atualizada', description: `Meta da empresa alterada para ${fmtFull(metaGlobalDraft)}` });
+      toast({ title: 'Meta atualizada', description: `Meta de ${MESES.find(m => m.value === selectedMonth)?.label} alterada para ${fmtFull(metaGlobalDraft)}` });
     }
     setEditingMetaGlobal(false);
   };
@@ -45,11 +98,33 @@ export default function SettingsPage() {
     setEditingVendorId(null);
   };
 
+  const handleGenerateSuggestions = () => {
+    setSuggestedGoals(calculateSuggestedGoals);
+    setShowSuggestions(true);
+  };
+
+  const handleApproveSuggestions = () => {
+    vendedores.forEach(v => {
+      if (suggestedGoals[v.id] !== undefined) {
+        updateVendedor(v.id, { meta: suggestedGoals[v.id] });
+      }
+    });
+    setShowSuggestions(false);
+    toast({ title: 'Metas aplicadas', description: 'As metas sugeridas foram aplicadas a todos os vendedores.' });
+  };
+
+  const handleRejectSuggestions = () => {
+    setShowSuggestions(false);
+  };
+
   const handleAddUser = () => {
     toast({ title: 'Vendedor adicionado', description: `${newUser.name} foi adicionado ao sistema.` });
     setDialogOpen(false);
     setNewUser({ name: '', email: '', password: '', role: 'seller', monthlyGoal: 50000 });
   };
+
+  const somaMetasIndividuais = vendedores.reduce((s, v) => s + v.meta, 0);
+  const somaSugeridas = Object.values(suggestedGoals).reduce((s, v) => s + v, 0);
 
   if (!isAdmin && !isManager) {
     return (
@@ -66,6 +141,23 @@ export default function SettingsPage() {
       {isAdmin && (
         <div className="glass-card p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">Meta da Empresa</h2>
+          
+          {/* Month selector */}
+          <div className="flex items-center gap-3 mb-4">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Mês de referência:</span>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[180px] bg-secondary border-border/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MESES.map(m => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <p className="text-sm text-muted-foreground mb-2">Meta Mensal Global (independente das metas individuais)</p>
           {editingMetaGlobal ? (
             <div className="flex items-center gap-3">
@@ -94,39 +186,93 @@ export default function SettingsPage() {
             </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">
-            Soma das metas individuais: {fmtFull(vendedores.reduce((s, v) => s + v.meta, 0))}
+            Soma das metas individuais: {fmtFull(somaMetasIndividuais)}
           </p>
+          <p className="text-xs text-muted-foreground">
+            💡 Se cada vendedor atingir 80% da sua meta individual, a meta da empresa deve ser batida.
+          </p>
+        </div>
+      )}
+
+      {/* Suggested Goals Banner */}
+      {showSuggestions && (
+        <div className="glass-card p-6 border border-kpi-goal-pct/30">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-kpi-goal-pct" />
+            <h2 className="text-lg font-semibold text-foreground">Sugestão de Metas Individuais</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-1">
+            Baseado na performance proporcional de cada vendedor, com 20% de margem sobre a meta da empresa ({fmtFull(metaMensalGlobal)}).
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Soma das metas sugeridas: <span className="text-foreground font-medium">{fmtFull(somaSugeridas)}</span> (= {fmtFull(metaMensalGlobal)} × 1.2)
+          </p>
+
+          <div className="space-y-2 mb-4">
+            {vendedores.map(v => {
+              const suggested = suggestedGoals[v.id] || 0;
+              return (
+                <div key={v.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{v.avatar}</span>
+                    <span className="text-foreground font-medium">{v.nome}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground text-sm">Atual: {fmtFull(v.meta)}</span>
+                    <span className="text-foreground font-semibold">→ {fmtFull(suggested)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={handleApproveSuggestions} className="bg-green-600 hover:bg-green-700">
+              <Check className="w-4 h-4 mr-2" />
+              Aprovar e Aplicar
+            </Button>
+            <Button variant="outline" onClick={handleRejectSuggestions}>
+              <X className="w-4 h-4 mr-2" />
+              Recusar (manter atuais)
+            </Button>
+          </div>
         </div>
       )}
 
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Vendedores</h2>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm"><UserPlus className="w-4 h-4 mr-2" />Adicionar</Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle>Novo Vendedor</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm text-muted-foreground">Nome</label>
-                  <Input value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleGenerateSuggestions}>
+              <Sparkles className="w-4 h-4 mr-2 text-kpi-goal-pct" />
+              Sugerir Metas
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><UserPlus className="w-4 h-4 mr-2" />Adicionar</Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Novo Vendedor</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm text-muted-foreground">Nome</label>
+                    <Input value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Email</label>
+                    <Input value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Meta Mensal</label>
+                    <Input type="number" value={newUser.monthlyGoal} onChange={e => setNewUser({ ...newUser, monthlyGoal: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" />
+                  </div>
+                  <Button onClick={handleAddUser} className="w-full">Salvar Vendedor</Button>
                 </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Email</label>
-                  <Input value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="bg-secondary border-border/50 mt-1" />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Meta Mensal</label>
-                  <Input type="number" value={newUser.monthlyGoal} onChange={e => setNewUser({ ...newUser, monthlyGoal: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" />
-                </div>
-                <Button onClick={handleAddUser} className="w-full">Salvar Vendedor</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

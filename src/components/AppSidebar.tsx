@@ -1,5 +1,5 @@
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +16,7 @@ const navItems = [
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift },
 ];
 
 const adminItems = [
