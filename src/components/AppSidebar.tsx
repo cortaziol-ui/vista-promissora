@@ -1,9 +1,10 @@
+import { useState, useEffect } from 'react';
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
@@ -28,6 +29,20 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const { user, logout, isAdmin, isManager } = useAuth();
   const navigate = useNavigate();
+
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('app-theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+    localStorage.setItem('app-theme', theme);
+  }, [theme]);
 
   const handleLogout = () => {
     logout();
@@ -85,6 +100,25 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-2">
         <SidebarMenu>
+          {/* Theme toggle */}
+          <SidebarMenuItem>
+            <div className="flex gap-1 px-2 py-1">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex items-center gap-2 flex-1 rounded-md px-2 py-1.5 text-sm transition-colors ${theme === 'light' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50'}`}
+              >
+                <Sun className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Claro</span>}
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex items-center gap-2 flex-1 rounded-md px-2 py-1.5 text-sm transition-colors ${theme === 'dark' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50'}`}
+              >
+                <Moon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Escuro</span>}
+              </button>
+            </div>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/perfil" className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">

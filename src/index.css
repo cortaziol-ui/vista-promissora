@@ -59,6 +59,57 @@
     --medal-silver: 210 11% 71%;
     --medal-bronze: 30 60% 50%;
   }
+
+  .light {
+    --background: 0 0% 97%;
+    --foreground: 220 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 15%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 220 30% 15%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 187 80% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+    --ring: 217 91% 50%;
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 220 10% 40%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 90%;
+    --sidebar-accent-foreground: 220 30% 15%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-ring: 217 91% 50%;
+
+    --kpi-revenue: 255 62% 55%;
+    --kpi-revenue-glow: 255 80% 45%;
+    --kpi-goal: 217 91% 50%;
+    --kpi-goal-pct: 38 92% 45%;
+    --kpi-ticket: 160 84% 32%;
+    --kpi-sales: 199 89% 45%;
+    --kpi-projection: 330 81% 50%;
+    --kpi-success: 160 84% 32%;
+    --kpi-warning: 38 92% 45%;
+    --kpi-error: 0 84% 50%;
+
+    --chart-1: 217 91% 50%;
+    --chart-2: 255 62% 55%;
+    --chart-3: 160 84% 32%;
+    --chart-4: 199 89% 45%;
+    --chart-5: 330 81% 50%;
+
+    --medal-gold: 45 93% 48%;
+    --medal-silver: 210 11% 55%;
+    --medal-bronze: 30 60% 42%;
+  }
 }
 
 @layer base {
