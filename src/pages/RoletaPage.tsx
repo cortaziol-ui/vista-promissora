@@ -3,112 +3,80 @@ import { useSalesData } from '@/contexts/SalesDataContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trophy, Gift, Zap, Target, TrendingUp, Crown, History } from 'lucide-react';
+import { Gift, Zap, Target, Crown, History, Trophy } from 'lucide-react';
 
-const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+interface PrizeOption {
+  label: string;
+  peso: number;
+  color: string;
+}
 
-interface TierConfig {
+const PRIZES: PrizeOption[] = [
+  { label: 'Monster / Red Bull', peso: 35, color: '#00BCD4' },
+  { label: 'Coca + Salgado', peso: 25, color: '#4CAF50' },
+  { label: 'Vale Marmita R$ 20', peso: 20, color: '#FF9800' },
+  { label: 'Pix de R$ 20', peso: 12, color: '#9C27B0' },
+  { label: 'Pix de R$ 30', peso: 6, color: '#E91E63' },
+  { label: 'Pix de R$ 50', peso: 2, color: '#FFD700' },
+];
+
+interface MotiveConfig {
   id: string;
   titulo: string;
   descricao: string;
-  frequencia: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  premios: { valor: number; peso: number }[];
 }
+
+const MOTIVES: MotiveConfig[] = [
+  {
+    id: 'volume_diario',
+    titulo: 'Volume Diário',
+    descricao: '3 vendas em um dia',
+    icon: <Zap className="w-5 h-5" />,
+    color: '#00BCD4',
+    bgColor: 'rgba(0, 188, 212, 0.15)',
+  },
+  {
+    id: 'meta_semanal_100',
+    titulo: 'Meta Semanal',
+    descricao: '100% da meta semanal atingida',
+    icon: <Target className="w-5 h-5" />,
+    color: '#4CAF50',
+    bgColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  {
+    id: 'meta_mensal_70',
+    titulo: 'Meta Mensal 70%',
+    descricao: '70% da meta mensal atingida',
+    icon: <Trophy className="w-5 h-5" />,
+    color: '#FF9800',
+    bgColor: 'rgba(255, 152, 0, 0.15)',
+  },
+  {
+    id: 'meta_mensal_100',
+    titulo: 'Meta Mensal 100%',
+    descricao: '100% da meta mensal atingida',
+    icon: <Crown className="w-5 h-5" />,
+    color: '#FFD700',
+    bgColor: 'rgba(255, 215, 0, 0.15)',
+  },
+];
 
 interface SpinRecord {
   id: string;
   vendedor: string;
-  tier: string;
-  tierTitulo: string;
-  premio: number;
+  motivo: string;
+  motivoTitulo: string;
+  premio: string;
   data: string;
   hora: string;
   status: 'pendente' | 'pago';
 }
 
-const TIERS: TierConfig[] = [
-  {
-    id: 'volume_diario',
-    titulo: 'Volume Diário',
-    descricao: '3+ vendas em um dia',
-    frequencia: '1x por dia',
-    icon: <Zap className="w-5 h-5" />,
-    color: '#00BCD4',
-    bgColor: 'rgba(0, 188, 212, 0.15)',
-    premios: [
-      { valor: 50, peso: 30 },
-      { valor: 75, peso: 25 },
-      { valor: 100, peso: 25 },
-      { valor: 150, peso: 20 },
-    ],
-  },
-  {
-    id: 'ticket_elevado',
-    titulo: 'Ticket Elevado',
-    descricao: '1+ venda acima de R$ 400',
-    frequencia: '1x a cada 2 dias',
-    icon: <TrendingUp className="w-5 h-5" />,
-    color: '#4CAF50',
-    bgColor: 'rgba(76, 175, 80, 0.15)',
-    premios: [
-      { valor: 150, peso: 20 },
-      { valor: 200, peso: 25 },
-      { valor: 250, peso: 30 },
-      { valor: 300, peso: 25 },
-    ],
-  },
-  {
-    id: 'meta_semanal',
-    titulo: 'Meta Semanal',
-    descricao: '50% da meta semanal atingida',
-    frequencia: '1x por semana',
-    icon: <Target className="w-5 h-5" />,
-    color: '#FF9800',
-    bgColor: 'rgba(255, 152, 0, 0.15)',
-    premios: [
-      { valor: 300, peso: 30 },
-      { valor: 500, peso: 25 },
-      { valor: 750, peso: 25 },
-      { valor: 1000, peso: 20 },
-    ],
-  },
-  {
-    id: 'conversao_alta',
-    titulo: 'Conversão Alta',
-    descricao: 'Taxa de conversão acima de 25%',
-    frequencia: '1x por semana',
-    icon: <Trophy className="w-5 h-5" />,
-    color: '#9C27B0',
-    bgColor: 'rgba(156, 39, 176, 0.15)',
-    premios: [
-      { valor: 250, peso: 25 },
-      { valor: 400, peso: 25 },
-      { valor: 600, peso: 30 },
-      { valor: 1000, peso: 20 },
-    ],
-  },
-  {
-    id: 'combo_semanal',
-    titulo: 'Combo Semanal',
-    descricao: '3+ objetivos na mesma semana',
-    frequencia: '1x por semana',
-    icon: <Crown className="w-5 h-5" />,
-    color: '#FFD700',
-    bgColor: 'rgba(255, 215, 0, 0.15)',
-    premios: [
-      { valor: 500, peso: 25 },
-      { valor: 750, peso: 25 },
-      { valor: 1000, peso: 30 },
-      { valor: 1500, peso: 20 },
-    ],
-  },
-];
-
-const STORAGE_KEY_SPINS = 'roleta_historico';
-const STORAGE_KEY_LIMITS = 'roleta_limites';
+const STORAGE_KEY_SPINS = 'roleta_historico_v2';
+const STORAGE_KEY_LIMITS = 'roleta_limites_v2';
 
 function loadSpins(): SpinRecord[] {
   try {
@@ -116,75 +84,96 @@ function loadSpins(): SpinRecord[] {
     return saved ? JSON.parse(saved) : [];
   } catch { return []; }
 }
-
 function saveSpins(spins: SpinRecord[]) {
   localStorage.setItem(STORAGE_KEY_SPINS, JSON.stringify(spins));
 }
-
 function loadLimits(): Record<string, string> {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_LIMITS);
     return saved ? JSON.parse(saved) : {};
   } catch { return {}; }
 }
-
 function saveLimits(limits: Record<string, string>) {
   localStorage.setItem(STORAGE_KEY_LIMITS, JSON.stringify(limits));
 }
 
-function weightedRandom(premios: { valor: number; peso: number }[]): number {
-  const totalWeight = premios.reduce((s, p) => s + p.peso, 0);
+function weightedRandom(prizes: PrizeOption[]): PrizeOption {
+  const totalWeight = prizes.reduce((s, p) => s + p.peso, 0);
   let r = Math.random() * totalWeight;
-  for (const p of premios) {
+  for (const p of prizes) {
     r -= p.peso;
-    if (r <= 0) return p.valor;
+    if (r <= 0) return p;
   }
-  return premios[premios.length - 1].valor;
+  return prizes[prizes.length - 1];
 }
 
 export default function RoletaPage() {
   const { vendedores, clientes, vendedorStats } = useSalesData();
   const [selectedVendedor, setSelectedVendedor] = useState('');
-  const [selectedTier, setSelectedTier] = useState('');
+  const [selectedMotivo, setSelectedMotivo] = useState('');
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<{ premio: number; tier: TierConfig } | null>(null);
+  const [result, setResult] = useState<{ prize: PrizeOption; motive: MotiveConfig } | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [spins, setSpins] = useState<SpinRecord[]>(loadSpins);
-  const [rotation, setRotation] = useState(0);
   const [validationError, setValidationError] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animFrameRef = useRef<number>(0);
+  const [wheelAngle, setWheelAngle] = useState(0);
+  const spinVelocityRef = useRef(0);
+  const targetPrizeRef = useRef<PrizeOption | null>(null);
 
-  const currentTier = useMemo(() => TIERS.find(t => t.id === selectedTier), [selectedTier]);
+  const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
 
   // Draw wheel
-  useEffect(() => {
+  const drawWheel = useCallback((angle: number) => {
     const canvas = canvasRef.current;
-    if (!canvas || !currentTier) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const size = canvas.width;
-    const center = size / 2;
-    const radius = center - 10;
-    const segments = currentTier.premios.length;
+    const dpr = window.devicePixelRatio || 1;
+    const displaySize = 320;
+    canvas.width = displaySize * dpr;
+    canvas.height = displaySize * dpr;
+    canvas.style.width = `${displaySize}px`;
+    canvas.style.height = `${displaySize}px`;
+    ctx.scale(dpr, dpr);
+
+    const center = displaySize / 2;
+    const radius = center - 15;
+    const segments = PRIZES.length;
     const anglePerSegment = (Math.PI * 2) / segments;
 
-    ctx.clearRect(0, 0, size, size);
+    ctx.clearRect(0, 0, displaySize, displaySize);
 
-    currentTier.premios.forEach((p, i) => {
-      const startAngle = i * anglePerSegment + (rotation * Math.PI / 180);
+    // Outer ring glow
+    ctx.beginPath();
+    ctx.arc(center, center, radius + 6, 0, Math.PI * 2);
+    const glowGrad = ctx.createRadialGradient(center, center, radius - 5, center, center, radius + 8);
+    glowGrad.addColorStop(0, 'rgba(79, 110, 247, 0)');
+    glowGrad.addColorStop(1, 'rgba(79, 110, 247, 0.3)');
+    ctx.fillStyle = glowGrad;
+    ctx.fill();
+
+    PRIZES.forEach((p, i) => {
+      const startAngle = i * anglePerSegment + angle;
       const endAngle = startAngle + anglePerSegment;
 
-      // Segment
+      // Segment fill
       ctx.beginPath();
       ctx.moveTo(center, center);
       ctx.arc(center, center, radius, startAngle, endAngle);
       ctx.closePath();
-      const lightness = 25 + (i * 12);
-      ctx.fillStyle = `hsl(${parseInt(currentTier.color.slice(1), 16) % 360}, 60%, ${lightness}%)`;
+
+      const grad = ctx.createRadialGradient(center, center, 0, center, center, radius);
+      grad.addColorStop(0, adjustBrightness(p.color, 0.6));
+      grad.addColorStop(1, p.color);
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.lineWidth = 2;
+
+      // Segment border
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
 
       // Text
@@ -192,41 +181,77 @@ export default function RoletaPage() {
       ctx.translate(center, center);
       ctx.rotate(startAngle + anglePerSegment / 2);
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Wrap text for long labels
+      const label = p.label;
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 16px system-ui';
-      ctx.fillText(`R$ ${p.valor}`, radius * 0.6, 5);
+      ctx.font = 'bold 11px Inter, system-ui';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 3;
+
+      const words = label.split(' ');
+      if (words.length <= 2) {
+        ctx.fillText(label, radius * 0.62, 0);
+      } else {
+        const mid = Math.ceil(words.length / 2);
+        ctx.fillText(words.slice(0, mid).join(' '), radius * 0.62, -7);
+        ctx.fillText(words.slice(mid).join(' '), radius * 0.62, 7);
+      }
+      ctx.shadowBlur = 0;
       ctx.restore();
     });
 
     // Center circle
+    const centerGrad = ctx.createRadialGradient(center, center, 0, center, center, 30);
+    centerGrad.addColorStop(0, '#2a2d4a');
+    centerGrad.addColorStop(1, '#1a1d35');
     ctx.beginPath();
-    ctx.arc(center, center, 25, 0, Math.PI * 2);
-    ctx.fillStyle = currentTier.color;
+    ctx.arc(center, center, 28, 0, Math.PI * 2);
+    ctx.fillStyle = centerGrad;
     ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Center icon
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🎰', center, center);
 
     // Pointer (top)
     ctx.beginPath();
-    ctx.moveTo(center - 12, 5);
-    ctx.lineTo(center + 12, 5);
-    ctx.lineTo(center, 30);
+    ctx.moveTo(center - 14, 4);
+    ctx.lineTo(center + 14, 4);
+    ctx.lineTo(center, 28);
     ctx.closePath();
     ctx.fillStyle = '#fff';
     ctx.fill();
-  }, [currentTier, rotation]);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }, []);
+
+  useEffect(() => {
+    drawWheel(wheelAngle);
+  }, [wheelAngle, drawWheel]);
+
+  // Initial draw
+  useEffect(() => {
+    drawWheel(0);
+  }, [drawWheel]);
 
   const validateSpin = useCallback((): string | null => {
     if (!selectedVendedor) return 'Selecione um vendedor';
-    if (!selectedTier) return 'Selecione um motivo';
+    if (!selectedMotivo) return 'Selecione um motivo';
 
     const vendedor = vendedores.find(v => v.nome === selectedVendedor);
     if (!vendedor) return 'Vendedor não encontrado';
 
-    const today = new Date().toLocaleDateString('pt-BR');
     const limits = loadLimits();
-    const limitKey = `${selectedVendedor}_${selectedTier}`;
+    const limitKey = `${selectedVendedor}_${selectedMotivo}`;
     const lastSpin = limits[limitKey];
 
     if (lastSpin) {
@@ -234,45 +259,48 @@ export default function RoletaPage() {
       const now = new Date();
       const diffHours = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60);
 
-      if (selectedTier === 'volume_diario' && diffHours < 24) {
+      if (selectedMotivo === 'volume_diario' && diffHours < 24) {
         return `Próxima girada disponível em ${Math.ceil(24 - diffHours)}h`;
       }
-      if (selectedTier === 'ticket_elevado' && diffHours < 48) {
-        return `Próxima girada disponível em ${Math.ceil(48 - diffHours)}h`;
-      }
-      if (['meta_semanal', 'conversao_alta', 'combo_semanal'].includes(selectedTier) && diffHours < 168) {
+      if (['meta_semanal_100', 'meta_mensal_70', 'meta_mensal_100'].includes(selectedMotivo) && diffHours < 168) {
         return `Próxima girada disponível em ${Math.ceil(168 - diffHours)}h`;
       }
     }
 
     // Validate actual achievement
+    const today = new Date().toLocaleDateString('pt-BR');
     const vendorClientes = clientes.filter(c => c.vendedor === selectedVendedor);
     const todayClientes = vendorClientes.filter(c => c.data === today);
+    const stat = vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
 
-    if (selectedTier === 'volume_diario' && todayClientes.length < 3) {
-      return `Você tem ${todayClientes.length} vendas hoje. Precisa de 3+ para girar. 💪`;
+    if (selectedMotivo === 'volume_diario' && todayClientes.length < 3) {
+      return `Você tem ${todayClientes.length} vendas hoje. Precisa de 3 para girar. 💪`;
     }
 
-    if (selectedTier === 'ticket_elevado') {
-      const hasHighTicket = todayClientes.some(c => c.entrada >= 400);
-      if (!hasHighTicket) return 'Nenhuma venda acima de R$ 400 hoje. Continue tentando! 💪';
-    }
-
-    if (selectedTier === 'meta_semanal') {
-      const stat = vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
+    if (selectedMotivo === 'meta_semanal_100') {
       const weeklyTarget = (stat?.vendedor.meta || 0) / 4;
       const weekFat = stat?.faturamento || 0;
-      if (weekFat < weeklyTarget * 0.5) {
-        return `Faturamento: ${fmtFull(weekFat)} / Meta semanal 50%: ${fmtFull(weeklyTarget * 0.5)}. Continue! 💪`;
+      if (weekFat < weeklyTarget) {
+        return `Meta semanal: ${formatPercent(weekFat, weeklyTarget)}. Precisa de 100%. 💪`;
       }
     }
 
-    if (selectedTier === 'conversao_alta') {
-      if (vendorClientes.length < 3) return 'Precisa de pelo menos 3 vendas para calcular conversão.';
+    if (selectedMotivo === 'meta_mensal_70') {
+      const pct = stat?.pctMeta || 0;
+      if (pct < 70) {
+        return `Meta mensal: ${pct.toFixed(1)}%. Precisa de 70%. 💪`;
+      }
+    }
+
+    if (selectedMotivo === 'meta_mensal_100') {
+      const pct = stat?.pctMeta || 0;
+      if (pct < 100) {
+        return `Meta mensal: ${pct.toFixed(1)}%. Precisa de 100%. 💪`;
+      }
     }
 
     return null;
-  }, [selectedVendedor, selectedTier, vendedores, clientes, vendedorStats]);
+  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats]);
 
   const handleSpin = useCallback(() => {
     const error = validateSpin();
@@ -282,49 +310,72 @@ export default function RoletaPage() {
     }
     setValidationError('');
 
-    const tier = TIERS.find(t => t.id === selectedTier)!;
-    const premio = weightedRandom(tier.premios);
+    const prize = weightedRandom(PRIZES);
+    const motive = MOTIVES.find(m => m.id === selectedMotivo)!;
+    targetPrizeRef.current = prize;
+
+    // Calculate target angle to land on the prize
+    const prizeIndex = PRIZES.indexOf(prize);
+    const segAngle = 360 / PRIZES.length;
+    // The pointer is at the top (270° in standard math), we want the prize segment center there
+    const targetSegCenter = prizeIndex * segAngle + segAngle / 2;
+    const stopAngle = (360 - targetSegCenter - 90 + 360) % 360;
+    const fullSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full spins
+    const totalDeg = fullSpins * 360 + stopAngle;
 
     setSpinning(true);
-    
-    // Animate rotation
-    const targetRotation = rotation + 1440 + Math.random() * 360;
-    setRotation(targetRotation);
 
-    setTimeout(() => {
-      setSpinning(false);
-      setResult({ premio, tier });
-      setShowResult(true);
+    // Animate with easing
+    const startAngle = wheelAngle;
+    const duration = 4000;
+    const startTime = performance.now();
 
-      // Save spin record
-      const now = new Date();
-      const record: SpinRecord = {
-        id: `${Date.now()}`,
-        vendedor: selectedVendedor,
-        tier: selectedTier,
-        tierTitulo: tier.titulo,
-        premio,
-        data: now.toLocaleDateString('pt-BR'),
-        hora: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        status: 'pendente',
-      };
-      const updated = [record, ...spins].slice(0, 50);
-      setSpins(updated);
-      saveSpins(updated);
+    const animate = (time: number) => {
+      const elapsed = time - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Cubic ease-out for natural deceleration
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const currentAngle = startAngle + totalDeg * eased;
+      setWheelAngle(currentAngle);
 
-      // Save limit
-      const limits = loadLimits();
-      limits[`${selectedVendedor}_${selectedTier}`] = now.toISOString();
-      saveLimits(limits);
-    }, 3000);
-  }, [selectedVendedor, selectedTier, rotation, spins, validateSpin]);
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        setSpinning(false);
+        setResult({ prize, motive });
+        setShowResult(true);
 
-  const saldoVendedor = useMemo(() => {
-    if (!selectedVendedor) return 0;
-    return spins
-      .filter(s => s.vendedor === selectedVendedor)
-      .reduce((s, r) => s + r.premio, 0);
-  }, [spins, selectedVendedor]);
+        // Save spin record
+        const now = new Date();
+        const record: SpinRecord = {
+          id: `${Date.now()}`,
+          vendedor: selectedVendedor,
+          motivo: selectedMotivo,
+          motivoTitulo: motive.titulo,
+          premio: prize.label,
+          data: now.toLocaleDateString('pt-BR'),
+          hora: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          status: 'pendente',
+        };
+        const updated = [record, ...spins].slice(0, 50);
+        setSpins(updated);
+        saveSpins(updated);
+
+        // Save limit
+        const limits = loadLimits();
+        limits[`${selectedVendedor}_${selectedMotivo}`] = now.toISOString();
+        saveLimits(limits);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+  }, [selectedVendedor, selectedMotivo, wheelAngle, spins, validateSpin]);
+
+  useEffect(() => {
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, []);
 
   const recentSpins = spins.slice(0, 10);
 
@@ -339,9 +390,8 @@ export default function RoletaPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Controls + Wheel */}
+        {/* Left: Controls */}
         <div className="space-y-4">
-          {/* Selectors */}
           <div className="glass-card p-5 space-y-4">
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Selecione seu vendedor</label>
@@ -361,29 +411,22 @@ export default function RoletaPage() {
 
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Por qual motivo você está girando?</label>
-              <Select value={selectedTier} onValueChange={v => { setSelectedTier(v); setValidationError(''); }}>
+              <Select value={selectedMotivo} onValueChange={v => { setSelectedMotivo(v); setValidationError(''); }}>
                 <SelectTrigger className="bg-secondary border-border/50">
-                  <SelectValue placeholder="Selecione o tier..." />
+                  <SelectValue placeholder="Selecione o motivo..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIERS.map(t => (
-                    <SelectItem key={t.id} value={t.id}>
+                  {MOTIVES.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
                       <div className="flex items-center gap-2">
-                        <span>{t.titulo}</span>
-                        <span className="text-xs text-muted-foreground">({t.descricao})</span>
+                        <span>{m.titulo}</span>
+                        <span className="text-xs text-muted-foreground">({m.descricao})</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedVendedor && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Trophy className="w-4 h-4 text-kpi-goal-pct" />
-                Saldo acumulado: <span className="text-foreground font-semibold">{fmtFull(saldoVendedor)}</span>
-              </div>
-            )}
 
             {validationError && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
@@ -393,28 +436,41 @@ export default function RoletaPage() {
 
             <Button
               onClick={handleSpin}
-              disabled={spinning || !selectedVendedor || !selectedTier}
+              disabled={spinning || !selectedVendedor || !selectedMotivo}
               className="w-full h-12 text-lg font-bold"
-              style={{ background: currentTier?.color || undefined }}
+              style={{ background: currentMotive?.color || undefined }}
             >
               {spinning ? '🎡 Girando...' : '🎰 GIRAR A ROLETA'}
             </Button>
           </div>
 
-          {/* Tiers info */}
+          {/* Motives info */}
           <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Tiers de Prêmios</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Motivos para Girar</h3>
             <div className="space-y-2">
-              {TIERS.map(t => (
-                <div key={t.id} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: t.bgColor }}>
-                  <div className="shrink-0" style={{ color: t.color }}>{t.icon}</div>
+              {MOTIVES.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: m.bgColor }}>
+                  <div className="shrink-0" style={{ color: m.color }}>{m.icon}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{t.titulo}</p>
-                    <p className="text-xs text-muted-foreground">{t.descricao} • {t.frequencia}</p>
+                    <p className="text-sm font-medium text-foreground">{m.titulo}</p>
+                    <p className="text-xs text-muted-foreground">{m.descricao}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {fmtFull(t.premios[0].valor)} – {fmtFull(t.premios[t.premios.length - 1].valor)}
-                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Prizes info */}
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Prêmios Possíveis</h3>
+            <div className="space-y-1.5">
+              {PRIZES.map(p => (
+                <div key={p.label} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ background: p.color }} />
+                    <span className="text-foreground">{p.label}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{p.peso}%</span>
                 </div>
               ))}
             </div>
@@ -423,24 +479,13 @@ export default function RoletaPage() {
 
         {/* Right: Wheel + History */}
         <div className="space-y-4">
-          {/* Wheel */}
           <div className="glass-card p-5 flex flex-col items-center">
-            <h3 className="text-sm font-semibold text-foreground mb-4">
-              {currentTier ? `🎡 ${currentTier.titulo}` : '🎡 Selecione um tier para ver a roleta'}
-            </h3>
+            <h3 className="text-sm font-semibold text-foreground mb-4">🎡 Gire e descubra seu prêmio!</h3>
             <div className="relative">
               <canvas
                 ref={canvasRef}
-                width={300}
-                height={300}
-                className="transition-transform duration-[3000ms] ease-out"
-                style={{ transform: `rotate(${rotation}deg)` }}
+                style={{ width: 320, height: 320 }}
               />
-              {!currentTier && (
-                <div className="absolute inset-0 flex items-center justify-center bg-secondary/80 rounded-full">
-                  <p className="text-muted-foreground text-sm text-center px-8">Selecione um vendedor e tier para começar</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -455,17 +500,17 @@ export default function RoletaPage() {
             ) : (
               <div className="space-y-2">
                 {recentSpins.map(s => {
-                  const tier = TIERS.find(t => t.id === s.tier);
+                  const motive = MOTIVES.find(m => m.id === s.motivo);
                   return (
                     <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{s.vendedor}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: tier?.bgColor, color: tier?.color }}>
-                          {s.tierTitulo}
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: motive?.bgColor, color: motive?.color }}>
+                          {s.motivoTitulo}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-bold text-foreground">{fmtFull(s.premio)}</span>
+                        <span className="font-bold text-foreground">{s.premio}</span>
                         <span className="text-xs text-muted-foreground">{s.data} {s.hora}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'pago' ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'}`}>
                           {s.status === 'pago' ? '✅ Pago' : '⏳ Pendente'}
@@ -488,19 +533,17 @@ export default function RoletaPage() {
           </DialogHeader>
           {result && (
             <div className="space-y-4 py-4">
-              <div className="text-5xl font-bold" style={{ color: result.tier.color }}>
-                {fmtFull(result.premio)}
+              <div className="text-4xl font-bold" style={{ color: result.prize.color }}>
+                🎁 {result.prize.label}
               </div>
               <p className="text-muted-foreground">
-                Motivo: <span className="text-foreground font-medium">{result.tier.titulo}</span>
+                Motivo: <span className="text-foreground font-medium">{result.motive.titulo}</span>
               </p>
               <p className="text-sm text-muted-foreground">
-                {result.premio >= 500 ? 'UAUUU! Merecido! 🤑' : 'Que legal! Continue assim! ⚡'}
+                {result.prize.peso <= 6 ? 'UAUUU! Que sorte incrível! 🤑' : 'Que legal! Continue assim! ⚡'}
               </p>
               <div className="flex gap-3 justify-center pt-2">
-                <Button onClick={() => setShowResult(false)}>
-                  Voltar
-                </Button>
+                <Button onClick={() => setShowResult(false)}>Voltar</Button>
               </div>
             </div>
           )}
@@ -508,4 +551,16 @@ export default function RoletaPage() {
       </Dialog>
     </div>
   );
+}
+
+function adjustBrightness(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgb(${Math.round(r * factor)}, ${Math.round(g * factor)}, ${Math.round(b * factor)})`;
+}
+
+function formatPercent(value: number, total: number): string {
+  if (total === 0) return '0%';
+  return `${((value / total) * 100).toFixed(1)}%`;
 }

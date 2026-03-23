@@ -118,16 +118,16 @@ export default function PlanilhaPage() {
           <Input placeholder="Buscar por nome, CPF ou email..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="pl-9 bg-secondary border-border/50" />
         </div>
         <Select value={filterVendedor} onValueChange={v => { setFilterVendedor(v); setPage(0); }}>
-          <SelectTrigger className="w-[150px] bg-secondary border-border/50"><SelectValue placeholder="Vendedor" /></SelectTrigger>
+          <SelectTrigger className="w-[180px] bg-secondary border-border/50"><SelectValue placeholder="Vendedor" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos Vendedores</SelectItem>
             {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterServico} onValueChange={v => { setFilterServico(v); setPage(0); }}>
-          <SelectTrigger className="w-[150px] bg-secondary border-border/50"><SelectValue placeholder="Serviço" /></SelectTrigger>
+          <SelectTrigger className="w-[180px] bg-secondary border-border/50"><SelectValue placeholder="Serviço" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos Serviços</SelectItem>
             <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
             <SelectItem value="RATING">Rating</SelectItem>
             <SelectItem value="OUTROS">Outros</SelectItem>
@@ -136,7 +136,7 @@ export default function PlanilhaPage() {
         <Select value={filterSituacao} onValueChange={v => { setFilterSituacao(v); setPage(0); }}>
           <SelectTrigger className="w-[200px] bg-secondary border-border/50"><SelectValue placeholder="Situação" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="all">Todas Situações</SelectItem>
             {situacoes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -210,97 +210,99 @@ export default function PlanilhaPage() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal — properly centered */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{editingId !== null ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente abaixo.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Data</Label>
-              <Input value={form.data} onChange={e => updateFormField('data', e.target.value)} placeholder="DD/MM/YYYY" />
-            </div>
-            <div className="space-y-2">
-              <Label>Nome Completo</Label>
-              <Input value={form.nome} onChange={e => updateFormField('nome', e.target.value.toUpperCase())} />
-            </div>
-            <div className="space-y-2">
-              <Label>CPF / CNPJ</Label>
-              <Input value={form.cpf} onChange={e => updateFormField('cpf', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Data de Nascimento</Label>
-              <Input value={form.nascimento} onChange={e => updateFormField('nascimento', e.target.value)} placeholder="DD/MM/YYYY" />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={e => updateFormField('email', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input value={form.telefone} onChange={e => updateFormField('telefone', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Serviço</Label>
-              <Select value={form.servico} onValueChange={v => updateFormField('servico', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
-                  <SelectItem value="RATING">Rating</SelectItem>
-                  <SelectItem value="OUTROS">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Vendedor</Label>
-              <Select value={form.vendedor} onValueChange={v => updateFormField('vendedor', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Entrada (R$)</Label>
-              <Input type="number" value={form.entrada} onChange={e => updateFormField('entrada', Number(e.target.value))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Situação</Label>
-              <Input value={form.situacao} onChange={e => updateFormField('situacao', e.target.value.toUpperCase())} />
-            </div>
-            <div className="col-span-full border-t border-border/30 pt-4">
-              <p className="text-sm font-medium text-foreground mb-3">Parcelas</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>1ª Parcela (R$)</Label>
-                  <Input type="number" value={form.parcela1.valor} onChange={e => setForm(f => ({ ...f, parcela1: { ...f.parcela1, valor: Number(e.target.value) } }))} />
-                  <Select value={form.parcela1.status} onValueChange={v => setForm(f => ({ ...f, parcela1: { ...f.parcela1, status: v as any } }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
-                      <SelectItem value="PAGO">Pago</SelectItem>
-                      <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>2ª Parcela (R$)</Label>
-                  <Input type="number" value={form.parcela2.valor} onChange={e => setForm(f => ({ ...f, parcela2: { ...f.parcela2, valor: Number(e.target.value) } }))} />
-                  <Select value={form.parcela2.status} onValueChange={v => setForm(f => ({ ...f, parcela2: { ...f.parcela2, status: v as any } }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
-                      <SelectItem value="PAGO">Pago</SelectItem>
-                      <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <div className="overflow-y-auto flex-1 pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Data</Label>
+                <Input value={form.data} onChange={e => updateFormField('data', e.target.value)} placeholder="DD/MM/YYYY" />
+              </div>
+              <div className="space-y-2">
+                <Label>Nome Completo</Label>
+                <Input value={form.nome} onChange={e => updateFormField('nome', e.target.value.toUpperCase())} />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF / CNPJ</Label>
+                <Input value={form.cpf} onChange={e => updateFormField('cpf', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Data de Nascimento</Label>
+                <Input value={form.nascimento} onChange={e => updateFormField('nascimento', e.target.value)} placeholder="DD/MM/YYYY" />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={form.email} onChange={e => updateFormField('email', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input value={form.telefone} onChange={e => updateFormField('telefone', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Serviço</Label>
+                <Select value={form.servico} onValueChange={v => updateFormField('servico', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
+                    <SelectItem value="RATING">Rating</SelectItem>
+                    <SelectItem value="OUTROS">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Vendedor</Label>
+                <Select value={form.vendedor} onValueChange={v => updateFormField('vendedor', v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Entrada (R$)</Label>
+                <Input type="number" value={form.entrada} onChange={e => updateFormField('entrada', Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Situação</Label>
+                <Input value={form.situacao} onChange={e => updateFormField('situacao', e.target.value.toUpperCase())} />
+              </div>
+              <div className="col-span-full border-t border-border/30 pt-4">
+                <p className="text-sm font-medium text-foreground mb-3">Parcelas</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>1ª Parcela (R$)</Label>
+                    <Input type="number" value={form.parcela1.valor} onChange={e => setForm(f => ({ ...f, parcela1: { ...f.parcela1, valor: Number(e.target.value) } }))} />
+                    <Select value={form.parcela1.status} onValueChange={v => setForm(f => ({ ...f, parcela1: { ...f.parcela1, status: v as any } }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                        <SelectItem value="PAGO">Pago</SelectItem>
+                        <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>2ª Parcela (R$)</Label>
+                    <Input type="number" value={form.parcela2.valor} onChange={e => setForm(f => ({ ...f, parcela2: { ...f.parcela2, valor: Number(e.target.value) } }))} />
+                    <Select value={form.parcela2.status} onValueChange={v => setForm(f => ({ ...f, parcela2: { ...f.parcela2, status: v as any } }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                        <SelectItem value="PAGO">Pago</SelectItem>
+                        <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-border/30 pt-4">
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave}>Salvar</Button>
           </DialogFooter>
