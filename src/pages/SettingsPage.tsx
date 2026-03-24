@@ -337,6 +337,8 @@ export default function SettingsPage() {
           </table>
         </div>
       </div>
+
+      {isAdmin && <MetaAdsIntegration />}
     </div>
   );
 }
