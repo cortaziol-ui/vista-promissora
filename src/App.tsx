@@ -36,13 +36,11 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary] Crash detected, auto-resetting data:", error, info);
-    // Clear all salesData keys to recover from corrupted state
     try {
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('salesData')) localStorage.removeItem(key);
       });
     } catch { /* ignore */ }
-    // Reload after a brief delay so the user sees a flash, not a white screen
     setTimeout(() => window.location.reload(), 500);
   }
 
@@ -61,26 +59,42 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+type AllowedRole = 'admin' | 'manager' | 'seller';
+
+function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: AllowedRole[] }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(user.role)) {
+    // Redirect to the default page for the user's role
+    const defaultRoute = user.role === 'seller' ? '/vendas' : '/';
+    return <Navigate to={defaultRoute} replace />;
+  }
   return <DashboardLayout>{children}</DashboardLayout>;
 }
 
 function AppRoutes() {
   const { user } = useAuth();
+  const defaultRoute = user?.role === 'seller' ? '/vendas' : '/';
+
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/" element={<ProtectedRoute><OverviewPage /></ProtectedRoute>} />
-      <Route path="/vendas" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
-      <Route path="/marketing" element={<ProtectedRoute><MarketingPage /></ProtectedRoute>} />
-      <Route path="/satisfacao" element={<ProtectedRoute><SatisfactionPage /></ProtectedRoute>} />
-      <Route path="/financeiro" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
-      <Route path="/planilha" element={<ProtectedRoute><PlanilhaPage /></ProtectedRoute>} />
+      <Route path="/login" element={user ? <Navigate to={defaultRoute} replace /> : <LoginPage />} />
+      
+      {/* Admin + Manager only */}
+      <Route path="/" element={<ProtectedRoute roles={['admin', 'manager']}><OverviewPage /></ProtectedRoute>} />
+      <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager']}><MarketingPage /></ProtectedRoute>} />
+      <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager']}><SatisfactionPage /></ProtectedRoute>} />
+      <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager']}><PlanilhaPage /></ProtectedRoute>} />
+      
+      {/* Admin only */}
+      <Route path="/financeiro" element={<ProtectedRoute roles={['admin']}><FinancialPage /></ProtectedRoute>} />
+      <Route path="/configuracoes" element={<ProtectedRoute roles={['admin']}><SettingsPage /></ProtectedRoute>} />
+      
+      {/* All roles */}
+      <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><SalesPage /></ProtectedRoute>} />
+      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-      <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-      <Route path="/roleta" element={<ProtectedRoute><RoletaPage /></ProtectedRoute>} />
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

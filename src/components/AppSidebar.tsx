@@ -10,25 +10,37 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
 
-const navItems = [
-  { title: 'Visão Geral', url: '/', icon: Home },
-  { title: 'Vendas', url: '/vendas', icon: BarChart3 },
-  { title: 'Marketing', url: '/marketing', icon: Megaphone },
-  { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus },
-  { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
-  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList },
-  { title: 'Roleta Premiada', url: '/roleta', icon: Gift },
+interface NavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: ('admin' | 'manager' | 'seller')[];
+}
+
+const allNavItems: NavItem[] = [
+  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin', 'manager'] },
+  { title: 'Vendas', url: '/vendas', icon: BarChart3, roles: ['admin', 'manager', 'seller'] },
+  { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager'] },
+  { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager'] },
+  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin'] },
+  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager'] },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller'] },
 ];
 
-const adminItems = [
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
+const adminItems: NavItem[] = [
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin'] },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { user, logout, isAdmin, isManager } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const userRole = user?.role || 'seller';
+
+  const visibleNavItems = allNavItems.filter(item => item.roles.includes(userRole));
+  const visibleAdminItems = adminItems.filter(item => item.roles.includes(userRole));
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('app-theme') as 'dark' | 'light') || 'dark';
@@ -63,7 +75,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.url === '/'} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
@@ -77,12 +89,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {(isAdmin || isManager) && (
+        {visibleAdminItems.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>Administração</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.map((item) => (
+                {visibleAdminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
                       <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
