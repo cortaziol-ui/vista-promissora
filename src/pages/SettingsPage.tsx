@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import MetaAdsIntegration from '@/components/MetaAdsIntegration';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
