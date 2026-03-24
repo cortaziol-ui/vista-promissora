@@ -18,7 +18,7 @@ export default function LoginPage() {
     if (login(email, password)) {
       navigate('/');
     } else {
-      toast({ title: 'Erro', description: 'Email não encontrado. Tente: carlos@empresa.com, ana@empresa.com, rafael@empresa.com', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Email ou senha incorretos.', variant: 'destructive' });
     }
   };
 
@@ -66,11 +66,11 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 glass-card p-4">
-          <p className="text-xs text-muted-foreground mb-2">Logins de teste:</p>
+          <p className="text-xs text-muted-foreground mb-2">Logins disponíveis:</p>
           <div className="space-y-1 text-xs text-muted-foreground">
-            <p><span className="text-kpi-revenue">Admin:</span> carlos@empresa.com</p>
-            <p><span className="text-kpi-goal">Gerente:</span> ana@empresa.com</p>
-            <p><span className="text-kpi-ticket">Vendedor:</span> rafael@empresa.com</p>
+            <p><span className="text-kpi-revenue">Admin:</span> caio@empresa.com</p>
+            <p><span className="text-kpi-goal">Gerente:</span> cunha@empresa.com</p>
+            <p><span className="text-kpi-ticket">Vendedores:</span> bianca@empresa.com, nayra@empresa.com, lucas@empresa.com, gustavo@empresa.com</p>
           </div>
         </div>
       </div>
