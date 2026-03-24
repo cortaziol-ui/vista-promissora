@@ -11,7 +11,7 @@ interface PrizeOption {
   color: string;
 }
 
-const PRIZES: PrizeOption[] = [
+const PRIZES_VOLUME_DIARIO: PrizeOption[] = [
   { label: 'Monster / Red Bull', peso: 35, color: '#00BCD4' },
   { label: 'Coca + Salgado', peso: 25, color: '#4CAF50' },
   { label: 'Vale Marmita R$ 20', peso: 20, color: '#FF9800' },
@@ -19,6 +19,40 @@ const PRIZES: PrizeOption[] = [
   { label: 'Pix de R$ 30', peso: 6, color: '#E91E63' },
   { label: 'Pix de R$ 50', peso: 2, color: '#FFD700' },
 ];
+
+const PRIZES_META_SEMANAL: PrizeOption[] = [
+  { label: 'Pix de R$ 40', peso: 40, color: '#4CAF50' },
+  { label: 'Caixa de Monster', peso: 25, color: '#00BCD4' },
+  { label: 'Vale iFood R$ 50', peso: 10, color: '#FF5722' },
+  { label: 'Pix de R$ 60', peso: 10, color: '#9C27B0' },
+  { label: 'Saída 1h mais cedo', peso: 10, color: '#E91E63' },
+  { label: 'Vale Transp/Gas R$ 100', peso: 5, color: '#FFD700' },
+];
+
+const PRIZES_META_MENSAL_70: PrizeOption[] = [
+  { label: 'Vale Almoço R$ 50', peso: 26, color: '#FF9800' },
+  { label: '1 Pack Monster + Lanche', peso: 24, color: '#00BCD4' },
+  { label: 'Meio período off', peso: 18, color: '#E91E63' },
+  { label: 'Pix de R$ 50', peso: 12, color: '#9C27B0' },
+  { label: 'Vale Combustível R$ 150', peso: 10, color: '#4CAF50' },
+  { label: 'Pix de R$ 100', peso: 10, color: '#FFD700' },
+];
+
+const PRIZES_META_MENSAL_100: PrizeOption[] = [
+  { label: 'Day off', peso: 20, color: '#00BCD4' },
+  { label: 'Vale Massagem', peso: 20, color: '#E91E63' },
+  { label: 'Jantar p/ 2 até R$ 150', peso: 20, color: '#FF9800' },
+  { label: 'Vale Almoço R$ 80', peso: 20, color: '#4CAF50' },
+  { label: 'Pix de R$ 100', peso: 15, color: '#9C27B0' },
+  { label: 'Pix de R$ 200', peso: 5, color: '#FFD700' },
+];
+
+const PRIZE_MAP: Record<string, PrizeOption[]> = {
+  volume_diario: PRIZES_VOLUME_DIARIO,
+  meta_semanal_100: PRIZES_META_SEMANAL,
+  meta_mensal_70: PRIZES_META_MENSAL_70,
+  meta_mensal_100: PRIZES_META_MENSAL_100,
+};
 
 interface MotiveConfig {
   id: string;
@@ -119,13 +153,13 @@ export default function RoletaPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const [wheelAngle, setWheelAngle] = useState(0);
-  const spinVelocityRef = useRef(0);
   const targetPrizeRef = useRef<PrizeOption | null>(null);
 
   const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
+  const currentPrizes = useMemo(() => PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO, [selectedMotivo]);
 
   // Draw wheel
-  const drawWheel = useCallback((angle: number) => {
+  const drawWheel = useCallback((angle: number, prizes: PrizeOption[]) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -141,7 +175,7 @@ export default function RoletaPage() {
 
     const center = displaySize / 2;
     const radius = center - 15;
-    const segments = PRIZES.length;
+    const segments = prizes.length;
     const anglePerSegment = (Math.PI * 2) / segments;
 
     ctx.clearRect(0, 0, displaySize, displaySize);
@@ -155,11 +189,10 @@ export default function RoletaPage() {
     ctx.fillStyle = glowGrad;
     ctx.fill();
 
-    PRIZES.forEach((p, i) => {
+    prizes.forEach((p, i) => {
       const startAngle = i * anglePerSegment + angle;
       const endAngle = startAngle + anglePerSegment;
 
-      // Segment fill
       ctx.beginPath();
       ctx.moveTo(center, center);
       ctx.arc(center, center, radius, startAngle, endAngle);
@@ -171,22 +204,19 @@ export default function RoletaPage() {
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // Segment border
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Text
       ctx.save();
       ctx.translate(center, center);
       ctx.rotate(startAngle + anglePerSegment / 2);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Wrap text for long labels
       const label = p.label;
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px Inter, system-ui';
+      ctx.font = 'bold 10px Inter, system-ui';
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 3;
 
@@ -214,7 +244,6 @@ export default function RoletaPage() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Center icon
     ctx.fillStyle = '#fff';
     ctx.font = '20px serif';
     ctx.textAlign = 'center';
@@ -235,13 +264,12 @@ export default function RoletaPage() {
   }, []);
 
   useEffect(() => {
-    drawWheel(wheelAngle);
-  }, [wheelAngle, drawWheel]);
+    drawWheel(wheelAngle, currentPrizes);
+  }, [wheelAngle, drawWheel, currentPrizes]);
 
-  // Initial draw
   useEffect(() => {
-    drawWheel(0);
-  }, [drawWheel]);
+    drawWheel(0, currentPrizes);
+  }, [drawWheel, currentPrizes]);
 
   const validateSpin = useCallback((): string | null => {
     if (!selectedVendedor) return 'Selecione um vendedor';
@@ -267,7 +295,6 @@ export default function RoletaPage() {
       }
     }
 
-    // Validate actual achievement
     const today = new Date().toLocaleDateString('pt-BR');
     const vendorClientes = clientes.filter(c => c.vendedor === selectedVendedor);
     const todayClientes = vendorClientes.filter(c => c.data === today);
@@ -310,31 +337,29 @@ export default function RoletaPage() {
     }
     setValidationError('');
 
-    const prize = weightedRandom(PRIZES);
+    const prizes = PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO;
+    const prize = weightedRandom(prizes);
     const motive = MOTIVES.find(m => m.id === selectedMotivo)!;
     targetPrizeRef.current = prize;
 
-    // Calculate target angle to land on the prize
-    const prizeIndex = PRIZES.indexOf(prize);
-    const segAngle = 360 / PRIZES.length;
-    // The pointer is at the top (270° in standard math), we want the prize segment center there
+    const prizeIndex = prizes.indexOf(prize);
+    const segAngle = 360 / prizes.length;
     const targetSegCenter = prizeIndex * segAngle + segAngle / 2;
     const stopAngle = (360 - targetSegCenter - 90 + 360) % 360;
-    const fullSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full spins
+    const fullSpins = 5 + Math.floor(Math.random() * 3);
     const totalDeg = fullSpins * 360 + stopAngle;
 
     setSpinning(true);
 
-    // Animate with easing
     const startAngle = wheelAngle;
-    const duration = 4000;
+    const duration = 5000;
     const startTime = performance.now();
 
     const animate = (time: number) => {
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Cubic ease-out for natural deceleration
-      const eased = 1 - Math.pow(1 - progress, 3);
+      // Quartic ease-out for more dramatic deceleration
+      const eased = 1 - Math.pow(1 - progress, 4);
       const currentAngle = startAngle + totalDeg * eased;
       setWheelAngle(currentAngle);
 
@@ -345,7 +370,6 @@ export default function RoletaPage() {
         setResult({ prize, motive });
         setShowResult(true);
 
-        // Save spin record
         const now = new Date();
         const record: SpinRecord = {
           id: `${Date.now()}`,
@@ -361,7 +385,6 @@ export default function RoletaPage() {
         setSpins(updated);
         saveSpins(updated);
 
-        // Save limit
         const limits = loadLimits();
         limits[`${selectedVendedor}_${selectedMotivo}`] = now.toISOString();
         saveLimits(limits);
@@ -460,11 +483,13 @@ export default function RoletaPage() {
             </div>
           </div>
 
-          {/* Prizes info */}
+          {/* Prizes info - show based on selected motive */}
           <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Prêmios Possíveis</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Prêmios — {currentMotive?.titulo || 'Volume Diário'}
+            </h3>
             <div className="space-y-1.5">
-              {PRIZES.map(p => (
+              {currentPrizes.map(p => (
                 <div key={p.label} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ background: p.color }} />

@@ -10,6 +10,8 @@ export interface User {
   avatar: string;
   position: string;
   status: 'active' | 'inactive';
+  password: string;
+  sellerName?: string; // maps to vendedor name in SalesDataContext
 }
 
 interface AuthContextType {
@@ -22,13 +24,12 @@ interface AuthContextType {
 }
 
 const appUsers: User[] = [
-  { id: 'u1', name: 'Carlos Mendes', email: 'carlos@empresa.com', role: 'admin', avatar: '👤', position: 'Diretor Comercial', status: 'active' },
-  { id: 'u2', name: 'Ana Souza', email: 'ana@empresa.com', role: 'manager', avatar: '👤', position: 'Gerente de Vendas', status: 'active' },
-  { id: 'u3', name: 'Bianca', email: 'bianca@empresa.com', role: 'seller', avatar: '👩', position: 'Vendedora', status: 'active' },
-  { id: 'u4', name: 'Nayra', email: 'nayra@empresa.com', role: 'seller', avatar: '👩', position: 'Vendedora', status: 'active' },
-  { id: 'u5', name: 'Lucas', email: 'lucas@empresa.com', role: 'seller', avatar: '👨', position: 'Vendedor', status: 'active' },
-  { id: 'u6', name: 'Gustavo', email: 'gustavo@empresa.com', role: 'seller', avatar: '👨', position: 'Vendedor', status: 'active' },
-  { id: 'u7', name: 'Cunha', email: 'cunha@empresa.com', role: 'seller', avatar: '👨', position: 'Vendedor Sênior', status: 'active' },
+  { id: 'u1', name: 'Caio', email: 'caio@empresa.com', role: 'admin', avatar: '👤', position: 'Administrador', status: 'active', password: 'Pjw6y0Q' },
+  { id: 'u2', name: 'Cunha', email: 'cunha@empresa.com', role: 'manager', avatar: '👨', position: 'Gerente / Vendedor', status: 'active', password: '8lYG25M', sellerName: 'Cunha' },
+  { id: 'u3', name: 'Bianca', email: 'bianca@empresa.com', role: 'seller', avatar: '👩', position: 'Vendedora', status: 'active', password: 'f5FhKep', sellerName: 'Bianca' },
+  { id: 'u4', name: 'Nayra', email: 'nayra@empresa.com', role: 'seller', avatar: '👩', position: 'Vendedora', status: 'active', password: '9LI86cb', sellerName: 'Nayra' },
+  { id: 'u5', name: 'Lucas', email: 'lucas@empresa.com', role: 'seller', avatar: '👨', position: 'Vendedor', status: 'active', password: 'PiY82Jt', sellerName: 'Lucas' },
+  { id: 'u6', name: 'Gustavo', email: 'gustavo@empresa.com', role: 'seller', avatar: '👨', position: 'Vendedor', status: 'active', password: 'Gjnzy9V', sellerName: 'Gustavo' },
 ];
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
-  const login = (email: string, _password: string) => {
-    const found = appUsers.find(u => u.email === email);
+  const login = (email: string, password: string) => {
+    const found = appUsers.find(u => u.email === email && u.password === password);
     if (found) {
       setUser(found);
       localStorage.setItem('bi-user', JSON.stringify({ id: found.id }));
