@@ -1,35 +1,79 @@
 
 
-## Plan: Fix White Screen with Auto-Reset of Corrupted Data
+## Plan: Meta Ads Integration + Marketing Analytics
 
-### Root Cause
+### Overview
 
-The white screen happens because corrupted data in `localStorage` causes runtime crashes. Specifically:
+Create a Meta Ads integration page in Settings (similar to the reference image) where the user inputs their Access Token, Ad Account ID, currency, and timezone. Then update the Marketing Analytics page to pull real data from Meta's Marketing API via a Supabase Edge Function proxy.
 
-1. **`SalesPage.tsx` line 34**: `c.data.split('/')` crashes if `c.data` is undefined (no optional chaining like the context has)
-2. **`loadFromStorage`**: Only checks `Array.isArray` but does not validate individual client objects — a single malformed record crashes the entire app
-3. **No Error Boundary**: When any page crashes, the entire React tree unmounts to white
+### Architecture
+
+```text
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────┐
+│  Settings Page   │────▶│  localStorage         │◀────│ Marketing   │
+│  (Meta config)   │     │  meta_ads_config       │     │ Page        │
+└─────────────────┘     └──────────────────────┘     └──────┬──────┘
+                                                            │
+                                                   fetch() to Meta API
+                                                   (client-side, using
+                                                    stored access token)
+```
+
+Since there is no backend (Supabase/Edge Functions), the Meta Marketing API will be called directly from the client using the user's long-lived access token stored in localStorage. This is acceptable because the token belongs to the user and is only stored locally.
 
 ### Changes
 
-**1. `src/contexts/SalesDataContext.tsx`** — Harden `loadFromStorage`
-- Add a `validateCliente` function that checks each object has required fields (`data`, `nome`, `entrada`, `parcela1`, `parcela2`)
-- If ANY item fails validation, discard the entire localStorage cache and fall back to defaults (auto-reset)
-- Add a version key (`salesData_v2`) so old corrupted data from previous format is automatically ignored
+**1. New file: `src/components/MetaAdsIntegration.tsx`**
 
-**2. `src/pages/SalesPage.tsx`** — Add safe access
-- Line 34: `c.data.split('/')` → `(c.data || '').split('/')`
-- Same for line 43
+A card component matching the reference image design:
+- Meta Ads header with blue icon + "Conectado" / "Desconectado" badge
+- Textarea for Meta Access Token (masked display)
+- Helper text: "Gere em developers.facebook.com > Tools > Graph API Explorer"
+- Three fields in a row: Ad Account ID, Moeda (BRL), Timezone (America/Sao_Paulo)
+- "Ultima sincronizacao" timestamp
+- Three buttons: "Salvar Conexao", "Testar Conexao", "Sincronizar Agora"
+- Config saved to localStorage key `meta_ads_config`
+- "Testar Conexao" calls Meta API `/me?fields=id,name` to validate token
+- "Sincronizar Agora" fetches campaign insights and caches them
 
-**3. `src/App.tsx`** — Add global Error Boundary
-- Create a class-based `ErrorBoundary` component that catches render errors
-- On error: auto-clear all `salesData_*` keys from localStorage, show a brief message, then reload the page
-- This is the ultimate safety net — if anything else crashes, the app self-heals
+**2. Update `src/pages/SettingsPage.tsx`**
 
-**4. `src/pages/FinancialPage.tsx`** — No changes needed (already uses safe access via context)
+- Import and render `<MetaAdsIntegration />` at the bottom of the settings page (admin only)
 
-### Result
-- App will never show a white screen again
-- If data is corrupted, it silently resets to the 40 default clients
-- User does not need to manually clear localStorage
+**3. New file: `src/lib/metaAdsApi.ts`**
+
+Utility functions to call Meta Marketing API:
+- `testConnection(token)` — GET `/me`
+- `fetchCampaignInsights(token, adAccountId, dateRange)` — GET `/{adAccountId}/insights` with fields: impressions, clicks, spend, cpc, ctr, actions (leads, conversions)
+- `fetchCampaigns(token, adAccountId)` — GET `/{adAccountId}/campaigns` with insights
+- Results cached in localStorage with timestamp
+
+**4. Update `src/pages/MarketingPage.tsx`**
+
+- Check for Meta Ads config in localStorage
+- If connected: fetch real data from Meta API using stored token and show real KPIs (impressions, clicks, spend, CPL, CPC, CTR, conversions)
+- If not connected: show current mock data with a banner "Conecte sua conta Meta Ads em Configuracoes para ver dados reais"
+- Replace mock leads data with Meta insights when available
+- Charts update to show real campaign performance data
+
+**5. Update `src/App.tsx`**
+
+- No new routes needed; Meta integration lives inside the existing Settings page
+
+**6. Update `src/components/AppSidebar.tsx`**
+
+- No changes needed; Marketing and Settings already exist in nav
+
+### Meta API Fields Used
+
+- `/me` — validate token
+- `/{ad_account_id}/insights` — spend, impressions, clicks, cpc, ctr, actions
+- `/{ad_account_id}/campaigns` — campaign-level breakdown
+
+### Important Notes
+
+- Meta API supports CORS for client-side calls with a valid access token
+- Long-lived tokens last ~60 days; the UI will show connection status
+- If the token expires, "Testar Conexao" will fail and update the status badge to "Desconectado"
+- All sensitive data (token) stays in the user's browser only
 
