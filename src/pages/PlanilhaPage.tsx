@@ -212,7 +212,7 @@ export default function PlanilhaPage() {
 
       {/* Add/Edit Modal — properly centered */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle>{editingId !== null ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente abaixo.</DialogDescription>
