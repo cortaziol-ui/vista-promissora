@@ -191,7 +191,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     row.situacao = c.situacao;
     row.valor_total = c.valorTotal;
 
-    const { data, error } = await supabase.from('clientes').insert(row).select().single();
+    const { data, error } = await supabase.from('clientes').insert(row as any).select().single();
     if (data && !error) {
       setClientes(prev => [...prev, mapRowToCliente(data)]);
     }
