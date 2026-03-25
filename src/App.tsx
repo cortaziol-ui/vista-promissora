@@ -35,12 +35,7 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[ErrorBoundary] Crash detected, auto-resetting data:", error, info);
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('salesData')) localStorage.removeItem(key);
-      });
-    } catch { /* ignore */ }
+    console.error("[ErrorBoundary] Crash detected:", error, info);
     setTimeout(() => window.location.reload(), 500);
   }
 
@@ -62,10 +57,21 @@ class ErrorBoundary extends React.Component<
 type AllowedRole = 'admin' | 'manager' | 'seller';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: AllowedRole[] }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) {
-    // Redirect to the default page for the user's role
     const defaultRoute = user.role === 'seller' ? '/vendas' : '/';
     return <Navigate to={defaultRoute} replace />;
   }
@@ -73,8 +79,16 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const defaultRoute = user?.role === 'seller' ? '/vendas' : '/';
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <Routes>
