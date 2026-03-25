@@ -9,13 +9,17 @@ import { useToast } from '@/hooks/use-toast';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(email, password)) {
+    setSubmitting(true);
+    const success = await login(email, password);
+    setSubmitting(false);
+    if (success) {
       navigate('/');
     } else {
       toast({ title: 'Erro', description: 'Email ou senha incorretos.', variant: 'destructive' });
@@ -62,7 +66,9 @@ export default function LoginPage() {
               />
             </div>
           </div>
-          <Button type="submit" className="w-full">Entrar</Button>
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? 'Entrando...' : 'Entrar'}
+          </Button>
         </form>
 
         <div className="mt-6 glass-card p-4">

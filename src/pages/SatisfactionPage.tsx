@@ -1,20 +1,36 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
-import { npsEntries } from '@/data/mockData';
 import { SmilePlus, Smile, Meh, Frown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+
+interface NPSEntry {
+  id: string;
+  date: string;
+  score: number;
+  comment: string | null;
+}
 
 export default function SatisfactionPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  const [npsEntries, setNpsEntries] = useState<NPSEntry[]>([]);
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  useEffect(() => {
+    const fetchNps = async () => {
+      const { data } = await supabase.from('nps_entries').select('*');
+      if (data) setNpsEntries(data);
+    };
+    fetchNps();
+  }, []);
 
   const monthEntries = useMemo(() => {
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
     return npsEntries.filter(e => e.date.startsWith(prefix));
-  }, [year, month]);
+  }, [year, month, npsEntries]);
 
   const promoters = monthEntries.filter(e => e.score >= 9).length;
   const passives = monthEntries.filter(e => e.score >= 7 && e.score <= 8).length;
