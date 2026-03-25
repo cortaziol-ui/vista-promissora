@@ -51,7 +51,6 @@ export function getCachedInsights(): { data: MetaInsights; campaigns: MetaCampai
 function saveCachedInsights(data: MetaInsights, campaigns: MetaCampaign[]) {
   const timestamp = new Date().toISOString();
   localStorage.setItem('meta_ads_insights_cache', JSON.stringify({ data, campaigns, timestamp }));
-  // Update lastSync on config
   const config = getMetaConfig();
   if (config) {
     config.lastSync = timestamp;
@@ -77,16 +76,25 @@ export async function fetchCampaignInsights(
   dateRange: { since: string; until: string }
 ): Promise<{ insights: MetaInsights; campaigns: MetaCampaign[]; error?: string }> {
   const accountId = adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`;
+  const timeRange = encodeURIComponent(JSON.stringify(dateRange));
 
   try {
     // Fetch account-level insights
-    const insightsRes = await fetch(
-      `${BASE_URL}/${accountId}/insights?fields=impressions,clicks,spend,cpc,ctr,actions&time_range=${JSON.stringify(dateRange)}&access_token=${token}`
-    );
+    const insightsUrl = `${BASE_URL}/${accountId}/insights?fields=impressions,clicks,spend,cpc,ctr,actions&time_range=${timeRange}&access_token=${token}`;
+    console.log('[MetaAds] Fetching insights:', insightsUrl.replace(token, 'TOKEN_HIDDEN'));
+    const insightsRes = await fetch(insightsUrl);
     const insightsData = await insightsRes.json();
+    console.log('[MetaAds] Insights response:', JSON.stringify(insightsData, null, 2));
 
     if (insightsData.error) {
-      return { insights: emptyInsights(), campaigns: [], error: insightsData.error.message };
+      const errMsg = insightsData.error.message || 'Erro desconhecido';
+      const code = insightsData.error.code;
+      const hint = code === 190
+        ? ' — Token expirado ou inválido. Gere um novo no Graph API Explorer.'
+        : code === 10 || code === 200
+        ? ' — Permissão negada. No Graph API Explorer, selecione o Ad Account no dropdown "User or Page" e marque ads_read.'
+        : '';
+      return { insights: emptyInsights(), campaigns: [], error: errMsg + hint };
     }
 
     const row = insightsData.data?.[0] || {};
@@ -104,34 +112,47 @@ export async function fetchCampaignInsights(
       conversions: Number(convAction.value),
     };
 
-    // Fetch campaigns
-    const campRes = await fetch(
-      `${BASE_URL}/${accountId}/campaigns?fields=id,name,status,insights.time_range(${JSON.stringify(dateRange)}){impressions,clicks,spend,cpc,ctr,actions}&limit=50&access_token=${token}`
-    );
+    // Fetch campaigns list
+    const campUrl = `${BASE_URL}/${accountId}/campaigns?fields=id,name,status&limit=50&access_token=${token}`;
+    console.log('[MetaAds] Fetching campaigns:', campUrl.replace(token, 'TOKEN_HIDDEN'));
+    const campRes = await fetch(campUrl);
     const campData = await campRes.json();
-    const campaigns: MetaCampaign[] = (campData.data || []).map((c: any) => {
-      const ci = c.insights?.data?.[0] || {};
-      const cActions = ci.actions || [];
-      const cLead = cActions.find((a: any) => a.action_type === 'lead') || { value: '0' };
-      return {
-        id: c.id,
-        name: c.name,
-        status: c.status,
-        insights: {
-          impressions: Number(ci.impressions || 0),
-          clicks: Number(ci.clicks || 0),
-          spend: Number(ci.spend || 0),
-          cpc: Number(ci.cpc || 0),
-          ctr: Number(ci.ctr || 0),
-          leads: Number(cLead.value),
-          conversions: 0,
-        },
-      };
-    });
+    console.log('[MetaAds] Campaigns found:', campData?.data?.length ?? 0);
+
+    // Fetch insights per campaign individually
+    const campaigns: MetaCampaign[] = await Promise.all(
+      (campData.data || []).map(async (c: any) => {
+        try {
+          const ciUrl = `${BASE_URL}/${c.id}/insights?fields=impressions,clicks,spend,cpc,ctr,actions&time_range=${timeRange}&access_token=${token}`;
+          const ciRes = await fetch(ciUrl);
+          const ciData = await ciRes.json();
+          const ci = ciData.data?.[0] || {};
+          const cActions = ci.actions || [];
+          const cLead = cActions.find((a: any) => a.action_type === 'lead') || { value: '0' };
+          return {
+            id: c.id,
+            name: c.name,
+            status: c.status,
+            insights: {
+              impressions: Number(ci.impressions || 0),
+              clicks: Number(ci.clicks || 0),
+              spend: Number(ci.spend || 0),
+              cpc: Number(ci.cpc || 0),
+              ctr: Number(ci.ctr || 0),
+              leads: Number(cLead.value),
+              conversions: 0,
+            },
+          };
+        } catch {
+          return { id: c.id, name: c.name, status: c.status };
+        }
+      })
+    );
 
     saveCachedInsights(insights, campaigns);
     return { insights, campaigns };
   } catch (e: any) {
+    console.error('[MetaAds] Fetch error:', e);
     return { insights: emptyInsights(), campaigns: [], error: e.message || 'Erro ao buscar dados' };
   }
 }
