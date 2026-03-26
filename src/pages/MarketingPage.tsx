@@ -20,6 +20,7 @@ export default function MarketingPage() {
   const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -27,12 +28,15 @@ export default function MarketingPage() {
     const config = getMetaConfig();
     if (!config?.accessToken || !config.adAccountId) return;
     setSyncing(true);
+    setSyncError(null);
     const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month + 1, 0).getDate();
     const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     const result = await fetchCampaignInsights(config.accessToken, config.adAccountId, { since, until });
     setSyncing(false);
-    if (!result.error) {
+    if (result.error) {
+      setSyncError(result.error);
+    } else {
       setMetaInsights(result.insights);
       setMetaCampaigns(result.campaigns);
     }
@@ -142,6 +146,23 @@ export default function MarketingPage() {
         <KpiCard title="CPL" value={fmtFull(cpl)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
       </div>
+
+      {syncing && (
+        <div className="glass-card p-6 flex items-center justify-center gap-3">
+          <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Sincronizando dados do Meta Ads...</span>
+        </div>
+      )}
+
+      {syncError && !syncing && (
+        <div className="glass-card p-6 border border-destructive/30 flex flex-col items-center gap-3 text-center">
+          <AlertCircle className="w-8 h-8 text-destructive" />
+          <p className="text-sm text-muted-foreground max-w-lg">{syncError}</p>
+          <Button onClick={syncMeta} variant="outline" size="sm" className="gap-2">
+            <RefreshCw className="w-4 h-4" /> Tentar novamente
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 glass-card p-5">
