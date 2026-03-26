@@ -1,113 +1,56 @@
 
 
-## Plano: Migrar Tudo para Banco de Dados (Supabase) + Corrigir Meta Ads
+## Diagnóstico
 
-### Resumo
+A tela fica no spinner de carregamento infinito. Há dois problemas:
 
-Dois blocos de trabalho:
-1. **Migrar dados de localStorage/mock para Supabase** (vendedores, clientes, metas, NPS, auth)
-2. **Criar Edge Function como proxy para Meta Ads** — resolve o erro de permissão (o token sendo enviado diretamente do navegador pode ser bloqueado por restrições de origem/app) e melhora segurança
+1. **AuthContext pode travar**: Se `fetchUserRole()` ou `fetchSellerName()` falharem (ex: erro de rede), o `setLoading(false)` nunca é chamado porque está depois do `await` — a Promise rejeita e o loading fica `true` para sempre.
 
----
+2. **Edge Function CORS incompleto**: Os headers CORS do `meta-ads-proxy` estão faltando headers obrigatórios do Supabase client (`x-supabase-client-platform`, etc.), o que pode causar falha na chamada de sincronização.
 
-### Bloco 1: Banco de Dados com Lovable Cloud
+3. **MarketingPage não mostra estado de loading/erro**: Quando a sincronização falha silenciosamente, a página mostra dados vazios sem feedback.
 
-**Tabelas a criar:**
+## Plano
 
-```text
-vendedores
-├── id (uuid, PK)
-├── user_id (uuid, FK auth.users, nullable)
-├── nome (text)
-├── cargo (text)
-├── meta (numeric)
-├── avatar (text)
-├── created_at (timestamptz)
+### 1. Corrigir AuthContext — impedir loading infinito
 
-clientes
-├── id (uuid, PK)
-├── data (text) -- formato DD/MM/YYYY
-├── nome (text)
-├── cpf (text)
-├── nascimento (text)
-├── email (text)
-├── telefone (text)
-├── servico (text) -- LIMPA NOME, RATING, OUTROS
-├── vendedor (text) -- nome do vendedor
-├── entrada (numeric)
-├── parcela1_valor (numeric)
-├── parcela1_status (text)
-├── parcela1_data_pagamento (text, nullable)
-├── parcela2_valor (numeric)
-├── parcela2_status (text)
-├── parcela2_data_pagamento (text, nullable)
-├── situacao (text)
-├── valor_total (numeric)
-├── created_at (timestamptz)
+**Arquivo**: `src/contexts/AuthContext.tsx`
 
-company_settings
-├── id (uuid, PK)
-├── meta_mensal (numeric)
-├── key (text, unique)
-├── value (jsonb)
+- Envolver os `await fetchUserRole()` e `await fetchSellerName()` em try/catch
+- Garantir que `setLoading(false)` é chamado mesmo se as queries falharem
+- Fallback: se fetchUserRole falhar, usar role `'seller'` como padrão
 
-nps_entries
-├── id (uuid, PK)
-├── date (date)
-├── score (integer)
-├── comment (text)
-├── created_at (timestamptz)
+### 2. Corrigir CORS da Edge Function
+
+**Arquivo**: `supabase/functions/meta-ads-proxy/index.ts`
+
+- Atualizar `Access-Control-Allow-Headers` para incluir todos os headers necessários:
+  `authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version`
+
+### 3. Adicionar feedback visual na MarketingPage
+
+**Arquivo**: `src/pages/MarketingPage.tsx`
+
+- Mostrar spinner enquanto `syncing` está ativo
+- Mostrar mensagem de erro se a sincronização falhar (guardar erro no estado)
+- Se não há dados e não está sincronizando, mostrar botão para tentar novamente
+
+### Detalhes Técnicos
+
+```typescript
+// AuthContext fix - wrap in try/catch
+supabase.auth.getSession().then(async ({ data: { session } }) => {
+  if (session?.user) {
+    try {
+      const role = await fetchUserRole(session.user.id);
+      const sellerName = await fetchSellerName(session.user.id);
+      setUser(buildUser(session.user, role, sellerName));
+    } catch (e) {
+      console.error('Error fetching user data:', e);
+      setUser(buildUser(session.user, 'seller'));
+    }
+  }
+  setLoading(false);
+});
 ```
-
-**Autenticação:**
-- Migrar de hardcoded users para Supabase Auth
-- Criar tabela `user_roles` com enum (admin, manager, seller) seguindo o padrão de segurança
-- Seed dos usuários existentes (Caio, Cunha, Bianca, etc.) via Supabase Auth
-- Manter o mesmo fluxo de login (email + senha)
-
-**SalesDataContext:**
-- Substituir localStorage por queries Supabase (select, insert, update, delete)
-- Usar React Query para cache e invalidação
-- Manter a mesma interface do contexto para não quebrar nenhuma página
-
-**Páginas afetadas:**
-- `SatisfactionPage.tsx` — trocar `npsEntries` mock por query Supabase
-- Todas as outras já usam `useSalesData()` — funcionam automaticamente após migrar o contexto
-- Deletar `src/data/mockData.ts`
-
----
-
-### Bloco 2: Edge Function Proxy para Meta Ads
-
-O erro `(#200) Ad account owner has NOT grant ads_management or ads_read permission` ocorre porque o token está sendo enviado diretamente do navegador. Quando o App do Meta está em modo desenvolvimento, a chamada pode ser rejeitada dependendo da origem. Uma Edge Function resolve isso:
-
-**Edge Function `meta-ads-proxy`:**
-- Recebe do frontend: `adAccountId`, `dateRange`
-- Armazena o Access Token como **secret** no Supabase (nunca exposto no browser)
-- Faz a chamada para `graph.facebook.com` server-side
-- Retorna os dados para o frontend
-
-**Mudanças no frontend:**
-- `metaAdsApi.ts` — trocar `fetch(graph.facebook.com)` por `supabase.functions.invoke('meta-ads-proxy')`
-- `MetaAdsIntegration.tsx` — ao salvar token, enviar para o secret store via edge function em vez de localStorage
-- Remover token do localStorage (segurança)
-
----
-
-### Ordem de Execução
-
-1. Habilitar Lovable Cloud / Supabase
-2. Criar migrations (tabelas + RLS + roles)
-3. Seed dos dados iniciais (vendedores, clientes existentes)
-4. Migrar AuthContext para Supabase Auth
-5. Migrar SalesDataContext para queries Supabase
-6. Migrar SatisfactionPage (NPS)
-7. Criar Edge Function `meta-ads-proxy`
-8. Atualizar `metaAdsApi.ts` para usar o proxy
-9. Deletar `mockData.ts` e limpar imports
-10. Testar fluxo completo
-
-### Nota sobre o erro do Meta Ads
-
-Mesmo que as permissões estejam corretas no painel do Meta, chamadas diretas do navegador (client-side) para a Marketing API podem ser bloqueadas quando o App está em modo desenvolvimento. O proxy via Edge Function resolve isso porque a requisição parte de um servidor, não do browser do usuário.
 
