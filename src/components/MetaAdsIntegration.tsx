@@ -39,18 +39,23 @@ export default function MetaAdsIntegration() {
       return;
     }
     setTesting(true);
-    const result = await testConnection(config.accessToken);
-    setTesting(false);
-    if (result.success) {
-      const updated = { ...config, connected: true };
-      setConfig(updated);
-      saveMetaConfig(updated);
-      toast({ title: 'Conexão bem-sucedida!', description: `Conta: ${result.name}` });
-    } else {
-      const updated = { ...config, connected: false };
-      setConfig(updated);
-      saveMetaConfig(updated);
-      toast({ title: 'Falha na conexão', description: result.error, variant: 'destructive' });
+    try {
+      const result = await testConnection(config.accessToken);
+      if (result.success) {
+        const updated = { ...config, connected: true };
+        setConfig(updated);
+        saveMetaConfig(updated);
+        toast({ title: 'Conexão bem-sucedida!', description: `Conta: ${result.name}` });
+      } else {
+        const updated = { ...config, connected: false };
+        setConfig(updated);
+        saveMetaConfig(updated);
+        toast({ title: 'Falha na conexão', description: result.error, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Erro inesperado', variant: 'destructive' });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -60,18 +65,23 @@ export default function MetaAdsIntegration() {
       return;
     }
     setSyncing(true);
-    const now = new Date();
-    const since = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const until = now.toISOString().slice(0, 10);
-    const result = await fetchCampaignInsights(config.accessToken, config.adAccountId, { since, until });
-    setSyncing(false);
-    if (result.error) {
-      toast({ title: 'Erro na sincronização', description: result.error, variant: 'destructive' });
-    } else {
-      const updated = { ...config, lastSync: new Date().toISOString(), connected: true };
-      setConfig(updated);
-      saveMetaConfig(updated);
-      toast({ title: 'Dados sincronizados!', description: `${result.campaigns.length} campanhas importadas.` });
+    try {
+      const now = new Date();
+      const since = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const until = now.toISOString().slice(0, 10);
+      const result = await fetchCampaignInsights(config.accessToken, config.adAccountId, { since, until });
+      if (result.error) {
+        toast({ title: 'Erro na sincronização', description: result.error, variant: 'destructive' });
+      } else {
+        const updated = { ...config, lastSync: new Date().toISOString(), connected: true };
+        setConfig(updated);
+        saveMetaConfig(updated);
+        toast({ title: 'Dados sincronizados!', description: `${result.campaigns.length} campanhas importadas.` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Erro inesperado', variant: 'destructive' });
+    } finally {
+      setSyncing(false);
     }
   };
 

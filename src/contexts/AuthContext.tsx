@@ -33,7 +33,7 @@ async function fetchUserRole(userId: string): Promise<UserRole> {
     .select('role')
     .eq('user_id', userId)
     .limit(1)
-    .single();
+    .maybeSingle();
   return (data?.role as UserRole) || 'seller';
 }
 
@@ -43,7 +43,7 @@ async function fetchSellerName(userId: string): Promise<string | undefined> {
     .select('nome')
     .eq('user_id', userId)
     .limit(1)
-    .single();
+    .maybeSingle();
   return data?.nome || undefined;
 }
 
