@@ -129,7 +129,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       const [vendRes, cliRes, settRes] = await Promise.all([
         supabase.from('vendedores').select('*').order('id'),
         supabase.from('clientes').select('*').order('id'),
-        supabase.from('company_settings').select('*').eq('key', 'meta_mensal').single(),
+        supabase.from('company_settings').select('*').eq('key', 'meta_mensal').maybeSingle(),
       ]);
 
       if (vendRes.data) {
