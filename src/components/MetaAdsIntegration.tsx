@@ -39,18 +39,23 @@ export default function MetaAdsIntegration() {
       return;
     }
     setTesting(true);
-    const result = await testConnection(config.accessToken);
-    setTesting(false);
-    if (result.success) {
-      const updated = { ...config, connected: true };
-      setConfig(updated);
-      saveMetaConfig(updated);
-      toast({ title: 'Conexão bem-sucedida!', description: `Conta: ${result.name}` });
-    } else {
-      const updated = { ...config, connected: false };
-      setConfig(updated);
-      saveMetaConfig(updated);
-      toast({ title: 'Falha na conexão', description: result.error, variant: 'destructive' });
+    try {
+      const result = await testConnection(config.accessToken);
+      if (result.success) {
+        const updated = { ...config, connected: true };
+        setConfig(updated);
+        saveMetaConfig(updated);
+        toast({ title: 'Conexão bem-sucedida!', description: `Conta: ${result.name}` });
+      } else {
+        const updated = { ...config, connected: false };
+        setConfig(updated);
+        saveMetaConfig(updated);
+        toast({ title: 'Falha na conexão', description: result.error, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Erro inesperado', variant: 'destructive' });
+    } finally {
+      setTesting(false);
     }
   };
 
