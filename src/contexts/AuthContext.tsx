@@ -43,7 +43,7 @@ async function fetchSellerName(userId: string): Promise<string | undefined> {
     .select('nome')
     .eq('user_id', userId)
     .limit(1)
-    .single();
+    .maybeSingle();
   return data?.nome || undefined;
 }
 
