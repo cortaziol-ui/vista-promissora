@@ -5,6 +5,13 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://graph.facebook.com/v21.0";
+const FETCH_TIMEOUT = 10000;
+
+function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -14,7 +21,6 @@ Deno.serve(async (req) => {
   try {
     const { action, adAccountId, dateRange, accessToken: clientToken } = await req.json();
 
-    // Use token from request (stored client-side for now, can be moved to secrets later)
     const token = clientToken;
     if (!token) {
       return new Response(
@@ -24,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "test") {
-      const res = await fetch(`${BASE_URL}/me?fields=id,name&access_token=${token}`);
+      const res = await fetchWithTimeout(`${BASE_URL}/me?fields=id,name&access_token=${token}`);
       const data = await res.json();
       if (data.error) {
         return new Response(
@@ -42,10 +48,9 @@ Deno.serve(async (req) => {
       const accountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
       const timeRange = encodeURIComponent(JSON.stringify(dateRange));
 
-      // Fetch account-level insights
       const insightsUrl = `${BASE_URL}/${accountId}/insights?fields=impressions,clicks,spend,cpc,ctr,actions&time_range=${timeRange}&access_token=${token}`;
       console.log("[MetaAdsProxy] Fetching insights for", accountId);
-      const insightsRes = await fetch(insightsUrl);
+      const insightsRes = await fetchWithTimeout(insightsUrl);
       const insightsData = await insightsRes.json();
 
       if (insightsData.error) {
@@ -82,16 +87,15 @@ Deno.serve(async (req) => {
         conversions: Number(convAction.value),
       };
 
-      // Fetch campaigns
       const campUrl = `${BASE_URL}/${accountId}/campaigns?fields=id,name,status&limit=50&access_token=${token}`;
-      const campRes = await fetch(campUrl);
+      const campRes = await fetchWithTimeout(campUrl);
       const campData = await campRes.json();
 
       const campaigns = await Promise.all(
         (campData.data || []).map(async (c: any) => {
           try {
             const ciUrl = `${BASE_URL}/${c.id}/insights?fields=impressions,clicks,spend,cpc,ctr,actions&time_range=${timeRange}&access_token=${token}`;
-            const ciRes = await fetch(ciUrl);
+            const ciRes = await fetchWithTimeout(ciUrl);
             const ciData = await ciRes.json();
             const ci = ciData.data?.[0] || {};
             const cActions = ci.actions || [];
@@ -128,8 +132,9 @@ Deno.serve(async (req) => {
     );
   } catch (e: any) {
     console.error("[MetaAdsProxy] Error:", e);
+    const msg = e.name === "AbortError" ? "Tempo limite excedido ao conectar com a API do Meta." : (e.message || "Erro interno");
     return new Response(
-      JSON.stringify({ error: e.message || "Erro interno" }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

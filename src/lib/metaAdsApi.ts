@@ -60,13 +60,19 @@ function saveCachedInsights(data: MetaInsights, campaigns: MetaCampaign[]) {
 }
 
 export async function testConnection(token: string): Promise<{ success: boolean; name?: string; error?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
   try {
     const { data, error } = await supabase.functions.invoke('meta-ads-proxy', {
       body: { action: 'test', accessToken: token },
+      signal: controller.signal,
     });
+    clearTimeout(timer);
     if (error) return { success: false, error: error.message };
     return data;
   } catch (e: any) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') return { success: false, error: 'Tempo limite excedido (20s). Verifique sua conexão.' };
     return { success: false, error: e.message || 'Erro de conexão' };
   }
 }
@@ -76,16 +82,22 @@ export async function fetchCampaignInsights(
   adAccountId: string,
   dateRange: { since: string; until: string }
 ): Promise<{ insights: MetaInsights; campaigns: MetaCampaign[]; error?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
   try {
     const { data, error } = await supabase.functions.invoke('meta-ads-proxy', {
       body: { action: 'sync', accessToken: token, adAccountId, dateRange },
+      signal: controller.signal,
     });
+    clearTimeout(timer);
     if (error) return { insights: emptyInsights(), campaigns: [], error: error.message };
     if (data.error) return { insights: emptyInsights(), campaigns: [], error: data.error };
     
     saveCachedInsights(data.insights, data.campaigns);
     return { insights: data.insights, campaigns: data.campaigns };
   } catch (e: any) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') return { insights: emptyInsights(), campaigns: [], error: 'Tempo limite excedido (30s). Verifique sua conexão.' };
     return { insights: emptyInsights(), campaigns: [], error: e.message || 'Erro ao buscar dados' };
   }
 }
