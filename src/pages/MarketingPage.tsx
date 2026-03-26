@@ -28,12 +28,15 @@ export default function MarketingPage() {
     const config = getMetaConfig();
     if (!config?.accessToken || !config.adAccountId) return;
     setSyncing(true);
+    setSyncError(null);
     const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month + 1, 0).getDate();
     const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     const result = await fetchCampaignInsights(config.accessToken, config.adAccountId, { since, until });
     setSyncing(false);
-    if (!result.error) {
+    if (result.error) {
+      setSyncError(result.error);
+    } else {
       setMetaInsights(result.insights);
       setMetaCampaigns(result.campaigns);
     }
