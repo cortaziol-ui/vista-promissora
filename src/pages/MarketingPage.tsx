@@ -20,6 +20,7 @@ export default function MarketingPage() {
   const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 

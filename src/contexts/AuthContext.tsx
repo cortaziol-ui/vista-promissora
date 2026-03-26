@@ -76,9 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const role = await fetchUserRole(session.user.id);
-        const sellerName = await fetchSellerName(session.user.id);
-        setUser(buildUser(session.user, role, sellerName));
+        try {
+          const role = await fetchUserRole(session.user.id);
+          const sellerName = await fetchSellerName(session.user.id);
+          setUser(buildUser(session.user, role, sellerName));
+        } catch (e) {
+          console.error('Error fetching user data:', e);
+          setUser(buildUser(session.user, 'seller'));
+        }
       } else {
         setUser(null);
       }
@@ -87,9 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const role = await fetchUserRole(session.user.id);
-        const sellerName = await fetchSellerName(session.user.id);
-        setUser(buildUser(session.user, role, sellerName));
+        try {
+          const role = await fetchUserRole(session.user.id);
+          const sellerName = await fetchSellerName(session.user.id);
+          setUser(buildUser(session.user, role, sellerName));
+        } catch (e) {
+          console.error('Error fetching user data:', e);
+          setUser(buildUser(session.user, 'seller'));
+        }
       }
       setLoading(false);
     });
