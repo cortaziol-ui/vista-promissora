@@ -147,6 +147,23 @@ export default function MarketingPage() {
         <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
       </div>
 
+      {syncing && (
+        <div className="glass-card p-6 flex items-center justify-center gap-3">
+          <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Sincronizando dados do Meta Ads...</span>
+        </div>
+      )}
+
+      {syncError && !syncing && (
+        <div className="glass-card p-6 border border-destructive/30 flex flex-col items-center gap-3 text-center">
+          <AlertCircle className="w-8 h-8 text-destructive" />
+          <p className="text-sm text-muted-foreground max-w-lg">{syncError}</p>
+          <Button onClick={syncMeta} variant="outline" size="sm" className="gap-2">
+            <RefreshCw className="w-4 h-4" /> Tentar novamente
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 glass-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">Investimento por Campanha</h3>
