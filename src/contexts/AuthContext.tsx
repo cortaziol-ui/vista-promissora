@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-export type UserRole = 'admin' | 'manager' | 'seller';
+export type UserRole = "admin" | "manager" | "seller";
 
 export interface User {
   id: string;
@@ -11,7 +11,7 @@ export interface User {
   role: UserRole;
   avatar: string;
   position: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   sellerName?: string;
 }
 
@@ -28,33 +28,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function fetchUserRole(userId: string): Promise<UserRole> {
-  const { data } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
-  return (data?.role as UserRole) || 'seller';
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId).limit(1).maybeSingle();
+  return (data?.role as UserRole) || "seller";
 }
 
 async function fetchSellerName(userId: string): Promise<string | undefined> {
-  const { data } = await supabase
-    .from('vendedores')
-    .select('nome')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
+  const { data } = await supabase.from("vendedores").select("nome").eq("user_id", userId).limit(1).maybeSingle();
   return data?.nome || undefined;
 }
 
 function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string): User {
-  const email = supaUser.email || '';
-  const name = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
-  
+  const email = supaUser.email || "";
+  const name = email.split("@")[0].charAt(0).toUpperCase() + email.split("@")[0].slice(1);
+
   const positionMap: Record<UserRole, string> = {
-    admin: 'Administrador',
-    manager: 'Gerente / Vendedor',
-    seller: 'Vendedor(a)',
+    admin: "Administrador",
+    manager: "Gerente / Vendedor",
+    seller: "Vendedor(a)",
   };
 
   return {
@@ -62,9 +52,9 @@ function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string):
     name,
     email,
     role,
-    avatar: role === 'admin' ? '👤' : '👨',
+    avatar: role === "admin" ? "👤" : "👨",
     position: positionMap[role],
-    status: 'active',
+    status: "active",
     sellerName,
   };
 }
@@ -74,32 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         try {
           const role = await fetchUserRole(session.user.id);
           const sellerName = await fetchSellerName(session.user.id);
           setUser(buildUser(session.user, role, sellerName));
         } catch (e) {
-          console.error('Error fetching user data:', e);
-          setUser(buildUser(session.user, 'seller'));
+          console.error("Error fetching user data:", e);
+          setUser(buildUser(session.user, "seller"));
         }
       } else {
         setUser(null);
-      }
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        try {
-          const role = await fetchUserRole(session.user.id);
-          const sellerName = await fetchSellerName(session.user.id);
-          setUser(buildUser(session.user, role, sellerName));
-        } catch (e) {
-          console.error('Error fetching user data:', e);
-          setUser(buildUser(session.user, 'seller'));
-        }
       }
       setLoading(false);
     });
@@ -118,15 +96,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      isAdmin: user?.role === 'admin',
-      isManager: user?.role === 'manager',
-      isSeller: user?.role === 'seller',
-      loading,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isAdmin: user?.role === "admin",
+        isManager: user?.role === "manager",
+        isSeller: user?.role === "seller",
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -134,6 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
