@@ -5,7 +5,9 @@ import { Users, DollarSign, MousePointerClick, Target, TrendingUp, Megaphone, Al
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { getMetaConfig, getCachedInsights, fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
+import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
+import { useAccountContext } from '@/contexts/AccountContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
@@ -16,6 +18,8 @@ export default function MarketingPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
 
+  const { activeAccount } = useAccountContext();
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [metaConnected, setMetaConnected] = useState(false);
   const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
@@ -24,15 +28,20 @@ export default function MarketingPage() {
 
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
+  // Load token from Supabase
+  useEffect(() => {
+    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').single()
+      .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
+  }, []);
+
   const syncMeta = useCallback(async () => {
-    const config = getMetaConfig();
-    if (!config?.accessToken || !config.adAccountId) return;
+    if (!accessToken || !activeAccount?.ad_account_id) return;
     setSyncing(true);
     setSyncError(null);
     const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month + 1, 0).getDate();
     const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    const result = await fetchCampaignInsights(config.accessToken, config.adAccountId, { since, until });
+    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
     setSyncing(false);
     if (result.error) {
       setSyncError(result.error);
@@ -40,24 +49,17 @@ export default function MarketingPage() {
       setMetaInsights(result.insights);
       setMetaCampaigns(result.campaigns);
     }
-  }, [year, month]);
+  }, [year, month, accessToken, activeAccount]);
 
   // Check connection + auto-sync
   useEffect(() => {
-    const config = getMetaConfig();
-    if (config?.connected && config.accessToken) {
+    if (accessToken && activeAccount) {
       setMetaConnected(true);
-      const cached = getCachedInsights();
-      if (cached) {
-        setMetaInsights(cached.data);
-        setMetaCampaigns(cached.campaigns);
-      }
-      // Auto-sync
       syncMeta();
     } else {
       setMetaConnected(false);
     }
-  }, [syncMeta]);
+  }, [accessToken, activeAccount, syncMeta]);
 
   const impressions = metaInsights?.impressions ?? 0;
   const clicks = metaInsights?.clicks ?? 0;
