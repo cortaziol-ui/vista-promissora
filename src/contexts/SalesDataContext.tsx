@@ -126,31 +126,35 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   // Fetch initial data
   useEffect(() => {
     const fetchAll = async () => {
-      const [vendRes, cliRes, settRes] = await Promise.all([
-        supabase.from('vendedores').select('*').order('id'),
-        supabase.from('clientes').select('*').order('id'),
-        supabase.from('company_settings').select('*').eq('key', 'meta_mensal').maybeSingle(),
-      ]);
+      try {
+        const [vendRes, cliRes, settRes] = await Promise.all([
+          supabase.from('vendedores').select('*').order('id'),
+          supabase.from('clientes').select('*').order('id'),
+          supabase.from('company_settings').select('*').eq('key', 'meta_mensal').maybeSingle(),
+        ]);
 
-      if (vendRes.data) {
-        setVendedores(vendRes.data.map(v => ({
-          id: v.id,
-          nome: v.nome,
-          cargo: v.cargo,
-          meta: Number(v.meta),
-          avatar: v.avatar,
-        })));
+        if (vendRes.data) {
+          setVendedores(vendRes.data.map(v => ({
+            id: v.id,
+            nome: v.nome,
+            cargo: v.cargo,
+            meta: Number(v.meta),
+            avatar: v.avatar,
+          })));
+        }
+
+        if (cliRes.data) {
+          setClientes(cliRes.data.map(mapRowToCliente));
+        }
+
+        if (settRes.data) {
+          setMetaMensalGlobalState(Number(settRes.data.value) || 450000);
+        }
+      } catch (e) {
+        console.error("[SalesDataProvider] Error fetching data:", e);
+      } finally {
+        setLoading(false);
       }
-
-      if (cliRes.data) {
-        setClientes(cliRes.data.map(mapRowToCliente));
-      }
-
-      if (settRes.data) {
-        setMetaMensalGlobalState(Number(settRes.data.value) || 450000);
-      }
-
-      setLoading(false);
     };
 
     fetchAll();

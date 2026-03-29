@@ -35,12 +35,17 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('meta_accounts')
-      .select('*')
-      .order('created_at', { ascending: true });
-    setAccounts((data as MetaAccount[]) ?? []);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('meta_accounts')
+        .select('*')
+        .order('created_at', { ascending: true });
+      setAccounts((data as MetaAccount[]) ?? []);
+    } catch (e) {
+      console.error("[AccountProvider] Error fetching accounts:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

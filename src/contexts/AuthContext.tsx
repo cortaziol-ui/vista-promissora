@@ -65,12 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Safety timeout — if Supabase doesn't respond in 5s, unblock the UI
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    const timeout = setTimeout(() => {
+      console.warn("[AuthContext] Timeout reached — unblocking UI");
+      setLoading(false);
+    }, 5000);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      clearTimeout(timeout);
+    // Also check the current session immediately
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         try {
           const role = await fetchUserRole(session.user.id);
@@ -83,7 +84,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
       }
+      clearTimeout(timeout);
       setLoading(false);
+    }).catch(() => {
+      clearTimeout(timeout);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        try {
+          const role = await fetchUserRole(session.user.id);
+          const sellerName = await fetchSellerName(session.user.id);
+          setUser(buildUser(session.user, role, sellerName));
+        } catch (e) {
+          console.error("Error fetching user data:", e);
+          setUser(buildUser(session.user, "seller"));
+        }
+      } else {
+        setUser(null);
+      }
     });
 
     return () => {
