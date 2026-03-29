@@ -115,8 +115,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return !error;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error || !data.user) return false;
+      // Build user immediately so navigation doesn't hit a null user
+      try {
+        const role = await fetchUserRole(data.user.id);
+        const sellerName = await fetchSellerName(data.user.id);
+        setUser(buildUser(data.user, role, sellerName));
+      } catch {
+        setUser(buildUser(data.user, "seller"));
+      }
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const logout = async () => {
