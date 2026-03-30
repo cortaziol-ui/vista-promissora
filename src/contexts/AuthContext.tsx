@@ -64,51 +64,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Safety timeout — if Supabase doesn't respond in 5s, unblock the UI
+    let cancelled = false;
+
+    // Safety timeout — if Supabase doesn't respond in 8s, unblock the UI
     const timeout = setTimeout(() => {
-      console.warn("[AuthContext] Timeout reached — unblocking UI");
-      setLoading(false);
-    }, 5000);
-
-    // Also check the current session immediately
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        try {
-          const role = await fetchUserRole(session.user.id);
-          const sellerName = await fetchSellerName(session.user.id);
-          setUser(buildUser(session.user, role, sellerName));
-        } catch (e) {
-          console.error("Error fetching user data:", e);
-          setUser(buildUser(session.user, "seller"));
-        }
-      } else {
-        setUser(null);
+      if (!cancelled) {
+        console.warn("[AuthContext] Timeout reached — unblocking UI");
+        setLoading(false);
       }
-      clearTimeout(timeout);
-      setLoading(false);
-    }).catch(() => {
-      clearTimeout(timeout);
-      setLoading(false);
-    });
+    }, 8000);
 
+    async function resolveUser(supaUser: SupabaseUser) {
+      try {
+        const role = await fetchUserRole(supaUser.id);
+        const sellerName = await fetchSellerName(supaUser.id);
+        if (!cancelled) setUser(buildUser(supaUser, role, sellerName));
+      } catch (e) {
+        console.error("Error fetching user data:", e);
+        if (!cancelled) setUser(buildUser(supaUser, "seller"));
+      }
+    }
+
+    // Listen to all auth state changes (including INITIAL_SESSION on page load)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        try {
-          const role = await fetchUserRole(session.user.id);
-          const sellerName = await fetchSellerName(session.user.id);
-          setUser(buildUser(session.user, role, sellerName));
-        } catch (e) {
-          console.error("Error fetching user data:", e);
-          setUser(buildUser(session.user, "seller"));
-        }
+        await resolveUser(session.user);
       } else {
-        setUser(null);
+        if (!cancelled) setUser(null);
+      }
+      if (!cancelled) {
+        clearTimeout(timeout);
+        setLoading(false);
       }
     });
 
     return () => {
+      cancelled = true;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
