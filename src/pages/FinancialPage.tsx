@@ -101,6 +101,25 @@ export default function FinancialPage() {
 
   useEffect(() => { fetchCustos(); }, [fetchCustos]);
 
+  // Auto-replicate fixed costs from previous month if current month has none
+  useEffect(() => {
+    if (custosLoading || custos.length === 0) return;
+    const currentMonthCustos = custos.filter(c => c.mes_referencia === selectedMonth);
+    const hasFixedCosts = currentMonthCustos.some(c => c.tipo === 'fixo');
+    if (hasFixedCosts) return; // Already has fixed costs
+
+    const prevMonth = subMonths(selectedMonth, 1);
+    const prevFixedCosts = custos.filter(c => c.mes_referencia === prevMonth && c.tipo === 'fixo');
+    if (prevFixedCosts.length === 0) return;
+
+    // Replicate fixed costs to current month (unpaid)
+    const inserts = prevFixedCosts.map(c => ({
+      nome: c.nome, tipo: 'fixo', valor: c.valor,
+      mes_referencia: selectedMonth, categoria: c.categoria, pago: false,
+    }));
+    (supabase.from as any)('custos_mensais').insert(inserts).then(() => fetchCustos());
+  }, [custos, custosLoading, selectedMonth, fetchCustos]);
+
   // Filter custos by month
   const custosMes = useMemo(() => custos.filter(c => c.mes_referencia === selectedMonth), [custos, selectedMonth]);
   // Only paid custos count toward financials
