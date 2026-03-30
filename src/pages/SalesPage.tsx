@@ -1,10 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CommissionProgress } from '@/components/CommissionProgress';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccountContext } from '@/contexts/AccountContext';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
+import { useCampaignLinks } from '@/hooks/useCampaignLinks';
+import { getLeadsByVendor } from '@/lib/vendorLeads';
 import { DollarSign, Target, Receipt, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -31,6 +36,43 @@ export default function SalesPage() {
   } = useSalesData();
 
   const [filterVendedor, setFilterVendedor] = useState('all');
+
+  const { activeAccount } = useAccountContext();
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
+
+  // Load Meta token
+  useEffect(() => {
+    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+      .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
+  }, []);
+
+  // Fetch campaigns for selected month
+  const syncMeta = useCallback(async () => {
+    if (!accessToken || !activeAccount?.ad_account_id) return;
+    const [selYear, selMonthStr] = selectedMonth.split('-');
+    const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
+    const since = `${selYear}-${selMonthStr}-01`;
+    const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
+    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
+    if (!result.error) {
+      setMetaCampaigns(result.campaigns);
+    }
+  }, [selectedMonth, accessToken, activeAccount]);
+
+  useEffect(() => {
+    if (accessToken && activeAccount) {
+      syncMeta();
+    }
+  }, [accessToken, activeAccount, syncMeta]);
+
+  // Campaign links and vendor leads
+  const { links } = useCampaignLinks({ campaigns: metaCampaigns, vendedores, month: selectedMonth });
+
+  const vendorLeadsMap = useMemo(
+    () => getLeadsByVendor(links, metaCampaigns),
+    [links, metaCampaigns]
+  );
 
   // Derive available months from all clientes
   const availableMonths = useMemo(() => {
@@ -186,6 +228,8 @@ export default function SalesPage() {
                 <th className="text-left py-3 px-2">Vendedor</th>
                 <th className="text-right py-3 px-2">Meta</th>
                 <th className="text-right py-3 px-2">Vendas</th>
+                <th className="text-right py-3 px-2">Leads</th>
+                <th className="text-right py-3 px-2">Conversao</th>
                 <th className="text-right py-3 px-2">Faltam</th>
                 <th className="text-center py-3 px-2">Projecao</th>
                 {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
@@ -194,34 +238,42 @@ export default function SalesPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredStats.map((stat, i) => (
-                <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
-                  <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
-                    {i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}
-                  </td>
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{stat.vendedor.avatar}</span>
-                      <div>
-                        <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
-                        <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
+              {filteredStats.map((stat, i) => {
+                const vendorLeads = vendorLeadsMap[stat.vendedor.id];
+                const leadsCount = vendorLeads?.leads ?? 0;
+                const conversionRate = leadsCount > 0 ? (stat.vendas / leadsCount) * 100 : 0;
+
+                return (
+                  <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
+                    <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
+                      {i < 3 ? ['\u{1F947}', '\u{1F948}', '\u{1F949}'][i] : i + 1}
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{stat.vendedor.avatar}</span>
+                        <div>
+                          <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
+                          <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta} vendas</td>
-                  <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
-                  <td className="py-3 px-2 text-center">
-                    {stat.dentroProjecao
-                      ? <CheckCircle2 className="w-5 h-5 text-green-500 inline-block" />
-                      : <XCircle className="w-5 h-5 text-red-500 inline-block" />
-                    }
-                  </td>
-                  {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
-                  {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
-                  <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta} vendas</td>
+                    <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
+                    <td className="py-3 px-2 text-center">
+                      {stat.dentroProjecao
+                        ? <CheckCircle2 className="w-5 h-5 text-green-500 inline-block" />
+                        : <XCircle className="w-5 h-5 text-red-500 inline-block" />
+                      }
+                    </td>
+                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
+                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
+                    <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -230,7 +282,7 @@ export default function SalesPage() {
       {/* Commission section - only visible for sellers */}
       {commissionStats.length > 0 && (
         <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Premiações por Vendedor</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Premiacoes por Vendedor</h3>
           <div className="space-y-4">
             {commissionStats.map(stat => (
               <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">

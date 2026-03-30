@@ -98,11 +98,11 @@ export default function MarketingPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Marketing Analytics</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Marketing Analytics</h1>
           <p className="text-muted-foreground text-sm">Conecte sua conta Meta Ads para visualizar os dados.</p>
         </div>
-        <div className="glass-card p-8 border border-primary/30 flex flex-col items-center gap-4 text-center">
-          <AlertCircle className="w-12 h-12 text-primary" />
+        <div className="glass-card p-10 border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent flex flex-col items-center gap-5 text-center">
+          <AlertCircle className="w-16 h-16 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Meta Ads não conectado</h2>
           <p className="text-sm text-muted-foreground max-w-md">
             Para visualizar dados reais de campanhas, impressões, cliques, CPC, CTR e leads, conecte sua conta Meta Ads na página de <strong>Configurações</strong>.
@@ -119,7 +119,7 @@ export default function MarketingPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Marketing Analytics</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Marketing Analytics</h1>
           <p className="text-muted-foreground text-sm">Dados do Meta Ads</p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -139,14 +139,14 @@ export default function MarketingPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <KpiCard title="Impressões" value={fmtNum(impressions)} icon={<Users className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
-        <KpiCard title="Cliques" value={fmtNum(clicks)} icon={<MousePointerClick className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
-        <KpiCard title="Investimento" value={fmtFull(totalCost)} icon={<Megaphone className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-        <KpiCard title="CPC" value={fmtFull(cpc)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        <KpiCard title="CTR" value={`${Number(ctr).toFixed(2)}%`} icon={<Target className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
-        <KpiCard title="Leads" value={String(totalLeads)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
-        <KpiCard title="CPL" value={fmtFull(cpl)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+        <KpiCard title="Impressões" value={fmtNum(impressions)} icon={<Users className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" delay={0} />
+        <KpiCard title="Cliques" value={fmtNum(clicks)} icon={<MousePointerClick className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" delay={50} />
+        <KpiCard title="Investimento" value={fmtFull(totalCost)} icon={<Megaphone className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" delay={100} />
+        <KpiCard title="CPC" value={fmtFull(cpc)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={150} />
+        <KpiCard title="CTR" value={`${Number(ctr).toFixed(2)}%`} icon={<Target className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={200} />
+        <KpiCard title="Leads" value={String(totalLeads)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={250} />
+        <KpiCard title="CPL" value={fmtFull(cpl)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={300} />
+        <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={350} />
       </div>
 
       {syncing && (
@@ -167,36 +167,36 @@ export default function MarketingPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Investimento por Campanha</h3>
-          <div className="h-64">
+        <div className="lg:col-span-2 glass-card bg-gradient-to-br from-primary/5 to-transparent border border-border/30 p-6">
+          <h3 className="text-base font-semibold text-foreground mb-4">Investimento por Campanha</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={campaignTableData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
-                <XAxis type="number" stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={v => `R$${v}`} />
-                <YAxis type="category" dataKey="name" stroke="hsl(215, 20%, 65%)" fontSize={11} width={160} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [fmtFull(v), 'Custo']} />
-                <Bar dataKey="cost" fill="hsl(220, 70%, 55%)" radius={[0, 4, 4, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 16%)" />
+                <XAxis type="number" stroke="hsl(215, 20%, 55%)" fontSize={11} tickFormatter={v => `R$${v}`} />
+                <YAxis type="category" dataKey="name" stroke="hsl(215, 20%, 55%)" fontSize={10} width={180} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 8%)', border: '1px solid hsl(220, 20%, 20%)', borderRadius: '12px', color: '#f1f5f9', padding: '12px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} formatter={(v: number) => [fmtFull(v), 'Custo']} />
+                <Bar dataKey="cost" fill="hsl(220, 70%, 55%)" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Distribuição de Investimento</h3>
-          <div className="h-64">
+        <div className="glass-card bg-gradient-to-br from-primary/5 to-transparent border border-border/30 p-6">
+          <h3 className="text-base font-semibold text-foreground mb-4">Distribuição de Investimento</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={campaignPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40}>
+                <Pie data={campaignPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={45}>
                   {campaignPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [fmtFull(v), 'Investimento']} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 8%)', border: '1px solid hsl(220, 20%, 20%)', borderRadius: '12px', color: '#f1f5f9', padding: '12px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} formatter={(v: number) => [fmtFull(v), 'Investimento']} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-3">
             {campaignPieData.map((s, i) => (
-              <span key={s.name} className="text-xs flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+              <span key={s.name} className="text-xs flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/50">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
                 {s.name}
               </span>
             ))}
@@ -205,29 +205,29 @@ export default function MarketingPage() {
       </div>
 
       {/* Campaign Performance Table */}
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Performance por Campanha</h3>
+      <div className="glass-card bg-gradient-to-br from-primary/5 to-transparent border border-border/30 p-6">
+        <h3 className="text-base font-semibold text-foreground mb-4">Performance por Campanha</h3>
         {campaignTableData.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Campanha</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead className="text-right">CPC</TableHead>
-                <TableHead className="text-right">CPL</TableHead>
-                <TableHead className="text-right">CTR</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
+                <TableHead className="uppercase tracking-wide text-xs">Campanha</TableHead>
+                <TableHead className="text-right uppercase tracking-wide text-xs">Custo</TableHead>
+                <TableHead className="text-right uppercase tracking-wide text-xs">CPC</TableHead>
+                <TableHead className="text-right uppercase tracking-wide text-xs">CPL</TableHead>
+                <TableHead className="text-right uppercase tracking-wide text-xs">CTR</TableHead>
+                <TableHead className="text-right uppercase tracking-wide text-xs">Leads</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaignTableData.map((c) => (
-                <TableRow key={c.name}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+              {campaignTableData.map((c, i) => (
+                <TableRow key={c.name} className={`hover:bg-primary/5 transition-colors ${i % 2 === 0 ? '' : 'bg-secondary/20'}`}>
+                  <TableCell className="font-medium text-sm">{c.name}</TableCell>
                   <TableCell className="text-right">{fmtFull(c.cost)}</TableCell>
                   <TableCell className="text-right">{fmtFull(c.cpc)}</TableCell>
                   <TableCell className="text-right">{c.leads > 0 ? fmtFull(c.cpl) : '—'}</TableCell>
                   <TableCell className="text-right">{Number(c.ctr).toFixed(2)}%</TableCell>
-                  <TableCell className="text-right">{c.leads}</TableCell>
+                  <TableCell className="text-right font-semibold">{c.leads}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
