@@ -91,6 +91,14 @@ export default function SettingsPage() {
     month: monthYM,
   });
 
+  // Sort: active campaigns first
+  const sortedLinks = [...links].sort((a, b) => {
+    const ca = metaCampaigns.find(c => c.id === a.campaign_id);
+    const cb = metaCampaigns.find(c => c.id === b.campaign_id);
+    const aActive = ca?.status === 'ACTIVE' ? 0 : 1;
+    const bActive = cb?.status === 'ACTIVE' ? 0 : 1;
+    return aActive - bActive;
+  });
   const unlinkedCampaigns = links.filter(l => !l.vendedor_id).length;
   const linkedVendorIds = new Set(links.filter(l => l.vendedor_id).map(l => l.vendedor_id));
   const unlinkedVendors = vendedores.filter(v => !linkedVendorIds.has(v.id)).length;
@@ -350,7 +358,7 @@ export default function SettingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {links.map(link => {
+                  {sortedLinks.map(link => {
                     const campaign = metaCampaigns.find(c => c.id === link.campaign_id);
                     const isActive = campaign?.status === 'ACTIVE';
                     return (
