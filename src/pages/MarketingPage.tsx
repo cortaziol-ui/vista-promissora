@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useAccountContext } from '@/contexts/AccountContext';
+import { useSalesData } from '@/contexts/SalesDataContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -45,6 +46,7 @@ export default function MarketingPage() {
   const [month, setMonth] = useState(now.getMonth());
 
   const { activeAccount } = useAccountContext();
+  const { totalVendas } = useSalesData();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [metaConnected, setMetaConnected] = useState(false);
   const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
@@ -83,8 +85,8 @@ export default function MarketingPage() {
   const ctr = metaInsights?.ctr ?? 0;
   const totalLeads = metaInsights?.leads ?? 0;
   const cpl = totalLeads > 0 ? totalCost / totalLeads : 0;
-  const conversions = metaInsights?.conversions ?? 0;
-  const conversionRate = totalLeads > 0 ? (conversions / totalLeads) * 100 : 0;
+  // Conversão real = vendas da planilha / leads do Meta
+  const conversionRate = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
 
   // Campaign data with vendor detection
   const campaigns = useMemo<CampaignData[]>(() => {
