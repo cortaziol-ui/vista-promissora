@@ -1,4 +1,4 @@
-import { Check, Lock, Trophy } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { useCommissionTiers } from '@/hooks/useCommissionTiers';
 
 interface CommissionProgressProps {
@@ -39,56 +39,65 @@ export function CommissionProgress({
     );
   }
 
+  const minPct = Math.min(...tiers.map((t) => t.pct_meta));
   const maxPct = Math.max(...tiers.map((t) => t.pct_meta));
+  const range = maxPct - minPct;
   const currentPct = meta > 0 ? (vendas / meta) * 100 : 0;
-  const barProgress = Math.min((currentPct / maxPct) * 100, 100);
+
+  // Map a pct_meta value to position on the bar (0% to 100%)
+  const toPos = (pct: number) => {
+    if (range === 0) return 50;
+    return Math.max(0, Math.min(100, ((pct - minPct) / range) * 100));
+  };
+
+  const barProgress = Math.max(0, Math.min(100, toPos(currentPct)));
 
   return (
-    <div className="w-full min-w-[240px]">
+    <div className="w-full">
       {/* Progress track */}
-      <div className="relative w-full h-6 flex items-center">
+      <div className="relative w-full h-8 flex items-center">
         {/* Background track */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-secondary" />
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary" />
 
         {/* Filled track */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 left-0 h-1.5 rounded-full bg-gradient-to-r from-kpi-sales to-kpi-success progress-animate"
+          className="absolute top-1/2 -translate-y-1/2 left-0 h-2 rounded-full bg-gradient-to-r from-kpi-sales to-kpi-success progress-animate"
           style={{ width: `${barProgress}%` }}
         />
 
         {/* Current position indicator */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-2 h-4 rounded-sm bg-foreground/90 shadow-lg z-20 transition-all duration-500"
-          style={{ left: `calc(${barProgress}% - 4px)` }}
+          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-5 rounded-sm bg-foreground/90 shadow-lg z-20 transition-all duration-500"
+          style={{ left: `calc(${barProgress}% - 5px)` }}
         />
 
         {/* Checkpoint dots */}
         {tiers.map((tier) => {
-          const left = (tier.pct_meta / maxPct) * 100;
+          const left = toPos(tier.pct_meta);
           const isUnlocked = tier.unlocked;
           const isCurrent = currentTier?.id === tier.id;
 
           return (
             <div
               key={tier.id}
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 transition-all duration-300"
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
               style={{ left: `${left}%` }}
             >
               <div
                 className={`
-                  w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold
+                  w-7 h-7 rounded-full flex items-center justify-center
                   transition-all duration-300 border-2
                   ${isUnlocked
-                    ? 'bg-kpi-success text-white border-kpi-success shadow-[0_0_8px_hsl(var(--kpi-success)/0.5)]'
+                    ? 'bg-kpi-success text-white border-kpi-success shadow-[0_0_10px_hsl(var(--kpi-success)/0.5)]'
                     : 'bg-secondary text-muted-foreground border-border'
                   }
-                  ${isCurrent ? 'ring-2 ring-kpi-success/40 ring-offset-1 ring-offset-background scale-110' : ''}
+                  ${isCurrent ? 'ring-2 ring-kpi-success/40 ring-offset-2 ring-offset-background scale-110' : ''}
                 `}
               >
                 {isUnlocked ? (
-                  <Check className="w-2.5 h-2.5" />
+                  <Check className="w-3.5 h-3.5" />
                 ) : (
-                  <Lock className="w-2.5 h-2.5" />
+                  <Lock className="w-3 h-3" />
                 )}
               </div>
             </div>
@@ -97,9 +106,9 @@ export function CommissionProgress({
       </div>
 
       {/* Tier labels */}
-      <div className="relative w-full mt-0.5" style={{ height: '2rem' }}>
+      <div className="relative w-full mt-1" style={{ height: '2.2rem' }}>
         {tiers.map((tier) => {
-          const left = (tier.pct_meta / maxPct) * 100;
+          const left = toPos(tier.pct_meta);
           return (
             <div
               key={tier.id}
@@ -107,14 +116,14 @@ export function CommissionProgress({
               style={{ left: `${left}%` }}
             >
               <p
-                className={`text-[9px] font-medium leading-tight truncate max-w-[60px] ${
+                className={`text-[11px] font-semibold leading-tight ${
                   tier.unlocked ? 'text-kpi-success' : 'text-muted-foreground'
                 }`}
               >
                 {tier.pct_meta}%
               </p>
               <p
-                className={`text-[8px] leading-tight ${
+                className={`text-[10px] leading-tight ${
                   tier.unlocked ? 'text-foreground/80' : 'text-muted-foreground/60'
                 }`}
               >

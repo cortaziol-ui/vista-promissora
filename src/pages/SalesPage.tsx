@@ -55,10 +55,23 @@ export default function SalesPage() {
     return filteredClientes.filter(c => c.vendedor === filterVendedor);
   }, [filteredClientes, filterVendedor]);
 
+  const { user, isSeller } = useAuth();
+
   const filteredStats = useMemo(() => {
     if (filterVendedor === 'all') return vendedorStats;
     return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
   }, [vendedorStats, filterVendedor]);
+
+  // Sellers only see their own commission; admin/manager see all
+  const commissionStats = useMemo(() => {
+    if (isSeller && user?.sellerName) {
+      return vendedorStats.filter(s => s.vendedor.nome === user.sellerName);
+    }
+    if (isSeller && user?.name) {
+      return vendedorStats.filter(s => s.vendedor.nome.toLowerCase() === user.name.toLowerCase());
+    }
+    return filteredStats;
+  }, [isSeller, user, vendedorStats, filteredStats]);
 
   // Local computed values based on vendedor filter
   const localFaturamento = useMemo(() => localClientes.reduce((s, c) => s + (c.entrada || 0), 0), [localClientes]);
@@ -221,7 +234,7 @@ export default function SalesPage() {
       <div className="glass-card p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">Comissionamento por Vendedor</h3>
         <div className="space-y-4">
-          {filteredStats.map(stat => (
+          {commissionStats.map(stat => (
             <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">{stat.vendedor.avatar}</span>
