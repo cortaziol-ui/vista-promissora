@@ -3,7 +3,6 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CommissionProgress } from '@/components/CommissionProgress';
-import { CommissionSummary } from '@/components/CommissionSummary';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { DollarSign, Target, Receipt, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
@@ -27,9 +26,6 @@ export default function SalesPage() {
     vendedorStats,
     metaEmpresaVendas,
     pctMeta,
-    totalVendas,
-    faturamento,
-    ticketMedio,
     selectedMonth,
     setSelectedMonth,
   } = useSalesData();
@@ -55,23 +51,20 @@ export default function SalesPage() {
     return filteredClientes.filter(c => c.vendedor === filterVendedor);
   }, [filteredClientes, filterVendedor]);
 
-  const { user, isSeller } = useAuth();
+  const { isSeller } = useAuth();
 
   const filteredStats = useMemo(() => {
     if (filterVendedor === 'all') return vendedorStats;
     return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
   }, [vendedorStats, filterVendedor]);
 
-  // Sellers only see their own commission; admin/manager see all
+  // Sellers see ALL vendors' commissions on this page; admin/manager don't see commission here (moved to OverviewPage)
   const commissionStats = useMemo(() => {
-    if (isSeller && user?.sellerName) {
-      return vendedorStats.filter(s => s.vendedor.nome === user.sellerName);
+    if (isSeller) {
+      return vendedorStats;
     }
-    if (isSeller && user?.name) {
-      return vendedorStats.filter(s => s.vendedor.nome.toLowerCase() === user.name.toLowerCase());
-    }
-    return filteredStats;
-  }, [isSeller, user, vendedorStats, filteredStats]);
+    return []; // admin/manager: commission section hidden on SalesPage
+  }, [isSeller, vendedorStats]);
 
   // Local computed values based on vendedor filter
   const localFaturamento = useMemo(() => localClientes.reduce((s, c) => s + (c.entrada || 0), 0), [localClientes]);
@@ -133,12 +126,16 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSeller ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-4`}>
         <KpiCard title="Meta Mensal" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
-        <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        <KpiCard title="Ticket Medio" value={fmtFull(localTicketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
+        {!isSeller && (
+          <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+        )}
+        {!isSeller && (
+          <KpiCard title="Ticket Medio" value={fmtFull(localTicketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -191,8 +188,8 @@ export default function SalesPage() {
                 <th className="text-right py-3 px-2">Vendas</th>
                 <th className="text-right py-3 px-2">Faltam</th>
                 <th className="text-center py-3 px-2">Projecao</th>
-                <th className="text-right py-3 px-2">Faturamento</th>
-                <th className="text-right py-3 px-2">Ticket Medio</th>
+                {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
+                {!isSeller && <th className="text-right py-3 px-2">Ticket Medio</th>}
                 <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
               </tr>
             </thead>
@@ -220,8 +217,8 @@ export default function SalesPage() {
                       : <XCircle className="w-5 h-5 text-red-500 inline-block" />
                     }
                   </td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>
-                  <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>
+                  {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
+                  {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
                   <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
                 </tr>
               ))}
@@ -230,27 +227,29 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* Commission section */}
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Premiações por Vendedor</h3>
-        <div className="space-y-4">
-          {commissionStats.map(stat => (
-            <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">{stat.vendedor.avatar}</span>
-                <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
-                <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+      {/* Commission section - only visible for sellers */}
+      {commissionStats.length > 0 && (
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Premiações por Vendedor</h3>
+          <div className="space-y-4">
+            {commissionStats.map(stat => (
+              <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">{stat.vendedor.avatar}</span>
+                  <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
+                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+                </div>
+                <CommissionProgress
+                  vendedorNome={stat.vendedor.nome}
+                  vendas={stat.vendas}
+                  meta={stat.vendedor.meta}
+                  month={selectedMonth}
+                />
               </div>
-              <CommissionProgress
-                vendedorNome={stat.vendedor.nome}
-                vendas={stat.vendas}
-                meta={stat.vendedor.meta}
-                month={selectedMonth}
-              />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

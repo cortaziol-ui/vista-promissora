@@ -1,12 +1,18 @@
-import { useMemo } from 'react';
-import { DollarSign, Target, TrendingUp, Receipt, ShoppingCart, BarChart3, Trophy, CalendarDays, CheckCircle2, XCircle } from 'lucide-react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { DollarSign, Target, TrendingUp, Receipt, ShoppingCart, BarChart3, Trophy, CalendarDays, CheckCircle2, XCircle, Users, MousePointerClick, Megaphone, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
+import { CommissionProgress } from '@/components/CommissionProgress';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAccountContext } from '@/contexts/AccountContext';
+import { fetchCampaignInsights, type MetaInsights } from '@/lib/metaAdsApi';
+import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
 
 /** Build a label like "Mar/2026" from "2026-03" */
@@ -30,6 +36,41 @@ export default function OverviewPage() {
     selectedMonth,
     setSelectedMonth,
   } = useSalesData();
+
+  const { isSeller } = useAuth();
+  const { activeAccount } = useAccountContext();
+
+  // Meta Ads state
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
+  const [metaConnected, setMetaConnected] = useState(false);
+
+  // Load Meta token
+  useEffect(() => {
+    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+      .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
+  }, []);
+
+  const syncMeta = useCallback(async () => {
+    if (!accessToken || !activeAccount?.ad_account_id) return;
+    const [selYear, selMonthStr] = selectedMonth.split('-');
+    const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
+    const since = `${selYear}-${selMonthStr}-01`;
+    const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
+    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
+    if (!result.error) {
+      setMetaInsights(result.insights);
+    }
+  }, [selectedMonth, accessToken, activeAccount]);
+
+  useEffect(() => {
+    if (accessToken && activeAccount) {
+      setMetaConnected(true);
+      syncMeta();
+    } else {
+      setMetaConnected(false);
+    }
+  }, [accessToken, activeAccount, syncMeta]);
 
   // Derive available months from all clientes
   const availableMonths = useMemo(() => {
@@ -68,13 +109,17 @@ export default function OverviewPage() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-4' : 'xl:grid-cols-6'} gap-4`}>
         <KpiCard title="Meta Mensal" value={`${metaEmpresaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" delay={0} />
         <KpiCard title="% da Meta" value={`${pctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, metaEmpresaVendas - totalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" delay={50} />
         <KpiCard title="Total Vendas" value={String(totalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" delay={100} />
         <KpiCard title="Projecao" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={150} />
-        <KpiCard title="Faturamento" value={fmtFull(faturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={200} />
-        <KpiCard title="Ticket Medio" value={fmtFull(ticketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={250} />
+        {!isSeller && (
+          <KpiCard title="Faturamento" value={fmtFull(faturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={200} />
+        )}
+        {!isSeller && (
+          <KpiCard title="Ticket Medio" value={fmtFull(ticketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={250} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -131,8 +176,8 @@ export default function OverviewPage() {
                 <th className="text-right py-3 px-2">Vendas</th>
                 <th className="text-right py-3 px-2">Faltam</th>
                 <th className="text-center py-3 px-2">Projecao</th>
-                <th className="text-right py-3 px-2">Faturamento</th>
-                <th className="text-right py-3 px-2">Ticket Medio</th>
+                {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
+                {!isSeller && <th className="text-right py-3 px-2">Ticket Medio</th>}
                 <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
               </tr>
             </thead>
@@ -162,8 +207,8 @@ export default function OverviewPage() {
                         : <XCircle className="w-5 h-5 text-red-500 inline-block" />
                       }
                     </td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>
+                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
+                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
                     <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
                   </tr>
                 );
@@ -172,6 +217,50 @@ export default function OverviewPage() {
           </table>
         </div>
       </div>
+
+      {/* Meta Ads key metrics */}
+      {metaConnected ? (
+        <div className="glass-card p-5 animate-in" style={{ animationDelay: '450ms' }}>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Meta Ads — Resumo</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard title="Impressões" value={fmtNum(metaInsights?.impressions ?? 0)} icon={<Users className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
+            <KpiCard title="Cliques" value={fmtNum(metaInsights?.clicks ?? 0)} icon={<MousePointerClick className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
+            <KpiCard title="Investimento" value={fmtFull(metaInsights?.spend ?? 0)} icon={<Megaphone className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+            <KpiCard title="Leads" value={String(metaInsights?.leads ?? 0)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+          </div>
+        </div>
+      ) : (
+        <div className="glass-card p-5 animate-in" style={{ animationDelay: '450ms' }}>
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <AlertCircle className="w-5 h-5" />
+            <p className="text-sm">Meta Ads não conectado — configure na página de Configurações para visualizar métricas.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Commission / Premiação section - admin/manager only */}
+      {!isSeller && (
+        <div className="glass-card p-5 animate-in" style={{ animationDelay: '500ms' }}>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Premiações por Vendedor</h3>
+          <div className="space-y-4">
+            {vendedorStats.map(stat => (
+              <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">{stat.vendedor.avatar}</span>
+                  <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
+                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+                </div>
+                <CommissionProgress
+                  vendedorNome={stat.vendedor.nome}
+                  vendas={stat.vendas}
+                  meta={stat.vendedor.meta}
+                  month={selectedMonth}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

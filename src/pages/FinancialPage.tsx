@@ -5,7 +5,7 @@ import { useSalesData, type Cliente } from '@/contexts/SalesDataContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DollarSign, TrendingUp, TrendingDown, Percent, AlertTriangle, Plus, Pencil, Trash2, CalendarDays } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, AlertTriangle, Plus, Pencil, Trash2, CalendarDays, Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ interface Custo {
   valor: number;
   mes_referencia: string;
   categoria: string;
+  pago: boolean;
 }
 
 /** Parse DD/MM/YYYY to Date */
@@ -102,8 +103,10 @@ export default function FinancialPage() {
 
   // Filter custos by month
   const custosMes = useMemo(() => custos.filter(c => c.mes_referencia === selectedMonth), [custos, selectedMonth]);
-  const custosFixos = useMemo(() => custosMes.filter(c => c.tipo === 'fixo').reduce((s, c) => s + c.valor, 0), [custosMes]);
-  const custosVariaveis = useMemo(() => custosMes.filter(c => c.tipo === 'variavel').reduce((s, c) => s + c.valor, 0), [custosMes]);
+  // Only paid custos count toward financials
+  const custosPagos = useMemo(() => custosMes.filter(c => c.pago), [custosMes]);
+  const custosFixos = useMemo(() => custosPagos.filter(c => c.tipo === 'fixo').reduce((s, c) => s + c.valor, 0), [custosPagos]);
+  const custosVariaveis = useMemo(() => custosPagos.filter(c => c.tipo === 'variavel').reduce((s, c) => s + c.valor, 0), [custosPagos]);
   const custosTotal = custosFixos + custosVariaveis;
 
   // Helper: get clientes for a given month
@@ -267,6 +270,11 @@ export default function FinancialPage() {
   const handleDeleteCusto = async (id: string) => {
     await (supabase.from as any)('custos_mensais').delete().eq('id', id);
     toast({ title: 'Custo excluído' });
+    fetchCustos();
+  };
+
+  const handleTogglePago = async (id: string, currentPago: boolean) => {
+    await (supabase.from as any)('custos_mensais').update({ pago: !currentPago }).eq('id', id);
     fetchCustos();
   };
 
@@ -470,12 +478,13 @@ export default function FinancialPage() {
                   <th className="text-left py-2 px-2">Tipo</th>
                   <th className="text-left py-2 px-2">Categoria</th>
                   <th className="text-right py-2 px-2">Valor</th>
+                  <th className="text-center py-2 px-2">Pago</th>
                   <th className="text-center py-2 px-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {custosMes.map(c => (
-                  <tr key={c.id} className="border-b border-border/30">
+                  <tr key={c.id} className={`border-b border-border/30 ${!c.pago ? 'opacity-60' : ''}`}>
                     <td className="py-2 px-2 font-medium">{c.nome}</td>
                     <td className="py-2 px-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${c.tipo === 'fixo' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}`}>
@@ -484,6 +493,11 @@ export default function FinancialPage() {
                     </td>
                     <td className="py-2 px-2 text-muted-foreground">{c.categoria || '—'}</td>
                     <td className="py-2 px-2 text-right font-medium">{fmtFull(c.valor)}</td>
+                    <td className="py-2 px-2 text-center">
+                      <button onClick={() => handleTogglePago(c.id, c.pago)} className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${c.pago ? 'bg-green-500 border-green-500 text-white' : 'border-border hover:border-muted-foreground'}`}>
+                        {c.pago && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    </td>
                     <td className="py-2 px-2 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Button variant="ghost" size="sm" onClick={() => openEditCusto(c)}><Pencil className="w-3.5 h-3.5" /></Button>
@@ -495,19 +509,19 @@ export default function FinancialPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-border/50">
-                  <td colSpan={3} className="py-2 px-2 text-muted-foreground">Custos Fixos</td>
-                  <td className="py-2 px-2 text-right font-medium">{fmtFull(custosFixos)}</td>
+                  <td colSpan={4} className="py-2 px-2 text-muted-foreground">Custos Fixos (pagos)</td>
                   <td />
+                  <td className="py-2 px-2 text-right font-medium">{fmtFull(custosFixos)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={3} className="py-2 px-2 text-muted-foreground">Custos Variáveis</td>
-                  <td className="py-2 px-2 text-right font-medium">{fmtFull(custosVariaveis)}</td>
+                  <td colSpan={4} className="py-2 px-2 text-muted-foreground">Custos Variáveis (pagos)</td>
                   <td />
+                  <td className="py-2 px-2 text-right font-medium">{fmtFull(custosVariaveis)}</td>
                 </tr>
                 <tr className="border-t border-border/50 font-semibold">
-                  <td colSpan={3} className="py-2 px-2">Total</td>
-                  <td className="py-2 px-2 text-right">{fmtFull(custosTotal)}</td>
+                  <td colSpan={4} className="py-2 px-2">Total Contabilizado</td>
                   <td />
+                  <td className="py-2 px-2 text-right">{fmtFull(custosTotal)}</td>
                 </tr>
               </tfoot>
             </table>
