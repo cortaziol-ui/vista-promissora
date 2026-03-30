@@ -80,16 +80,12 @@ export async function fetchCampaignInsights(
         const ctr = Number(ins.ctr || 0);
 
         // Extract leads and conversions from actions
-        // Leads = messaging conversations (WhatsApp/Messenger) + pixel leads + form leads
+        // Leads = ONLY messaging conversations (WhatsApp/Messenger) — matches Meta Ads Manager "Results"
         let leads = 0, conversions = 0;
         for (const action of (ins.actions || [])) {
           const t = action.action_type;
           const v = Number(action.value || 0);
-          // Count as LEADS: messaging conversations, pixel leads, form leads
           if (t === 'onsite_conversion.messaging_conversation_started_7d') leads += v;
-          if (t === 'lead') leads += v;
-          if (t === 'offsite_conversion.fb_pixel_lead') leads += v;
-          // Count as CONVERSIONS: purchases, registrations
           if (t === 'purchase' || t === 'complete_registration') conversions += v;
         }
 
