@@ -24,7 +24,7 @@ const allNavItems: NavItem[] = [
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin'] },
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager'] },
-  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller'] },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin'] },
 ];
 
 const adminItems: NavItem[] = [
