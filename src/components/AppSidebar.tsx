@@ -18,7 +18,7 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin', 'manager'] },
+  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin'] },
   { title: 'Vendas', url: '/vendas', icon: BarChart3, roles: ['admin', 'manager', 'seller'] },
   { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager'] },
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager'] },

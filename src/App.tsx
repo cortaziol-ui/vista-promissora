@@ -73,7 +73,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) {
-    const defaultRoute = user.role === 'seller' ? '/vendas' : '/';
+    const defaultRoute = user.role === 'admin' ? '/' : '/vendas';
     return <Navigate to={defaultRoute} replace />;
   }
   return <DashboardLayout>{children}</DashboardLayout>;
@@ -81,7 +81,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  const defaultRoute = user?.role === 'seller' ? '/vendas' : '/';
+  const defaultRoute = user?.role === 'admin' ? '/' : '/vendas';
 
   if (loading) {
     return (
@@ -95,8 +95,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to={defaultRoute} replace /> : <LoginPage />} />
       
-      {/* Admin + Manager only */}
-      <Route path="/" element={<ProtectedRoute roles={['admin', 'manager']}><OverviewPage /></ProtectedRoute>} />
+      {/* Admin only */}
+      <Route path="/" element={<ProtectedRoute roles={['admin']}><OverviewPage /></ProtectedRoute>} />
       <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager']}><MarketingPage /></ProtectedRoute>} />
       <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager']}><SatisfactionPage /></ProtectedRoute>} />
       <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager']}><PlanilhaPage /></ProtectedRoute>} />
