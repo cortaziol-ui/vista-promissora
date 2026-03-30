@@ -39,16 +39,25 @@ export interface VendedorStats {
   ticketMedio: number;
   pctMeta: number;
   faltam: number;
+  projecaoVendas: number;
+  dentroProjecao: boolean;
 }
 
 interface SalesDataContextType {
   metaMensalGlobal: number;
   setMetaMensalGlobal: (v: number) => void;
+  metaEmpresaVendas: number;
+  setMetaEmpresaVendas: (v: number) => void;
+  metaComercialVendas: number;
+  setMetaComercialVendas: (v: number) => void;
+  selectedMonth: string;
+  setSelectedMonth: (v: string) => void;
   vendedores: Vendedor[];
   addVendedor: (v: Omit<Vendedor, 'id'>) => Promise<Vendedor | null>;
   updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
   deleteVendedor: (id: number) => void;
   clientes: Cliente[];
+  filteredClientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
   deleteCliente: (id: number) => void;
@@ -117,22 +126,53 @@ function mapClienteToRow(c: Partial<Cliente>) {
   return row;
 }
 
+/** Parse "DD/MM/YYYY" into "YYYY-MM" */
+function parseMonthFromData(data: string): string | null {
+  if (!data) return null;
+  const parts = data.split('/');
+  if (parts.length !== 3) return null;
+  const [, mm, yyyy] = parts;
+  if (!yyyy || !mm) return null;
+  return `${yyyy}-${mm.padStart(2, '0')}`;
+}
+
+/** Get current month as "YYYY-MM" */
+function getCurrentMonth(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(450000);
+  const [metaEmpresaVendas, setMetaEmpresaVendasState] = useState<number>(30);
+  const [metaComercialVendas, setMetaComercialVendasState] = useState<number>(30);
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [loading, setLoading] = useState(true);
+
+  // Helper to fetch all clientes
+  const fetchClientes = useCallback(async () => {
+    const { data } = await supabase.from('clientes').select('*').order('id');
+    if (data) {
+      setClientes(data.map(mapRowToCliente));
+    }
+  }, []);
 
   // Fetch initial data
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [vendRes, cliRes, settRes] = await Promise.all([
+        const [vendRes, cliRes, settRes, metaEmpRes, metaComRes] = await Promise.all([
           supabase.from('vendedores').select('*').order('id'),
           supabase.from('clientes').select('*').order('id'),
           supabase.from('company_settings').select('*').eq('key', 'meta_mensal').maybeSingle(),
+          supabase.from('company_settings').select('*').eq('key', 'meta_empresa_vendas').maybeSingle(),
+          supabase.from('company_settings').select('*').eq('key', 'meta_comercial_vendas').maybeSingle(),
         ]);
 
         if (vendRes.data) {
@@ -152,6 +192,14 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
         if (settRes.data) {
           setMetaMensalGlobalState(Number(settRes.data.value) || 450000);
         }
+
+        if (metaEmpRes.data) {
+          setMetaEmpresaVendasState(Number(metaEmpRes.data.value) || 30);
+        }
+
+        if (metaComRes.data) {
+          setMetaComercialVendasState(Number(metaComRes.data.value) || 30);
+        }
       } catch (e) {
         console.error("[SalesDataProvider] Error fetching data:", e);
       } finally {
@@ -162,12 +210,52 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     fetchAll();
   }, []);
 
+  // Supabase realtime subscription for clientes
+  useEffect(() => {
+    const channel = supabase
+      .channel('clientes-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'clientes' },
+        () => { fetchClientes(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'clientes' },
+        () => { fetchClientes(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'clientes' },
+        () => { fetchClientes(); }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchClientes]);
+
   const setMetaMensalGlobal = useCallback(async (v: number) => {
     setMetaMensalGlobalState(v);
     await supabase
       .from('company_settings')
       .update({ value: v as any })
       .eq('key', 'meta_mensal');
+  }, []);
+
+  const setMetaEmpresaVendas = useCallback(async (v: number) => {
+    setMetaEmpresaVendasState(v);
+    await supabase
+      .from('company_settings')
+      .upsert({ key: 'meta_empresa_vendas', value: v as any } as any, { onConflict: 'key' });
+  }, []);
+
+  const setMetaComercialVendas = useCallback(async (v: number) => {
+    setMetaComercialVendasState(v);
+    await supabase
+      .from('company_settings')
+      .upsert({ key: 'meta_comercial_vendas', value: v as any } as any, { onConflict: 'key' });
   }, []);
 
   const addVendedor = useCallback(async (v: Omit<Vendedor, 'id'>): Promise<Vendedor | null> => {
@@ -234,33 +322,89 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('clientes').delete().eq('id', id);
   }, []);
 
-  const faturamento = useMemo(() => clientes.reduce((s, c) => s + (c.entrada || 0), 0), [clientes]);
-  const totalVendas = clientes.length;
+  // Filter clientes by selectedMonth
+  const filteredClientes = useMemo(() => {
+    return clientes.filter(c => {
+      const month = parseMonthFromData(c.data);
+      return month === selectedMonth;
+    });
+  }, [clientes, selectedMonth]);
+
+  // All computed values use filteredClientes
+  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + (c.entrada || 0), 0), [filteredClientes]);
+  const totalVendas = filteredClientes.length;
   const ticketMedio = useMemo(() => totalVendas > 0 ? faturamento / totalVendas : 0, [faturamento, totalVendas]);
-  const pctMeta = useMemo(() => (faturamento / metaMensalGlobal) * 100, [faturamento, metaMensalGlobal]);
+
+  // Global pctMeta is now sales-count based against metaEmpresaVendas
+  const pctMeta = useMemo(() => metaEmpresaVendas > 0 ? (totalVendas / metaEmpresaVendas) * 100 : 0, [totalVendas, metaEmpresaVendas]);
 
   const projecao = useMemo(() => {
     const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    return currentDay > 0 ? (faturamento / currentDay) * daysInMonth : 0;
-  }, [faturamento]);
+    const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(selYear, selMonthStr, 0).getDate();
+
+    const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
+
+    let diasPassados: number;
+    if (isCurrentMonth) {
+      diasPassados = now.getDate();
+    } else {
+      // For past/future months, use the last day that has data, or the full month
+      const daysWithData = filteredClientes
+        .map(c => {
+          const parts = c.data.split('/');
+          return parts.length === 3 ? parseInt(parts[0], 10) : 0;
+        })
+        .filter(d => d > 0);
+      diasPassados = daysWithData.length > 0 ? Math.max(...daysWithData) : daysInMonth;
+    }
+
+    if (diasPassados <= 0) return 0;
+    const ritmo = totalVendas / diasPassados;
+    return ritmo * daysInMonth;
+  }, [filteredClientes, totalVendas, selectedMonth]);
 
   const vendedorStats = useMemo<VendedorStats[]>(() => {
+    const now = new Date();
+    const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(selYear, selMonthStr, 0).getDate();
+    const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
+
     return vendedores.map(v => {
-      const cv = clientes.filter(c => c.vendedor === v.nome);
+      const cv = filteredClientes.filter(c => c.vendedor === v.nome);
       const fat = cv.reduce((s, c) => s + (c.entrada || 0), 0);
       const vendas = cv.length;
       const ticket = vendas > 0 ? fat / vendas : 0;
-      const pct = v.meta > 0 ? (fat / v.meta) * 100 : 0;
-      const faltam = Math.max(0, v.meta - fat);
-      return { vendedor: v, faturamento: fat, vendas, ticketMedio: ticket, pctMeta: pct, faltam };
-    }).sort((a, b) => b.faturamento - a.faturamento);
-  }, [clientes, vendedores]);
+
+      // Meta is now number of sales
+      const pct = v.meta > 0 ? (vendas / v.meta) * 100 : 0;
+      const faltam = Math.max(0, v.meta - vendas);
+
+      // Per-vendor projection
+      let diasPassados: number;
+      if (isCurrentMonth) {
+        diasPassados = now.getDate();
+      } else {
+        const daysWithData = cv
+          .map(c => {
+            const parts = c.data.split('/');
+            return parts.length === 3 ? parseInt(parts[0], 10) : 0;
+          })
+          .filter(d => d > 0);
+        diasPassados = daysWithData.length > 0 ? Math.max(...daysWithData) : daysInMonth;
+      }
+
+      const ritmo = diasPassados > 0 ? vendas / diasPassados : 0;
+      const projecaoVendas = Math.round(ritmo * daysInMonth);
+      const dentroProjecao = projecaoVendas >= v.meta;
+
+      return { vendedor: v, faturamento: fat, vendas, ticketMedio: ticket, pctMeta: pct, faltam, projecaoVendas, dentroProjecao };
+    }).sort((a, b) => b.vendas - a.vendas);
+  }, [filteredClientes, vendedores, selectedMonth]);
 
   const dailyEvolution = useMemo(() => {
     const byDay: Record<string, { fat: number; dataFull: string }> = {};
-    clientes.forEach(c => {
+    filteredClientes.forEach(c => {
       const day = c.data?.split('/')[0] || '00';
       if (!byDay[day]) byDay[day] = { fat: 0, dataFull: c.data };
       byDay[day].fat += (c.entrada || 0);
@@ -268,11 +412,11 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([dia, d]) => ({ dia, dataFull: d.dataFull, faturamento: d.fat }));
-  }, [clientes]);
+  }, [filteredClientes]);
 
   const ticketPorDia = useMemo(() => {
     const byDay: Record<string, { total: number; count: number }> = {};
-    clientes.forEach(c => {
+    filteredClientes.forEach(c => {
       const day = c.data?.split('/')[0] || '00';
       if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
       byDay[day].total += (c.entrada || 0);
@@ -281,11 +425,16 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([dia, d]) => ({ dia, ticketMedio: d.count > 0 ? d.total / d.count : 0 }));
-  }, [clientes]);
+  }, [filteredClientes]);
 
   return (
     <SalesDataContext.Provider value={{
-      metaMensalGlobal, setMetaMensalGlobal, vendedores, addVendedor, updateVendedor, deleteVendedor, clientes,
+      metaMensalGlobal, setMetaMensalGlobal,
+      metaEmpresaVendas, setMetaEmpresaVendas,
+      metaComercialVendas, setMetaComercialVendas,
+      selectedMonth, setSelectedMonth,
+      vendedores, addVendedor, updateVendedor, deleteVendedor,
+      clientes, filteredClientes,
       addCliente, updateCliente, deleteCliente,
       faturamento, totalVendas, ticketMedio, pctMeta, projecao,
       vendedorStats, dailyEvolution, ticketPorDia, loading,

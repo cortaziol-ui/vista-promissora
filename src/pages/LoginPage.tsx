@@ -72,14 +72,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-6 glass-card p-4">
-          <p className="text-xs text-muted-foreground mb-2">Logins disponíveis:</p>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p><span className="text-kpi-revenue">Admin:</span> caio@empresa.com</p>
-            <p><span className="text-kpi-goal">Gerente:</span> cunha@empresa.com</p>
-            <p><span className="text-kpi-ticket">Vendedores:</span> bianca@empresa.com, nayra@empresa.com, lucas@empresa.com, gustavo@empresa.com</p>
-          </div>
-        </div>
       </div>
     </div>
   );
