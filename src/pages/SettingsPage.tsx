@@ -344,15 +344,22 @@ export default function SettingsPage() {
                 <thead>
                   <tr className="text-muted-foreground border-b border-border/50">
                     <th className="text-left py-2 px-2">Campanha</th>
+                    <th className="text-center py-2 px-2">Ativa</th>
                     <th className="text-left py-2 px-2 w-[180px]">Vendedor</th>
-                    <th className="text-center py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2">Vínculo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {links.map(link => (
+                  {links.map(link => {
+                    const campaign = metaCampaigns.find(c => c.id === link.campaign_id);
+                    const isActive = campaign?.status === 'ACTIVE';
+                    return (
                     <tr key={link.campaign_id} className="border-b border-border/30 hover:bg-secondary/50">
                       <td className="py-2 px-2">
                         <span className="text-foreground text-xs">{link.campaign_name}</span>
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <span className={`inline-block w-2 h-2 rounded-full ${isActive ? 'bg-green-400' : 'bg-muted-foreground/40'}`} title={campaign?.status || 'Desconhecido'} />
                       </td>
                       <td className="py-2 px-2">
                         <Select
@@ -382,7 +389,8 @@ export default function SettingsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
