@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -27,33 +27,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function fetchUserRole(userId: string): Promise<UserRole> {
-  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId).limit(1).maybeSingle();
-  return (data?.role as UserRole) || "seller";
-}
-
-async function fetchSellerName(userId: string): Promise<string | undefined> {
-  const { data } = await supabase.from("vendedores").select("nome").eq("user_id", userId).limit(1).maybeSingle();
-  return data?.nome || undefined;
-}
+const POSITION_MAP: Record<UserRole, string> = {
+  admin: "Administrador",
+  manager: "Gerente / Vendedor",
+  seller: "Vendedor(a)",
+};
 
 function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string): User {
   const email = supaUser.email || "";
   const name = email.split("@")[0].charAt(0).toUpperCase() + email.split("@")[0].slice(1);
-
-  const positionMap: Record<UserRole, string> = {
-    admin: "Administrador",
-    manager: "Gerente / Vendedor",
-    seller: "Vendedor(a)",
-  };
-
   return {
     id: supaUser.id,
     name,
     email,
     role,
     avatar: role === "admin" ? "👤" : "👨",
-    position: positionMap[role],
+    position: POSITION_MAP[role],
     status: "active",
     sellerName,
   };
@@ -63,66 +52,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    // Safety timeout — if Supabase doesn't respond in 8s, unblock the UI
-    const timeout = setTimeout(() => {
-      if (!cancelled) {
-        console.warn("[AuthContext] Timeout reached — unblocking UI");
-        setLoading(false);
-      }
-    }, 8000);
-
-    async function resolveUser(supaUser: SupabaseUser) {
-      try {
-        const role = await fetchUserRole(supaUser.id);
-        const sellerName = await fetchSellerName(supaUser.id);
-        if (!cancelled) setUser(buildUser(supaUser, role, sellerName));
-      } catch (e) {
-        console.error("Error fetching user data:", e);
-        if (!cancelled) setUser(buildUser(supaUser, "seller"));
-      }
+  // Fetch role + seller name and update user in background (non-blocking)
+  const enrichUser = useCallback(async (supaUser: SupabaseUser) => {
+    try {
+      const [roleRes, sellerRes] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", supaUser.id).limit(1).maybeSingle(),
+        supabase.from("vendedores").select("nome").eq("user_id", supaUser.id).limit(1).maybeSingle(),
+      ]);
+      const role = (roleRes.data?.role as UserRole) || "seller";
+      const sellerName = sellerRes.data?.nome || undefined;
+      setUser(buildUser(supaUser, role, sellerName));
+    } catch (e) {
+      console.error("[AuthContext] enrichUser error:", e);
+      // Keep whatever user we already have set
     }
+  }, []);
 
-    // Listen to all auth state changes (including INITIAL_SESSION on page load)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+  useEffect(() => {
+    // Safety timeout
+    const timeout = setTimeout(() => setLoading(false), 6000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      clearTimeout(timeout);
+
       if (session?.user) {
-        await resolveUser(session.user);
+        // Set user immediately with default role so UI unblocks
+        setUser(prev => {
+          // If we already have this user resolved, keep the enriched version
+          if (prev?.id === session.user.id) return prev;
+          return buildUser(session.user, "seller");
+        });
+        setLoading(false);
+        // Then enrich with actual role in background
+        enrichUser(session.user);
       } else {
-        if (!cancelled) setUser(null);
-      }
-      if (!cancelled) {
-        clearTimeout(timeout);
+        setUser(null);
         setLoading(false);
       }
     });
 
     return () => {
-      cancelled = true;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [enrichUser]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error || !data.user) return false;
-      // Build user immediately so navigation doesn't hit a null user
-      try {
-        const role = await fetchUserRole(data.user.id);
-        const sellerName = await fetchSellerName(data.user.id);
-        setUser(buildUser(data.user, role, sellerName));
-      } catch {
-        setUser(buildUser(data.user, "seller"));
-      }
-      return true;
-    } catch {
-      return false;
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return !error;
   };
 
   const logout = async () => {
