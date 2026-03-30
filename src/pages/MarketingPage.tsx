@@ -30,7 +30,7 @@ export default function MarketingPage() {
 
   // Load token from Supabase
   useEffect(() => {
-    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').single()
+    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
   }, []);
 
