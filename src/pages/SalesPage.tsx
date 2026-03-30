@@ -2,7 +2,10 @@ import { useState, useMemo } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
+import { CommissionProgress } from '@/components/CommissionProgress';
+import { CommissionSummary } from '@/components/CommissionSummary';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { DollarSign, Target, Receipt, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -211,6 +214,28 @@ export default function SalesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Commission section */}
+      <div className="glass-card p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Comissionamento por Vendedor</h3>
+        <div className="space-y-4">
+          {filteredStats.map(stat => (
+            <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">{stat.vendedor.avatar}</span>
+                <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
+                <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+              </div>
+              <CommissionProgress
+                vendedorNome={stat.vendedor.nome}
+                vendas={stat.vendas}
+                meta={stat.vendedor.meta}
+                month={selectedMonth}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>

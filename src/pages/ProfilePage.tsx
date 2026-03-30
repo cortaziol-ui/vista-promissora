@@ -1,14 +1,24 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useSalesData } from '@/contexts/SalesDataContext';
+import { CommissionSummary } from '@/components/CommissionSummary';
+import { CommissionProgress } from '@/components/CommissionProgress';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+  const { vendedorStats, selectedMonth } = useSalesData();
   const navigate = useNavigate();
 
   if (!user) return null;
 
   const roleLabel = user.role === 'admin' ? 'Administrador' : user.role === 'manager' ? 'Gerente' : 'Vendedor';
+
+  // Find this user's vendor stats (by sellerName or email prefix)
+  const myStats = vendedorStats.find(s =>
+    s.vendedor.nome === user.sellerName ||
+    s.vendedor.nome.toLowerCase() === user.name.toLowerCase()
+  );
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -33,11 +43,15 @@ export default function ProfilePage() {
             <p className="text-xs text-muted-foreground">Status</p>
             <p className="text-sm text-foreground capitalize">{user.status === 'active' ? 'Ativo' : 'Inativo'}</p>
           </div>
-          {user.role === 'seller' && (
+          {myStats && (
             <>
               <div>
-                <p className="text-xs text-muted-foreground">Cargo</p>
-                <p className="text-sm text-foreground">{user.position}</p>
+                <p className="text-xs text-muted-foreground">Vendas no mês</p>
+                <p className="text-sm text-foreground font-semibold">{myStats.vendas} / {myStats.vendedor.meta}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Faturamento</p>
+                <p className="text-sm text-foreground">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(myStats.faturamento)}</p>
               </div>
             </>
           )}
@@ -49,6 +63,27 @@ export default function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      {/* Commission section for this user */}
+      {myStats && (
+        <>
+          <div className="glass-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Progresso de Comissão</h2>
+            <CommissionProgress
+              vendedorNome={myStats.vendedor.nome}
+              vendas={myStats.vendas}
+              meta={myStats.vendedor.meta}
+              month={selectedMonth}
+            />
+          </div>
+          <CommissionSummary
+            vendedorNome={myStats.vendedor.nome}
+            vendas={myStats.vendas}
+            meta={myStats.vendedor.meta}
+            month={selectedMonth}
+          />
+        </>
+      )}
     </div>
   );
 }
