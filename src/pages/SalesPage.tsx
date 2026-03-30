@@ -232,7 +232,7 @@ export default function SalesPage() {
 
       {/* Commission section */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Comissionamento por Vendedor</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-4">Premiações por Vendedor</h3>
         <div className="space-y-4">
           {commissionStats.map(stat => (
             <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">

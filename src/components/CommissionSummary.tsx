@@ -37,7 +37,7 @@ export function CommissionSummary({
     return (
       <div className="glass-card p-4">
         <p className="text-sm text-muted-foreground">
-          Sem faixas de comissao configuradas para este periodo.
+          Sem faixas de premiação configuradas para este período.
         </p>
       </div>
     );

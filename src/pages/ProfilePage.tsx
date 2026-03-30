@@ -68,7 +68,7 @@ export default function ProfilePage() {
       {myStats && (
         <>
           <div className="glass-card p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Progresso de Comissão</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Progresso de Premiação</h2>
             <CommissionProgress
               vendedorNome={myStats.vendedor.nome}
               vendas={myStats.vendas}

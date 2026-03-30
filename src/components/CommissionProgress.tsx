@@ -53,7 +53,7 @@ export function CommissionProgress({
   const barProgress = Math.max(0, Math.min(100, toPos(currentPct)));
 
   return (
-    <div className="w-full">
+    <div className="w-full px-6">
       {/* Progress track */}
       <div className="relative w-full h-8 flex items-center">
         {/* Background track */}
