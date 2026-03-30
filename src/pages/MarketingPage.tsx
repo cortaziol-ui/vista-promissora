@@ -169,7 +169,7 @@ export default function MarketingPage() {
   // Cards sorted by score then leads
   const campaignCards = useMemo(() => {
     return [...campaigns]
-      .filter(c => c.leads > 0)
+      .filter(c => c.leads > 0 && c.status === 'ACTIVE')
       .sort((a, b) => b.leads - a.leads);
   }, [campaigns]);
 
