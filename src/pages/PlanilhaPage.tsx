@@ -14,7 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -40,7 +40,7 @@ const emptyCliente = (): Omit<Cliente, 'id'> => ({
 });
 
 export default function PlanilhaPage() {
-  const { clientes, vendedores, addCliente, updateCliente, deleteCliente } = useSalesData();
+  const { clientes, vendedores, addCliente, updateCliente, deleteCliente, selectedMonth, setSelectedMonth } = useSalesData();
   const [search, setSearch] = useState('');
   const [filterVendedor, setFilterVendedor] = useState('all');
   const [filterServico, setFilterServico] = useState('all');
@@ -51,8 +51,31 @@ export default function PlanilhaPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<Omit<Cliente, 'id'>>(emptyCliente());
 
+  // Month navigation helpers
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const [selYear, selMonthNum] = selectedMonth.split('-').map(Number);
+  const monthDisplay = `${monthNames[selMonthNum - 1]} ${selYear}`;
+
+  const goToPrevMonth = () => {
+    const d = new Date(selYear, selMonthNum - 2, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setPage(0);
+  };
+  const goToNextMonth = () => {
+    const d = new Date(selYear, selMonthNum, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setPage(0);
+  };
+
+  // Filter clientes by selected month first, then by other filters
   const filtered = useMemo(() => {
-    let data = [...clientes];
+    let data = clientes.filter(c => {
+      if (!c.data) return false;
+      const parts = c.data.split('/');
+      if (parts.length !== 3) return false;
+      const ym = `${parts[2]}-${parts[1].padStart(2, '0')}`;
+      return ym === selectedMonth;
+    });
     if (search) {
       const q = search.toLowerCase();
       data = data.filter(c => c.nome.toLowerCase().includes(q) || c.cpf.includes(q) || c.email.toLowerCase().includes(q));
@@ -61,7 +84,7 @@ export default function PlanilhaPage() {
     if (filterServico !== 'all') data = data.filter(c => c.servico === filterServico);
     if (filterSituacao !== 'all') data = data.filter(c => c.situacao === filterSituacao);
     return data;
-  }, [clientes, search, filterVendedor, filterServico, filterSituacao]);
+  }, [clientes, selectedMonth, search, filterVendedor, filterServico, filterSituacao]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
@@ -102,10 +125,23 @@ export default function PlanilhaPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">📋 Planilha de Controle</h1>
-          <p className="text-muted-foreground text-sm">Dados de clientes e operações — {filtered.length} registros</p>
+          <h1 className="text-2xl font-bold text-foreground">Planilha de Controle</h1>
+          <p className="text-muted-foreground text-sm">{filtered.length} registros</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          {/* Month navigator */}
+          <div className="flex items-center gap-1 bg-secondary rounded-lg border border-border/50 px-1">
+            <Button variant="ghost" size="sm" onClick={goToPrevMonth} className="h-8 w-8 p-0">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">{monthDisplay}</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={goToNextMonth} className="h-8 w-8 p-0">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
           <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
           <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Exportar CSV</Button>
         </div>

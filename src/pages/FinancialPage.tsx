@@ -11,7 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
+const fmt = (v: number) => {
+  if (v >= 1000) return `R$ ${Math.round(v / 1000)}k`;
+  return `R$ ${Math.round(v)}`;
+};
 
 interface Custo {
   id: string;
@@ -333,7 +336,7 @@ export default function FinancialPage() {
             <BarChart data={projecao.map(p => ({ mes: monthLabel(p.mes), Entradas: Math.round(p.entradas), 'Parcela 1': Math.round(p.p1), 'Parcela 2': Math.round(p.p2) }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
               <XAxis dataKey="mes" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-              <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
+              <YAxis stroke="hsl(215, 20%, 65%)" fontSize={11} tickFormatter={fmt} width={70} />
               <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => fmtFull(v)} />
               <Legend />
               <Bar dataKey="Entradas" stackId="a" fill="hsl(217, 91%, 60%)" radius={[0, 0, 0, 0]} />
@@ -515,7 +518,7 @@ export default function FinancialPage() {
             <BarChart data={comparativo}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
               <XAxis dataKey="mes" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-              <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
+              <YAxis stroke="hsl(215, 20%, 65%)" fontSize={11} tickFormatter={fmt} width={70} />
               <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => fmtFull(v)} />
               <Legend />
               <Bar dataKey="receita" name="Receita" fill="hsl(160, 84%, 39%)" radius={[4, 4, 0, 0]} />
