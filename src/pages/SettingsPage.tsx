@@ -32,7 +32,7 @@ const MESES = [
 
 export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
-  const { vendedores, metaMensalGlobal, setMetaMensalGlobal, updateVendedor, clientes } = useSalesData();
+  const { vendedores, metaMensalGlobal, setMetaMensalGlobal, addVendedor, updateVendedor, deleteVendedor, clientes } = useSalesData();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'seller', monthlyGoal: 50000 });
@@ -118,8 +118,22 @@ export default function SettingsPage() {
     setShowSuggestions(false);
   };
 
-  const handleAddUser = () => {
-    toast({ title: 'Vendedor adicionado', description: `${newUser.name} foi adicionado ao sistema.` });
+  const handleAddUser = async () => {
+    if (!newUser.name.trim()) {
+      toast({ title: 'Erro', description: 'Nome é obrigatório.', variant: 'destructive' });
+      return;
+    }
+    const result = await addVendedor({
+      nome: newUser.name.trim(),
+      cargo: 'Vendedor',
+      meta: newUser.monthlyGoal,
+      avatar: '👤',
+    });
+    if (result) {
+      toast({ title: 'Vendedor adicionado', description: `${newUser.name} foi adicionado ao sistema.` });
+    } else {
+      toast({ title: 'Erro', description: 'Falha ao salvar vendedor.', variant: 'destructive' });
+    }
     setDialogOpen(false);
     setNewUser({ name: '', email: '', password: '', role: 'seller', monthlyGoal: 50000 });
   };
@@ -325,7 +339,7 @@ export default function SettingsPage() {
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       {isAdmin && (
-                        <Button variant="ghost" size="sm" onClick={() => toast({ title: 'Excluir', description: `${v.nome} removido` })}>
+                        <Button variant="ghost" size="sm" onClick={() => { deleteVendedor(v.id); toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); }}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       )}

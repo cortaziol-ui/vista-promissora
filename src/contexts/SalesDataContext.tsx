@@ -45,7 +45,9 @@ interface SalesDataContextType {
   metaMensalGlobal: number;
   setMetaMensalGlobal: (v: number) => void;
   vendedores: Vendedor[];
+  addVendedor: (v: Omit<Vendedor, 'id'>) => Promise<Vendedor | null>;
   updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
+  deleteVendedor: (id: number) => void;
   clientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
@@ -168,6 +170,26 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       .eq('key', 'meta_mensal');
   }, []);
 
+  const addVendedor = useCallback(async (v: Omit<Vendedor, 'id'>): Promise<Vendedor | null> => {
+    const { data, error } = await supabase.from('vendedores').insert({
+      nome: v.nome,
+      cargo: v.cargo,
+      meta: v.meta,
+      avatar: v.avatar,
+    } as any).select().single();
+    if (data && !error) {
+      const newV: Vendedor = { id: data.id, nome: data.nome, cargo: data.cargo, meta: Number(data.meta), avatar: data.avatar };
+      setVendedores(prev => [...prev, newV]);
+      return newV;
+    }
+    return null;
+  }, []);
+
+  const deleteVendedor = useCallback(async (id: number) => {
+    setVendedores(prev => prev.filter(v => v.id !== id));
+    await supabase.from('vendedores').delete().eq('id', id);
+  }, []);
+
   const updateVendedor = useCallback(async (id: number, partial: Partial<Vendedor>) => {
     setVendedores(prev => prev.map(v => v.id === id ? { ...v, ...partial } : v));
     const dbPartial: Record<string, any> = {};
@@ -263,7 +285,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <SalesDataContext.Provider value={{
-      metaMensalGlobal, setMetaMensalGlobal, vendedores, updateVendedor, clientes,
+      metaMensalGlobal, setMetaMensalGlobal, vendedores, addVendedor, updateVendedor, deleteVendedor, clientes,
       addCliente, updateCliente, deleteCliente,
       faturamento, totalVendas, ticketMedio, pctMeta, projecao,
       vendedorStats, dailyEvolution, ticketPorDia, loading,
