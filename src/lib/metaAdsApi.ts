@@ -57,7 +57,8 @@ export async function fetchCampaignInsights(
 
     // Fetch campaigns with insights
     const fields = 'name,status,insights.time_range({"since":"' + dateRange.since + '","until":"' + dateRange.until + '"}){impressions,clicks,spend,cpc,ctr,actions}';
-    const url = `${META_API}/${actId}/campaigns?fields=${encodeURIComponent(fields)}&limit=100&access_token=${token}`;
+    // Fetch ALL campaigns (active + paused + archived) that may have data in the period
+    const url = `${META_API}/${actId}/campaigns?fields=${encodeURIComponent(fields)}&limit=500&access_token=${token}`;
 
     const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
     const data = await res.json();
@@ -79,12 +80,17 @@ export async function fetchCampaignInsights(
         const ctr = Number(ins.ctr || 0);
 
         // Extract leads and conversions from actions
+        // Leads = messaging conversations (WhatsApp/Messenger) + pixel leads + form leads
         let leads = 0, conversions = 0;
         for (const action of (ins.actions || [])) {
-          if (action.action_type === 'lead') leads += Number(action.value || 0);
-          if (action.action_type === 'offsite_conversion.fb_pixel_lead') leads += Number(action.value || 0);
-          if (action.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversions += Number(action.value || 0);
-          if (action.action_type === 'purchase' || action.action_type === 'complete_registration') conversions += Number(action.value || 0);
+          const t = action.action_type;
+          const v = Number(action.value || 0);
+          // Count as LEADS: messaging conversations, pixel leads, form leads
+          if (t === 'onsite_conversion.messaging_conversation_started_7d') leads += v;
+          if (t === 'lead') leads += v;
+          if (t === 'offsite_conversion.fb_pixel_lead') leads += v;
+          // Count as CONVERSIONS: purchases, registrations
+          if (t === 'purchase' || t === 'complete_registration') conversions += v;
         }
 
         campInsights = { impressions, clicks, spend, cpc, ctr, leads, conversions };
