@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAccountContext, type MetaAccount } from "@/contexts/AccountContext";
+import { testConnection, testAdAccount, fetchCampaignInsights } from "@/lib/metaAdsApi";
 
 // ─── Token Section ────────────────────────────────────────────────────────────
 
@@ -150,13 +151,9 @@ function SyncSection() {
 
     for (const account of accounts) {
       try {
-        const { data, error } = await supabase.functions.invoke("meta-ads-proxy", {
-          body: { action: "sync", accessToken, adAccountId: account.ad_account_id, dateRange: { since, until } },
-        });
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
-        const campaigns = data?.campaigns?.length ?? 0;
-        logs.push({ name: account.name, ok: true, msg: `${campaigns} campanhas · ${account.ad_account_id}` });
+        const result = await fetchCampaignInsights(accessToken, account.ad_account_id, { since, until });
+        if (result.error) throw new Error(result.error);
+        logs.push({ name: account.name, ok: true, msg: `${result.campaigns.length} campanhas · ${account.ad_account_id}` });
       } catch (e: any) {
         logs.push({ name: account.name, ok: false, msg: e.message });
       }
@@ -239,19 +236,16 @@ function AddAccountForm({ onAdded }: { onAdded: () => void }) {
       const accessToken = tokenData?.value;
       if (!accessToken) throw new Error("Configure o Access Token antes de testar.");
 
-      const { data, error } = await supabase.functions.invoke("meta-ads-proxy", {
-        body: { action: "test", accessToken },
-      });
-      if (error) throw new Error(error.message);
+      const result = await testAdAccount(accessToken, accountId);
 
-      if (data?.success) {
+      if (result.success) {
         setStatus("success");
         setTested(true);
-        if (!name && data.name) setName(data.name);
-        setMessage(`Conectado! ${data.name || accountId}`);
+        if (!name && result.name) setName(result.name);
+        setMessage(`Conectado! ${result.name || accountId}`);
       } else {
         setStatus("error");
-        setMessage(data?.error || "Falha na conexão.");
+        setMessage(result.error || "Falha na conexão.");
       }
     } catch (e: any) {
       setStatus("error");
