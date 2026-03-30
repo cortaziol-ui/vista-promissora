@@ -310,8 +310,8 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      {/* Section 2: Campaign Decision Cards */}
-      <div>
+      {/* Section 2: Campaign Decision Table */}
+      <div className="glass-card bg-gradient-to-br from-primary/5 to-transparent border border-border/30 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-foreground">Campanhas — Decisão Rápida</h3>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -320,55 +320,51 @@ export default function MarketingPage() {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Pausar/Rever</span>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {campaignCards.map(c => {
-            const score = scoreCampaign(c);
-            const borderColor = score.color === 'green' ? 'border-green-500/40' : score.color === 'yellow' ? 'border-amber-500/40' : 'border-red-500/40';
-            const bgColor = score.color === 'green' ? 'from-green-500/5' : score.color === 'yellow' ? 'from-amber-500/5' : 'from-red-500/5';
-            const badgeColor = score.color === 'green' ? 'bg-green-500/20 text-green-400' : score.color === 'yellow' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400';
-            const StatusIcon = score.color === 'green' ? Rocket : score.color === 'yellow' ? Zap : Pause;
-
-            return (
-              <div key={c.name} className={`glass-card bg-gradient-to-br ${bgColor} to-transparent border ${borderColor} p-4 hover:scale-[1.02] transition-all duration-200`}>
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <p className="text-xs font-medium text-foreground leading-tight line-clamp-2" title={c.name}>{c.name}</p>
-                  <span className={`shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
-                    <StatusIcon className="w-3 h-3" />
-                    {score.label}
-                  </span>
-                </div>
-
-                {/* Metrics */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Leads</p>
-                    <p className="text-lg font-bold text-foreground">{c.leads}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">CPL</p>
-                    <p className={`text-lg font-bold ${cplColor(c.cpl)}`}>{fmtFull(c.cpl)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">CTR</p>
-                    <p className={`text-sm font-semibold ${ctrColor(c.ctr)}`}>{Number(c.ctr).toFixed(2)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Investido</p>
-                    <p className="text-sm font-semibold text-foreground">{fmtFull(c.cost)}</p>
-                  </div>
-                </div>
-
-                {/* Action */}
-                <div className="pt-2 border-t border-border/30">
-                  <p className="text-[10px] text-muted-foreground">
-                    Ação sugerida: <span className="text-foreground font-medium">{score.action}</span>
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {campaignCards.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/50">
+                  <th className="text-left py-2.5 px-2 uppercase tracking-wide text-xs">Campanha</th>
+                  <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">Leads</th>
+                  <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">CPL</th>
+                  <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">CTR</th>
+                  <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">Investido</th>
+                  <th className="text-center py-2.5 px-2 uppercase tracking-wide text-xs">Status</th>
+                  <th className="text-left py-2.5 px-2 uppercase tracking-wide text-xs">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaignCards.map((c, i) => {
+                  const score = scoreCampaign(c);
+                  const badgeColor = score.color === 'green' ? 'bg-green-500/20 text-green-400' : score.color === 'yellow' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400';
+                  const StatusIcon = score.color === 'green' ? Rocket : score.color === 'yellow' ? Zap : Pause;
+                  return (
+                    <tr key={c.name} className={`border-b border-border/20 hover:bg-primary/5 transition-colors ${i % 2 !== 0 ? 'bg-secondary/15' : ''}`}>
+                      <td className="py-2.5 px-2 max-w-[250px]">
+                        <p className="text-xs font-medium text-foreground truncate" title={c.name}>{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{c.vendor}</p>
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-semibold text-foreground">{c.leads}</td>
+                      <td className={`py-2.5 px-2 text-right font-medium ${cplColor(c.cpl)}`}>{fmtFull(c.cpl)}</td>
+                      <td className={`py-2.5 px-2 text-right font-medium ${ctrColor(c.ctr)}`}>{Number(c.ctr).toFixed(2)}%</td>
+                      <td className="py-2.5 px-2 text-right text-muted-foreground">{fmtFull(c.cost)}</td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {score.label}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-xs text-muted-foreground">{score.action}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-8">Nenhuma campanha com leads no período.</p>
+        )}
       </div>
     </div>
   );
