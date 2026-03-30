@@ -223,7 +223,8 @@ export default function MarketingPage() {
         <KpiCard title="CTR" value={`${Number(ctr).toFixed(2)}%`} icon={<Target className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={200} />
         <KpiCard title="Leads" value={fmtNum(totalLeads)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={250} />
         <KpiCard title="CPL" value={fmtFull(cpl)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={300} />
-        <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={350} />
+        <KpiCard title="Conversão" value={`${conversionRate.toFixed(1)}%`} subtitle="Vendas / Leads" icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={350} />
+        <KpiCard title="CAC" value={totalVendas > 0 ? fmtFull(totalCost / totalVendas) : '—'} subtitle="Custo por cliente" icon={<DollarSign className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={400} />
       </div>
 
       {syncing && (

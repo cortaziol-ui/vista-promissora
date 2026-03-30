@@ -122,6 +122,28 @@ export default function OverviewPage() {
         )}
       </div>
 
+      {/* Meta Ads key metrics — above charts */}
+      {metaConnected ? (
+        <div className="glass-card p-5 animate-in" style={{ animationDelay: '280ms' }}>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Meta Ads — Resumo</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <KpiCard title="Investimento" value={fmtFull(metaInsights?.spend ?? 0)} icon={<Megaphone className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+            <KpiCard title="Leads" value={fmtNum(metaInsights?.leads ?? 0)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+            <KpiCard title="CAC" value={totalVendas > 0 ? fmtFull((metaInsights?.spend ?? 0) / totalVendas) : '—'} subtitle="Custo por cliente" icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+            <KpiCard title="Conversão" value={`${(metaInsights?.leads ?? 0) > 0 ? ((totalVendas / (metaInsights?.leads ?? 1)) * 100).toFixed(1) : '0.0'}%`} subtitle="Vendas / Leads" icon={<Target className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
+            <KpiCard title="Impressões" value={fmtNum(metaInsights?.impressions ?? 0)} icon={<Users className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
+            <KpiCard title="CPL" value={(metaInsights?.leads ?? 0) > 0 ? fmtFull((metaInsights?.spend ?? 0) / (metaInsights?.leads ?? 1)) : '—'} icon={<DollarSign className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
+          </div>
+        </div>
+      ) : (
+        <div className="glass-card p-5 animate-in" style={{ animationDelay: '280ms' }}>
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <AlertCircle className="w-5 h-5" />
+            <p className="text-sm">Meta Ads não conectado — configure na página de Configurações para visualizar métricas.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="glass-card p-5 animate-in" style={{ animationDelay: '300ms' }}>
           <h3 className="text-sm font-semibold text-foreground mb-4">Evolucao de Vendas (Diaria)</h3>
@@ -218,27 +240,6 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* Meta Ads key metrics */}
-      {metaConnected ? (
-        <div className="glass-card p-5 animate-in" style={{ animationDelay: '450ms' }}>
-          <h3 className="text-sm font-semibold text-foreground mb-4">Meta Ads — Resumo</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <KpiCard title="Investimento" value={fmtFull(metaInsights?.spend ?? 0)} icon={<Megaphone className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-            <KpiCard title="Leads" value={fmtNum(metaInsights?.leads ?? 0)} icon={<TrendingUp className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
-            <KpiCard title="CAC" value={totalVendas > 0 ? fmtFull((metaInsights?.spend ?? 0) / totalVendas) : '—'} subtitle="Custo por cliente" icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-            <KpiCard title="Conversão" value={`${(metaInsights?.leads ?? 0) > 0 ? ((totalVendas / (metaInsights?.leads ?? 1)) * 100).toFixed(1) : '0.0'}%`} subtitle="Vendas / Leads" icon={<Target className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
-            <KpiCard title="Impressões" value={fmtNum(metaInsights?.impressions ?? 0)} icon={<Users className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
-            <KpiCard title="CPL" value={(metaInsights?.leads ?? 0) > 0 ? fmtFull((metaInsights?.spend ?? 0) / (metaInsights?.leads ?? 1)) : '—'} icon={<DollarSign className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
-          </div>
-        </div>
-      ) : (
-        <div className="glass-card p-5 animate-in" style={{ animationDelay: '450ms' }}>
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <AlertCircle className="w-5 h-5" />
-            <p className="text-sm">Meta Ads não conectado — configure na página de Configurações para visualizar métricas.</p>
-          </div>
-        </div>
-      )}
 
       {/* Commission / Premiação section - admin/manager only */}
       {!isSeller && (
