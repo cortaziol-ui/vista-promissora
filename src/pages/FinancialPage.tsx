@@ -88,9 +88,14 @@ export default function FinancialPage() {
 
   // Fetch custos
   const fetchCustos = useCallback(async () => {
-    const { data } = await (supabase.from as any)('custos_mensais').select('*').order('created_at');
-    if (data) setCustos(data as Custo[]);
-    setCustosLoading(false);
+    try {
+      const { data } = await (supabase.from as any)('custos_mensais').select('*').order('created_at');
+      if (data) setCustos(data as Custo[]);
+    } catch (e) {
+      console.error('[FinancialPage] Error fetching custos:', e);
+    } finally {
+      setCustosLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchCustos(); }, [fetchCustos]);

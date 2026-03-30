@@ -285,7 +285,7 @@ export default function SettingsPage() {
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       {isAdmin && (
-                        <Button variant="ghost" size="sm" onClick={() => { deleteVendedor(v.id); toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); }}>
+                        <Button variant="ghost" size="sm" onClick={async () => { const ok = await deleteVendedor(v.id); if (ok) { toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); } else { toast({ title: 'Erro', description: `${v.nome} tem clientes vinculados. Remova os clientes primeiro.`, variant: 'destructive' }); } }}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       )}

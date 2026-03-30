@@ -55,7 +55,7 @@ interface SalesDataContextType {
   vendedores: Vendedor[];
   addVendedor: (v: Omit<Vendedor, 'id'>) => Promise<Vendedor | null>;
   updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
-  deleteVendedor: (id: number) => void;
+  deleteVendedor: (id: number) => Promise<boolean>;
   clientes: Cliente[];
   filteredClientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
@@ -229,7 +229,11 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
         { event: 'DELETE', schema: 'public', table: 'clientes' },
         () => { fetchClientes(); }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('[SalesDataProvider] Realtime subscription error');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -273,10 +277,16 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  const deleteVendedor = useCallback(async (id: number) => {
+  const deleteVendedor = useCallback(async (id: number): Promise<boolean> => {
+    const vendedor = vendedores.find(v => v.id === id);
+    if (vendedor) {
+      const hasClientes = clientes.some(c => c.vendedor === vendedor.nome);
+      if (hasClientes) return false; // Has linked clients, caller should warn user
+    }
     setVendedores(prev => prev.filter(v => v.id !== id));
     await supabase.from('vendedores').delete().eq('id', id);
-  }, []);
+    return true;
+  }, [vendedores, clientes]);
 
   const updateVendedor = useCallback(async (id: number, partial: Partial<Vendedor>) => {
     setVendedores(prev => prev.map(v => v.id === id ? { ...v, ...partial } : v));

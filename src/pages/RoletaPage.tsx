@@ -306,9 +306,9 @@ export default function RoletaPage() {
 
     if (selectedMotivo === 'meta_semanal_100') {
       const weeklyTarget = (stat?.vendedor.meta || 0) / 4;
-      const weekFat = stat?.faturamento || 0;
-      if (weekFat < weeklyTarget) {
-        return `Meta semanal: ${formatPercent(weekFat, weeklyTarget)}. Precisa de 100%. 💪`;
+      const weekSales = stat?.vendas || 0;
+      if (weekSales < weeklyTarget) {
+        return `Meta semanal: ${weeklyTarget > 0 ? ((weekSales / weeklyTarget) * 100).toFixed(1) : 0}%. Precisa de 100%. 💪`;
       }
     }
 

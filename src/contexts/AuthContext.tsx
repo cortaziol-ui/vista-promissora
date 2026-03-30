@@ -76,15 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeout);
 
       if (session?.user) {
-        // Set user immediately with default role so UI unblocks
-        setUser(prev => {
-          // If we already have this user resolved, keep the enriched version
-          if (prev?.id === session.user.id) return prev;
-          return buildUser(session.user, "seller");
-        });
-        setLoading(false);
-        // Then enrich with actual role in background
-        enrichUser(session.user);
+        // If we already resolved this user, just unblock
+        if (user?.id === session.user.id) {
+          setLoading(false);
+          return;
+        }
+        // Fetch role before unblocking UI to avoid flickering
+        enrichUser(session.user).finally(() => setLoading(false));
       } else {
         setUser(null);
         setLoading(false);

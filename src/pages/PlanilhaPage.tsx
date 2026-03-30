@@ -29,15 +29,19 @@ const parcelaIcon = (s: string) => s === 'PAGO' ? '✅' : s === 'CANCELADO' ? '�
 
 const ITEMS_PER_PAGE = 20;
 
-const emptyCliente = (): Omit<Cliente, 'id'> => ({
-  data: new Date().toLocaleDateString('pt-BR'),
-  nome: '', cpf: '', nascimento: '', email: '', telefone: '',
-  servico: 'LIMPA NOME', vendedor: '', entrada: 179,
-  parcela1: { valor: 250, status: 'AGUARDANDO' },
-  parcela2: { valor: 250, status: 'AGUARDANDO' },
-  situacao: 'ENVIADO - AGUARDANDO LIMPAR',
-  valorTotal: 679,
-});
+function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
+  const [y, m] = selectedMonth.split('-');
+  const defaultDate = `01/${m}/${y}`;
+  return {
+    data: defaultDate,
+    nome: '', cpf: '', nascimento: '', email: '', telefone: '',
+    servico: 'LIMPA NOME', vendedor: '', entrada: 179,
+    parcela1: { valor: 250, status: 'AGUARDANDO' },
+    parcela2: { valor: 250, status: 'AGUARDANDO' },
+    situacao: 'ENVIADO - AGUARDANDO LIMPAR',
+    valorTotal: 679,
+  };
+}
 
 export default function PlanilhaPage() {
   const { clientes, vendedores, addCliente, updateCliente, deleteCliente, selectedMonth, setSelectedMonth } = useSalesData();
@@ -49,7 +53,7 @@ export default function PlanilhaPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState<Omit<Cliente, 'id'>>(emptyCliente());
+  const [form, setForm] = useState<Omit<Cliente, 'id'>>(makeEmptyCliente(selectedMonth));
 
   // Month navigation helpers
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -91,7 +95,7 @@ export default function PlanilhaPage() {
 
   const situacoes = useMemo(() => [...new Set(clientes.map(c => c.situacao))], [clientes]);
 
-  const openNew = () => { setEditingId(null); setForm(emptyCliente()); setModalOpen(true); };
+  const openNew = () => { setEditingId(null); setForm(makeEmptyCliente(selectedMonth)); setModalOpen(true); };
   const openEdit = (c: Cliente) => { setEditingId(c.id); setForm({ ...c }); setModalOpen(true); };
 
   const handleSave = () => {
@@ -111,7 +115,7 @@ export default function PlanilhaPage() {
 
   const exportCSV = () => {
     const headers = ['ID', 'Data', 'Nome', 'CPF', 'Email', 'Telefone', 'Serviço', 'Vendedor', 'Entrada', 'Parcela 1', 'Status P1', 'Parcela 2', 'Status P2', 'Situação', 'Valor Total'];
-    const rows = clientes.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.situacao, c.valorTotal].join(','));
+    const rows = filtered.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.situacao, c.valorTotal].join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
