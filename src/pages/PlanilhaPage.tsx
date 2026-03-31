@@ -93,7 +93,7 @@ export default function PlanilhaPage() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 
-  const situacoes = useMemo(() => [...new Set(clientes.map(c => c.situacao))], [clientes]);
+  const situacoes = useMemo(() => [...new Set(clientes.map(c => c.situacao).filter(s => s && s.trim()))], [clientes]);
 
   const openNew = () => { setEditingId(null); setForm(makeEmptyCliente(selectedMonth)); setModalOpen(true); };
   const openEdit = (c: Cliente) => { setEditingId(c.id); setForm({ ...c }); setModalOpen(true); };
