@@ -158,9 +158,9 @@ export default function OverviewPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
                 <XAxis dataKey="dia" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: 'hsl(210, 40%, 98%)' }} formatter={(value: number) => [fmtFull(value), 'Faturamento']} />
-                <Area type="monotone" dataKey="faturamento" stroke="hsl(217, 91%, 60%)" fill="url(#colorRevenue)" strokeWidth={2} />
+                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: 'hsl(210, 40%, 98%)' }} formatter={(value: number) => [value, 'Vendas']} />
+                <Area type="monotone" dataKey="vendas" stroke="hsl(217, 91%, 60%)" fill="url(#colorRevenue)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -43,7 +43,7 @@ export default function SettingsPage() {
   const { activeAccount } = useAccountContext();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', monthlyGoal: 10 });
+  const [newUser, setNewUser] = useState({ name: '', email: '', monthlyGoal: 10, aniversario: '', foto: '' });
 
   // Month selector
   const currentMonth = new Date().toISOString().slice(5, 7);
@@ -150,6 +150,8 @@ export default function SettingsPage() {
       cargo: 'Vendedor',
       meta: newUser.monthlyGoal,
       avatar: '👤',
+      aniversario: newUser.aniversario || undefined,
+      foto: newUser.foto || undefined,
     });
     if (result) {
       toast({ title: 'Vendedor adicionado', description: `${newUser.name} foi adicionado ao sistema.` });
@@ -157,7 +159,7 @@ export default function SettingsPage() {
       toast({ title: 'Erro', description: 'Falha ao salvar vendedor.', variant: 'destructive' });
     }
     setDialogOpen(false);
-    setNewUser({ name: '', email: '', monthlyGoal: 10 });
+    setNewUser({ name: '', email: '', monthlyGoal: 10, aniversario: '', foto: '' });
   };
 
   const somaMetasIndividuais = vendedores.reduce((s, v) => s + v.meta, 0);
@@ -253,6 +255,14 @@ export default function SettingsPage() {
                   <label className="text-sm text-muted-foreground">Meta Mensal (nº de vendas)</label>
                   <Input type="number" value={newUser.monthlyGoal} onChange={e => setNewUser({ ...newUser, monthlyGoal: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" />
                 </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Aniversário</label>
+                  <Input type="date" value={newUser.aniversario} onChange={e => setNewUser({ ...newUser, aniversario: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Foto (URL)</label>
+                  <Input value={newUser.foto} onChange={e => setNewUser({ ...newUser, foto: e.target.value })} placeholder="https://..." className="bg-secondary border-border/50 mt-1" />
+                </div>
                 <Button onClick={handleAddUser} className="w-full">Salvar Vendedor</Button>
               </div>
             </DialogContent>
@@ -265,7 +275,9 @@ export default function SettingsPage() {
               <tr className="text-muted-foreground border-b border-border/50">
                 <th className="text-left py-3 px-2">Nome</th>
                 <th className="text-left py-3 px-2">Cargo</th>
-                <th className="text-right py-3 px-2">Meta (vendas)</th>
+                <th className="text-right py-3 px-2">Meta</th>
+                <th className="text-center py-3 px-2">Aniversário</th>
+                <th className="text-center py-3 px-2">Foto</th>
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
             </thead>
@@ -289,6 +301,12 @@ export default function SettingsPage() {
                     ) : (
                       <span className="text-foreground">{v.meta} vendas</span>
                     )}
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <Input type="date" value={v.aniversario || ''} onChange={e => updateVendedor(v.id, { aniversario: e.target.value } as any)} className="bg-secondary border-border/50 w-36 text-xs h-8" />
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <Input value={v.foto || ''} onChange={e => updateVendedor(v.id, { foto: e.target.value } as any)} placeholder="URL..." className="bg-secondary border-border/50 w-28 text-xs h-8" />
                   </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">

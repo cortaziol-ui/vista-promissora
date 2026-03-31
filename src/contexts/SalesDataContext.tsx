@@ -30,6 +30,8 @@ export interface Vendedor {
   cargo: string;
   meta: number;
   avatar: string;
+  aniversario?: string;
+  foto?: string;
 }
 
 export interface VendedorStats {
@@ -67,7 +69,7 @@ interface SalesDataContextType {
   pctMeta: number;
   projecao: number;
   vendedorStats: VendedorStats[];
-  dailyEvolution: { dia: string; dataFull: string; faturamento: number }[];
+  dailyEvolution: { dia: string; dataFull: string; vendas: number }[];
   ticketPorDia: { dia: string; ticketMedio: number }[];
   loading: boolean;
 }
@@ -186,12 +188,14 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (vendRes.data) {
-          setVendedores(vendRes.data.map(v => ({
+          setVendedores(vendRes.data.map((v: any) => ({
             id: v.id,
             nome: v.nome,
             cargo: v.cargo,
             meta: Number(v.meta),
             avatar: v.avatar,
+            aniversario: v.aniversario || undefined,
+            foto: v.foto || undefined,
           })));
         }
 
@@ -278,9 +282,12 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       cargo: v.cargo,
       meta: v.meta,
       avatar: v.avatar,
+      ...(v.aniversario ? { aniversario: v.aniversario } : {}),
+      ...(v.foto ? { foto: v.foto } : {}),
     } as any).select().single();
     if (data && !error) {
-      const newV: Vendedor = { id: data.id, nome: data.nome, cargo: data.cargo, meta: Number(data.meta), avatar: data.avatar };
+      const d = data as any;
+      const newV: Vendedor = { id: d.id, nome: d.nome, cargo: d.cargo, meta: Number(d.meta), avatar: d.avatar, aniversario: d.aniversario, foto: d.foto };
       setVendedores(prev => [...prev, newV]);
       return newV;
     }
@@ -305,7 +312,9 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     if (partial.cargo !== undefined) dbPartial.cargo = partial.cargo;
     if (partial.meta !== undefined) dbPartial.meta = partial.meta;
     if (partial.avatar !== undefined) dbPartial.avatar = partial.avatar;
-    await supabase.from('vendedores').update(dbPartial).eq('id', id);
+    if (partial.aniversario !== undefined) dbPartial.aniversario = partial.aniversario;
+    if (partial.foto !== undefined) dbPartial.foto = partial.foto;
+    await supabase.from('vendedores').update(dbPartial as any).eq('id', id);
   }, []);
 
   const addCliente = useCallback(async (c: Omit<Cliente, 'id'>) => {
@@ -427,15 +436,15 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   }, [filteredClientes, vendedores, selectedMonth]);
 
   const dailyEvolution = useMemo(() => {
-    const byDay: Record<string, { fat: number; dataFull: string }> = {};
+    const byDay: Record<string, { vendas: number; dataFull: string }> = {};
     filteredClientes.forEach(c => {
       const day = c.data?.split('/')[0] || '00';
-      if (!byDay[day]) byDay[day] = { fat: 0, dataFull: c.data };
-      byDay[day].fat += (c.entrada || 0);
+      if (!byDay[day]) byDay[day] = { vendas: 0, dataFull: c.data };
+      byDay[day].vendas++;
     });
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dia, d]) => ({ dia, dataFull: d.dataFull, faturamento: d.fat }));
+      .map(([dia, d]) => ({ dia, dataFull: d.dataFull, vendas: d.vendas }));
   }, [filteredClientes]);
 
   const ticketPorDia = useMemo(() => {

@@ -123,24 +123,74 @@ export default function SalesPage() {
     const byDay: Record<string, number> = {};
     localClientes.forEach(c => {
       const day = (c.data || '').split('/')[0];
-      byDay[day] = (byDay[day] || 0) + (c.entrada || 0);
+      byDay[day] = (byDay[day] || 0) + 1;
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, value]) => ({ day, value }));
   }, [localClientes]);
 
-  const ticketByDay = useMemo(() => {
-    const byDay: Record<string, { total: number; count: number }> = {};
-    localClientes.forEach(c => {
-      const day = (c.data || '').split('/')[0];
-      if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += (c.entrada || 0);
-      byDay[day].count++;
+  // Top 3 vendors from previous month
+  const prevMonth = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, [selectedMonth]);
+
+  const prevMonthLabel = useMemo(() => {
+    const [y, m] = prevMonth.split('-');
+    const names = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return `${names[Number(m) - 1]}/${y}`;
+  }, [prevMonth]);
+
+  const top3PrevMonth = useMemo(() => {
+    const prevClientes = clientes.filter(c => {
+      if (!c.data) return false;
+      const parts = c.data.split('/');
+      if (parts.length !== 3) return false;
+      return `${parts[2]}-${parts[1].padStart(2, '0')}` === prevMonth;
     });
-    return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, d]) => ({ day, ticket: d.count > 0 ? d.total / d.count : 0 }));
-  }, [localClientes]);
+    const counts: Record<string, number> = {};
+    prevClientes.forEach(c => { counts[c.vendedor] = (counts[c.vendedor] || 0) + 1; });
+    return Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([nome, vendas], i) => {
+        const v = vendedores.find(v => v.nome === nome);
+        return { nome, vendas, rank: i + 1, avatar: v?.avatar || '👤', foto: v?.foto };
+      });
+  }, [clientes, prevMonth, vendedores]);
+
+  // Birthday check
+  const aniversariantes = useMemo(() => {
+    const hoje = new Date();
+    const diaHoje = String(hoje.getDate()).padStart(2, '0');
+    const mesHoje = String(hoje.getMonth() + 1).padStart(2, '0');
+    return vendedores.filter(v => {
+      if (!v.aniversario) return false;
+      // aniversario can be "YYYY-MM-DD" or "DD/MM/YYYY"
+      let dia: string, mes: string;
+      if (v.aniversario.includes('-')) {
+        const parts = v.aniversario.split('-');
+        mes = parts[1]; dia = parts[2];
+      } else {
+        const parts = v.aniversario.split('/');
+        dia = parts[0]; mes = parts[1];
+      }
+      return dia === diaHoje && mes === mesHoje;
+    });
+  }, [vendedores]);
 
   return (
     <div className="space-y-6">
+      {/* Birthday banner */}
+      {aniversariantes.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
+          <span className="text-lg">🎂</span>
+          <p className="text-sm text-foreground">
+            Feliz Aniversário, <span className="font-semibold">{aniversariantes.map(v => v.nome).join(', ')}</span>! 🎉
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard de Vendas</h1>
@@ -180,40 +230,57 @@ export default function SalesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Evolucao Diaria</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 glass-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Vendas por Dia</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailySales}>
-                <defs>
-                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="hsl(255, 62%, 68%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={dailySales}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
                 <XAxis dataKey="day" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [fmtFull(v), 'Vendas']} />
-                <Area type="monotone" dataKey="value" stroke="hsl(217, 91%, 60%)" fill="url(#salesGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Ticket Medio por Dia</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ticketByDay}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
-                <XAxis dataKey="day" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [fmtFull(v), 'Ticket']} />
-                <Bar dataKey="ticket" fill="hsl(160, 84%, 39%)" radius={[4, 4, 0, 0]} />
+                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [v, 'Vendas']} />
+                <Bar dataKey="value" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+        {/* Top 3 do mês anterior */}
+        <div className="glass-card p-5 bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Top 3 Vendedores</h3>
+          <p className="text-xs text-muted-foreground mb-5">{prevMonthLabel}</p>
+          {top3PrevMonth.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              {top3PrevMonth.map((v, i) => {
+                const medals = ['🥇', '🥈', '🥉'];
+                const sizes = ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
+                const nameSizes = ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
+                const glows = [
+                  'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
+                  'ring-2 ring-gray-400/30',
+                  'ring-2 ring-amber-700/30',
+                ];
+                return (
+                  <div key={v.nome} className="flex items-center gap-4 w-full">
+                    <span className="text-2xl w-8 text-center">{medals[i]}</span>
+                    <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
+                      {v.foto ? (
+                        <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{v.avatar}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
+                      <p className="text-xs text-muted-foreground">{v.vendas} vendas</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
