@@ -113,7 +113,7 @@ function AppRoutes() {
       
       {/* All roles */}
       <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><SalesPage /></ProtectedRoute>} />
-      <Route path="/roleta" element={<ProtectedRoute roles={['admin']}><RoletaPage /></ProtectedRoute>} />
+      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'seller']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       
       <Route path="*" element={<NotFound />} />

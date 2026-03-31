@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -143,6 +144,7 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 
 export default function RoletaPage() {
   const { vendedores, clientes, vendedorStats } = useSalesData();
+  const { isSeller } = useAuth();
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
   const [spinning, setSpinning] = useState(false);
@@ -495,7 +497,7 @@ export default function RoletaPage() {
                     <div className="w-3 h-3 rounded-full" style={{ background: p.color }} />
                     <span className="text-foreground">{p.label}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{p.peso}%</span>
+                  {!isSeller && <span className="text-xs text-muted-foreground">{p.peso}%</span>}
                 </div>
               ))}
             </div>
@@ -514,8 +516,8 @@ export default function RoletaPage() {
             </div>
           </div>
 
-          {/* History */}
-          <div className="glass-card p-5">
+          {/* History — hidden for sellers */}
+          {!isSeller && <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
               <History className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Últimas Giradas</h3>
@@ -546,7 +548,7 @@ export default function RoletaPage() {
                 })}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
