@@ -41,7 +41,7 @@ function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string):
     name,
     email,
     role,
-    avatar: role === "admin" ? "👤" : "👨",
+    avatar: role === "admin" ? "/foto-caio.jpg" : "👨",
     position: POSITION_MAP[role],
     status: "active",
     sellerName,

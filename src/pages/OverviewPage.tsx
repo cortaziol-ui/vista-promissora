@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { DollarSign, Target, TrendingUp, Receipt, ShoppingCart, BarChart3, Trophy, CalendarDays, CheckCircle2, XCircle, Users, MousePointerClick, Megaphone, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { VendorAvatar } from '@/components/VendorAvatar';
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CommissionProgress } from '@/components/CommissionProgress';
@@ -213,7 +214,7 @@ export default function OverviewPage() {
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{stat.vendedor.avatar}</span>
+                        <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} size="lg" />
                         <div>
                           <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
                           <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
@@ -249,7 +250,7 @@ export default function OverviewPage() {
             {vendedorStats.map(stat => (
               <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">{stat.vendedor.avatar}</span>
+                  <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
                   <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
                   <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
                 </div>

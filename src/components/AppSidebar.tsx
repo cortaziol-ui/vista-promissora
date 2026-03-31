@@ -65,10 +65,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="p-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center font-bold text-primary-foreground text-sm shrink-0">
-            BI
-          </div>
-          {!collapsed && <span className="font-semibold text-foreground tracking-tight">Performance</span>}
+          <img src="/logo-outcom.png" alt="out.com" className={collapsed ? "w-8 shrink-0" : "w-28 shrink-0"} />
         </div>
 
         <SidebarGroup>

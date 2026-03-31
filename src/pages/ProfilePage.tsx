@@ -26,7 +26,9 @@ export default function ProfilePage() {
 
       <div className="glass-card p-6">
         <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center text-4xl">{user.avatar}</div>
+          <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center text-4xl overflow-hidden">
+            {user.avatar.startsWith('/') ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" /> : user.avatar}
+          </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">{user.name}</h2>
             <p className="text-muted-foreground">{user.position}</p>

@@ -18,7 +18,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                 <p className="text-sm font-medium text-foreground">{user?.name}</p>
                 <p className="text-xs text-muted-foreground">{user?.position}</p>
               </div>
-              <img src={user?.avatar} alt={user?.name} className="w-8 h-8 rounded-full bg-secondary" />
+              {user?.avatar?.startsWith('/') ? (
+                <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">{user?.avatar}</div>
+              )}
             </div>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">

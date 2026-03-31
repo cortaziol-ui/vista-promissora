@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy } from 'lucide-react';
+import { VendorAvatar } from '@/components/VendorAvatar';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -308,7 +309,7 @@ export default function SettingsPage() {
                 <tr key={v.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{v.avatar}</span>
+                      <VendorAvatar foto={v.foto} avatar={v.avatar} />
                       <Input defaultValue={v.nome} onBlur={e => { if (e.target.value !== v.nome) updateVendedor(v.id, { nome: e.target.value }); }} className="bg-transparent border-transparent hover:border-border/50 focus:border-border/50 h-8 w-40 text-foreground font-medium px-1" />
                     </div>
                   </td>
