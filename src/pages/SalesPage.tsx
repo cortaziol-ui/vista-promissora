@@ -191,7 +191,7 @@ export default function SalesPage() {
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
           <span className="text-lg">🎂</span>
           <p className="text-sm text-foreground">
-            Aniversariantes do mês: {aniversariantes.map(v => <span key={v.id}><span className="font-semibold">{v.nome}</span> <span className="text-muted-foreground text-xs">({v.diaAniversario}/{String(new Date().getMonth() + 1).padStart(2, '0')})</span></span>).reduce((prev, curr) => <>{prev}, {curr}</>)}
+            Aniversariantes do mês: {aniversariantes.map((v, i) => <span key={v.id}>{i > 0 && ', '}<span className="font-semibold">{v.nome}</span> <span className="text-muted-foreground text-xs">({v.diaAniversario}/{String(new Date().getMonth() + 1).padStart(2, '0')})</span></span>)}
           </p>
         </div>
       )}

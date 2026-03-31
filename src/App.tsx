@@ -37,7 +37,13 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary] Crash detected:", error, info);
-    setTimeout(() => window.location.reload(), 500);
+    // Prevent infinite reload loop
+    const lastCrash = Number(sessionStorage.getItem('lastCrashTime') || '0');
+    const now = Date.now();
+    if (now - lastCrash > 5000) {
+      sessionStorage.setItem('lastCrashTime', String(now));
+      setTimeout(() => window.location.reload(), 1000);
+    }
   }
 
   render() {
