@@ -86,7 +86,7 @@ export default function OverviewPage() {
   }, [clientes]);
 
   const sellerChart = useMemo(() =>
-    vendedorStats.map(s => ({ name: s.vendedor.nome, value: s.faturamento })),
+    vendedorStats.map(s => ({ name: s.vendedor.nome, value: s.vendas })),
   [vendedorStats]);
 
   return (
@@ -173,8 +173,8 @@ export default function OverviewPage() {
               <BarChart data={sellerChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
                 <XAxis dataKey="name" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} tickFormatter={fmt} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: 'hsl(210, 40%, 98%)' }} formatter={(value: number) => [fmtFull(value), 'Faturamento']} />
+                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: 'hsl(210, 40%, 98%)' }} formatter={(value: number) => [value, 'Vendas']} />
                 <Bar dataKey="value" fill="hsl(199, 89%, 60%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -160,23 +160,28 @@ export default function SalesPage() {
   }, [clientes, prevMonth, vendedores]);
 
   // Birthday check
+  // Birthday: show all month (not just today)
   const aniversariantes = useMemo(() => {
-    const hoje = new Date();
-    const diaHoje = String(hoje.getDate()).padStart(2, '0');
-    const mesHoje = String(hoje.getMonth() + 1).padStart(2, '0');
-    return vendedores.filter(v => {
-      if (!v.aniversario) return false;
-      // aniversario can be "YYYY-MM-DD" or "DD/MM/YYYY"
-      let dia: string, mes: string;
-      if (v.aniversario.includes('-')) {
-        const parts = v.aniversario.split('-');
-        mes = parts[1]; dia = parts[2];
-      } else {
-        const parts = v.aniversario.split('/');
-        dia = parts[0]; mes = parts[1];
-      }
-      return dia === diaHoje && mes === mesHoje;
-    });
+    const mesHoje = String(new Date().getMonth() + 1).padStart(2, '0');
+    return vendedores
+      .filter(v => {
+        if (!v.aniversario) return false;
+        let dia: string, mes: string;
+        if (v.aniversario.includes('-')) {
+          const parts = v.aniversario.split('-');
+          mes = parts[1]; dia = parts[2];
+        } else {
+          const parts = v.aniversario.split('/');
+          dia = parts[0]; mes = parts[1];
+        }
+        return mes === mesHoje;
+      })
+      .map(v => {
+        let dia = '';
+        if (v.aniversario!.includes('-')) dia = v.aniversario!.split('-')[2];
+        else dia = v.aniversario!.split('/')[0];
+        return { ...v, diaAniversario: dia };
+      });
   }, [vendedores]);
 
   return (
@@ -186,7 +191,7 @@ export default function SalesPage() {
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
           <span className="text-lg">🎂</span>
           <p className="text-sm text-foreground">
-            Feliz Aniversário, <span className="font-semibold">{aniversariantes.map(v => v.nome).join(', ')}</span>! 🎉
+            Aniversariantes do mês: {aniversariantes.map(v => <span key={v.id}><span className="font-semibold">{v.nome}</span> <span className="text-muted-foreground text-xs">({v.diaAniversario}/{String(new Date().getMonth() + 1).padStart(2, '0')})</span></span>).reduce((prev, curr) => <>{prev}, {curr}</>)}
           </p>
         </div>
       )}

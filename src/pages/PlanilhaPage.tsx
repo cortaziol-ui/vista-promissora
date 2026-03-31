@@ -317,7 +317,10 @@ export default function PlanilhaPage() {
                   <div className="space-y-2">
                     <Label>1ª Parcela (R$)</Label>
                     <Input type="number" value={form.parcela1.valor} onChange={e => setForm(f => ({ ...f, parcela1: { ...f.parcela1, valor: Number(e.target.value) } }))} />
-                    <Select value={form.parcela1.status} onValueChange={v => setForm(f => ({ ...f, parcela1: { ...f.parcela1, status: v as any } }))}>
+                    <Select value={form.parcela1.status} onValueChange={v => {
+                      const today = new Date().toLocaleDateString('pt-BR');
+                      setForm(f => ({ ...f, parcela1: { ...f.parcela1, status: v as any, dataPagamento: v === 'PAGO' ? (f.parcela1.dataPagamento || today) : undefined } }));
+                    }}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
@@ -325,11 +328,20 @@ export default function PlanilhaPage() {
                         <SelectItem value="CANCELADO">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
+                    {form.parcela1.status === 'PAGO' && (
+                      <div>
+                        <Label className="text-xs">Data Pagamento</Label>
+                        <Input value={form.parcela1.dataPagamento || ''} onChange={e => setForm(f => ({ ...f, parcela1: { ...f.parcela1, dataPagamento: e.target.value } }))} placeholder="DD/MM/YYYY" className="text-xs h-8" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>2ª Parcela (R$)</Label>
                     <Input type="number" value={form.parcela2.valor} onChange={e => setForm(f => ({ ...f, parcela2: { ...f.parcela2, valor: Number(e.target.value) } }))} />
-                    <Select value={form.parcela2.status} onValueChange={v => setForm(f => ({ ...f, parcela2: { ...f.parcela2, status: v as any } }))}>
+                    <Select value={form.parcela2.status} onValueChange={v => {
+                      const today = new Date().toLocaleDateString('pt-BR');
+                      setForm(f => ({ ...f, parcela2: { ...f.parcela2, status: v as any, dataPagamento: v === 'PAGO' ? (f.parcela2.dataPagamento || today) : undefined } }));
+                    }}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
@@ -337,6 +349,12 @@ export default function PlanilhaPage() {
                         <SelectItem value="CANCELADO">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
+                    {form.parcela2.status === 'PAGO' && (
+                      <div>
+                        <Label className="text-xs">Data Pagamento</Label>
+                        <Input value={form.parcela2.dataPagamento || ''} onChange={e => setForm(f => ({ ...f, parcela2: { ...f.parcela2, dataPagamento: e.target.value } }))} placeholder="DD/MM/YYYY" className="text-xs h-8" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

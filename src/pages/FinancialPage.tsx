@@ -172,18 +172,7 @@ export default function FinancialPage() {
       tipo: 'realizado',
     });
 
-    // Média de entradas dos últimos 3 meses
-    let somaEntradas = 0;
-    let mesesComDados = 0;
-    for (let i = 0; i < 3; i++) {
-      const m = subMonths(selectedMonth, i);
-      const mc = clientesPorMes(m);
-      const ent = mc.reduce((s, c) => s + (c.entrada || 0), 0);
-      if (mc.length > 0) { somaEntradas += ent; mesesComDados++; }
-    }
-    const mediaEntradas = mesesComDados > 0 ? somaEntradas / mesesComDados : 0;
-
-    // Próximos 3 meses
+    // Próximos 3 meses — only parcelas are projected, NOT new entradas
     for (let i = 1; i <= 3; i++) {
       const futureMonth = addMonths(selectedMonth, i);
       const mesP1 = subMonths(futureMonth, 1); // vendas 1 mês antes → parcela 1
@@ -197,8 +186,7 @@ export default function FinancialPage() {
         .filter(c => c.parcela2.status === 'AGUARDANDO')
         .reduce((s, c) => s + c.parcela2.valor, 0);
 
-      const entradas = mediaEntradas;
-      months.push({ mes: futureMonth, entradas, p1, p2, total: entradas + p1 + p2, tipo: 'projetado' });
+      months.push({ mes: futureMonth, entradas: 0, p1, p2, total: p1 + p2, tipo: 'projetado' });
     }
 
     return months;
