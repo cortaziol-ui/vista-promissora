@@ -300,7 +300,6 @@ export default function SettingsPage() {
                 <th className="text-left py-3 px-2">Cargo</th>
                 <th className="text-right py-3 px-2">Meta</th>
                 <th className="text-center py-3 px-2">Aniversário</th>
-                <th className="text-center py-3 px-2">Foto</th>
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
             </thead>
@@ -309,7 +308,16 @@ export default function SettingsPage() {
                 <tr key={v.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
-                      <VendorAvatar foto={v.foto} avatar={v.avatar} />
+                      <label className="cursor-pointer shrink-0">
+                        <VendorAvatar foto={v.foto} avatar={v.avatar} className="hover:opacity-75 transition-opacity" />
+                        <input type="file" accept="image/*" className="hidden" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => updateVendedor(v.id, { foto: reader.result as string } as any);
+                          reader.readAsDataURL(file);
+                        }} />
+                      </label>
                       <Input defaultValue={v.nome} onBlur={e => { if (e.target.value !== v.nome) updateVendedor(v.id, { nome: e.target.value }); }} className="bg-transparent border-transparent hover:border-border/50 focus:border-border/50 h-8 w-40 text-foreground font-medium px-1" />
                     </div>
                   </td>
@@ -327,21 +335,6 @@ export default function SettingsPage() {
                   </td>
                   <td className="py-3 px-2 text-center">
                     <Input type="date" value={v.aniversario || ''} onChange={e => updateVendedor(v.id, { aniversario: e.target.value } as any)} className="bg-secondary border-border/50 w-36 text-xs h-8" />
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    <div className="flex items-center gap-2 justify-center">
-                      {v.foto && <img src={v.foto} alt="" className="w-7 h-7 rounded-full object-cover" />}
-                      <label className="cursor-pointer text-xs text-primary hover:underline">
-                        {v.foto ? 'Trocar' : 'Upload'}
-                        <input type="file" accept="image/*" className="hidden" onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => updateVendedor(v.id, { foto: reader.result as string } as any);
-                          reader.readAsDataURL(file);
-                        }} />
-                      </label>
-                    </div>
                   </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
