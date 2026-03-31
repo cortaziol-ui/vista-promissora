@@ -162,31 +162,37 @@ export default function FinancialPage() {
   const projecao = useMemo(() => {
     const months: { mes: string; entradas: number; p1: number; p2: number; total: number; tipo: 'realizado' | 'projetado' }[] = [];
 
-    // Mês atual (realizado)
-    months.push({
-      mes: selectedMonth,
-      entradas: receitaMes.entradas,
-      p1: receitaMes.p1Pagas,
-      p2: receitaMes.p2Pagas,
-      total: receitaMes.total,
-      tipo: 'realizado',
-    });
+    // For each month (current + next 3): calculate expected parcelas
+    // P1 expected in month M = vendas from M-1 with parcela1 AGUARDANDO
+    // P2 expected in month M = vendas from M-2 with parcela2 AGUARDANDO
+    for (let i = 0; i <= 3; i++) {
+      const m = i === 0 ? selectedMonth : addMonths(selectedMonth, i);
+      const mesP1Source = subMonths(m, 1); // vendas 1 mês antes → parcela 1
+      const mesP2Source = subMonths(m, 2); // vendas 2 meses antes → parcela 2
 
-    // Próximos 3 meses — only parcelas are projected, NOT new entradas
-    for (let i = 1; i <= 3; i++) {
-      const futureMonth = addMonths(selectedMonth, i);
-      const mesP1 = subMonths(futureMonth, 1); // vendas 1 mês antes → parcela 1
-      const mesP2 = subMonths(futureMonth, 2); // vendas 2 meses antes → parcela 2
-
-      const p1 = clientesPorMes(mesP1)
+      const p1Aguardando = clientesPorMes(mesP1Source)
         .filter(c => c.parcela1.status === 'AGUARDANDO')
         .reduce((s, c) => s + c.parcela1.valor, 0);
 
-      const p2 = clientesPorMes(mesP2)
+      const p2Aguardando = clientesPorMes(mesP2Source)
         .filter(c => c.parcela2.status === 'AGUARDANDO')
         .reduce((s, c) => s + c.parcela2.valor, 0);
 
-      months.push({ mes: futureMonth, entradas: 0, p1, p2, total: p1 + p2, tipo: 'projetado' });
+      if (i === 0) {
+        // Current month: show realized (entradas + paid parcelas) + pending parcelas
+        const p1Total = receitaMes.p1Pagas + p1Aguardando;
+        const p2Total = receitaMes.p2Pagas + p2Aguardando;
+        months.push({
+          mes: m,
+          entradas: receitaMes.entradas,
+          p1: p1Total,
+          p2: p2Total,
+          total: receitaMes.entradas + p1Total + p2Total,
+          tipo: 'realizado',
+        });
+      } else {
+        months.push({ mes: m, entradas: 0, p1: p1Aguardando, p2: p2Aguardando, total: p1Aguardando + p2Aguardando, tipo: 'projetado' });
+      }
     }
 
     return months;
