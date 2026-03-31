@@ -12,6 +12,7 @@ import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { getLeadsByVendor } from '@/lib/vendorLeads';
 import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { VendorAvatar } from '@/components/VendorAvatar';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
@@ -321,7 +322,7 @@ export default function SalesPage() {
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{stat.vendedor.avatar}</span>
+                        <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} size="lg" />
                         <div>
                           <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
                           <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
@@ -358,7 +359,7 @@ export default function SalesPage() {
             {commissionStats.map(stat => (
               <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">{stat.vendedor.avatar}</span>
+                  <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
                   <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
                   <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
                 </div>
