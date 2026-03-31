@@ -93,13 +93,13 @@ export default function OverviewPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Visao Geral de Performance</h1>
+          <h1 className="text-2xl font-bold text-foreground">Visão Geral de Performance</h1>
           <p className="text-muted-foreground text-sm">Acompanhe os resultados em tempo real — {monthLabel(selectedMonth)}</p>
         </div>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-[160px] bg-secondary border-border/50">
             <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Selecionar mes" />
+            <SelectValue placeholder="Selecionar mês" />
           </SelectTrigger>
           <SelectContent>
             {availableMonths.map(m => (
@@ -113,12 +113,12 @@ export default function OverviewPage() {
         <KpiCard title="Meta Mensal" value={`${metaEmpresaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" delay={0} />
         <KpiCard title="% da Meta" value={`${pctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, metaEmpresaVendas - totalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" delay={50} />
         <KpiCard title="Total Vendas" value={String(totalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" delay={100} />
-        <KpiCard title="Projecao" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={150} />
+        <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" delay={150} />
         {!isSeller && (
           <KpiCard title="Faturamento" value={fmtFull(faturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" delay={200} />
         )}
         {!isSeller && (
-          <KpiCard title="Ticket Medio" value={fmtFull(ticketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={250} />
+          <KpiCard title="Ticket Médio" value={fmtFull(ticketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" delay={250} />
         )}
       </div>
 
@@ -146,7 +146,7 @@ export default function OverviewPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="glass-card p-5 animate-in" style={{ animationDelay: '300ms' }}>
-          <h3 className="text-sm font-semibold text-foreground mb-4">Evolucao de Vendas (Diaria)</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Evolução de Vendas (Diária)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyEvolution}>
@@ -197,9 +197,9 @@ export default function OverviewPage() {
                 <th className="text-right py-3 px-2">Meta</th>
                 <th className="text-right py-3 px-2">Vendas</th>
                 <th className="text-right py-3 px-2">Faltam</th>
-                <th className="text-center py-3 px-2">Projecao</th>
+                <th className="text-center py-3 px-2">Projeção</th>
                 {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
-                {!isSeller && <th className="text-right py-3 px-2">Ticket Medio</th>}
+                {!isSeller && <th className="text-right py-3 px-2">Ticket Médio</th>}
                 <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
               </tr>
             </thead>

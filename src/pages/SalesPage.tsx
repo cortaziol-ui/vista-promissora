@@ -205,7 +205,7 @@ export default function SalesPage() {
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-[160px] bg-secondary border-border/50">
               <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Selecionar mes" />
+              <SelectValue placeholder="Selecionar mês" />
             </SelectTrigger>
             <SelectContent>
               {availableMonths.map(m => (
@@ -231,7 +231,7 @@ export default function SalesPage() {
           <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         )}
         {!isSeller && (
-          <KpiCard title="Ticket Medio" value={fmtFull(localTicketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
+          <KpiCard title="Ticket Médio" value={fmtFull(localTicketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
         )}
       </div>
 
@@ -303,9 +303,9 @@ export default function SalesPage() {
                 <th className="text-right py-3 px-2">Leads</th>
                 <th className="text-right py-3 px-2">Conversao</th>
                 <th className="text-right py-3 px-2">Faltam</th>
-                <th className="text-center py-3 px-2">Projecao</th>
+                <th className="text-center py-3 px-2">Projeção</th>
                 {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
-                {!isSeller && <th className="text-right py-3 px-2">Ticket Medio</th>}
+                {!isSeller && <th className="text-right py-3 px-2">Ticket Médio</th>}
                 <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
               </tr>
             </thead>
