@@ -64,8 +64,8 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className="p-4 flex items-center gap-3">
-          <img src="/logo-outcom.png" alt="out.com" className={collapsed ? "w-8 shrink-0" : "w-28 shrink-0"} />
+        <div className="p-4 flex justify-center">
+          <img src="/logo-outcom.png" alt="out.com" className={collapsed ? "w-8 shrink-0 rounded-lg" : "w-28 shrink-0 rounded-xl"} />
         </div>
 
         <SidebarGroup>
