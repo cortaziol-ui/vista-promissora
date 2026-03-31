@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { getLeadsByVendor } from '@/lib/vendorLeads';
-import { DollarSign, Target, Receipt, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
+import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -31,6 +31,7 @@ export default function SalesPage() {
     vendedorStats,
     metaEmpresaVendas,
     pctMeta,
+    projecao,
     selectedMonth,
     setSelectedMonth,
   } = useSalesData();
@@ -223,15 +224,13 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSeller ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-4`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSeller ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4`}>
         <KpiCard title="Meta Mensal" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
+        <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
         {!isSeller && (
           <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        )}
-        {!isSeller && (
-          <KpiCard title="Ticket Médio" value={fmtFull(localTicketMedio)} icon={<Receipt className="w-5 h-5 text-kpi-ticket" />} glowClass="kpi-glow-ticket" colorClass="bg-kpi-ticket/15" />
         )}
       </div>
 

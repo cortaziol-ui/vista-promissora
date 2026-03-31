@@ -9,7 +9,7 @@ import { matchAllCampaigns } from '@/lib/campaignMatcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -58,6 +58,22 @@ export default function SettingsPage() {
   const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
+
+  // Commission tiers state
+  interface Tier { id: string; faixa_nome: string; pct_meta: number; premiacao: number; sort_order: number; }
+  const [tiers, setTiers] = useState<Tier[]>([]);
+
+  const fetchTiers = useCallback(async () => {
+    const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+    if (data) setTiers(data as Tier[]);
+  }, [monthYM]);
+
+  useEffect(() => { fetchTiers(); }, [fetchTiers]);
+
+  const handleUpdateTierPremiacao = async (id: string, premiacao: number) => {
+    await (supabase.from as any)('commission_tiers').update({ premiacao }).eq('id', id);
+    fetchTiers();
+  };
 
   // Campaign linking state
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -260,8 +276,14 @@ export default function SettingsPage() {
                   <Input type="date" value={newUser.aniversario} onChange={e => setNewUser({ ...newUser, aniversario: e.target.value })} className="bg-secondary border-border/50 mt-1" />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Foto (URL)</label>
-                  <Input value={newUser.foto} onChange={e => setNewUser({ ...newUser, foto: e.target.value })} placeholder="https://..." className="bg-secondary border-border/50 mt-1" />
+                  <label className="text-sm text-muted-foreground">Foto</label>
+                  <input type="file" accept="image/*" className="mt-1 text-sm text-muted-foreground file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-secondary file:text-foreground hover:file:bg-secondary/80" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => setNewUser(prev => ({ ...prev, foto: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }} />
                 </div>
                 <Button onClick={handleAddUser} className="w-full">Salvar Vendedor</Button>
               </div>
@@ -287,7 +309,7 @@ export default function SettingsPage() {
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{v.avatar}</span>
-                      <span className="text-foreground font-medium">{v.nome}</span>
+                      <Input defaultValue={v.nome} onBlur={e => { if (e.target.value !== v.nome) updateVendedor(v.id, { nome: e.target.value }); }} className="bg-transparent border-transparent hover:border-border/50 focus:border-border/50 h-8 w-40 text-foreground font-medium px-1" />
                     </div>
                   </td>
                   <td className="py-3 px-2 text-muted-foreground">{v.cargo}</td>
@@ -306,7 +328,19 @@ export default function SettingsPage() {
                     <Input type="date" value={v.aniversario || ''} onChange={e => updateVendedor(v.id, { aniversario: e.target.value } as any)} className="bg-secondary border-border/50 w-36 text-xs h-8" />
                   </td>
                   <td className="py-3 px-2 text-center">
-                    <Input value={v.foto || ''} onChange={e => updateVendedor(v.id, { foto: e.target.value } as any)} placeholder="URL..." className="bg-secondary border-border/50 w-28 text-xs h-8" />
+                    <div className="flex items-center gap-2 justify-center">
+                      {v.foto && <img src={v.foto} alt="" className="w-7 h-7 rounded-full object-cover" />}
+                      <label className="cursor-pointer text-xs text-primary hover:underline">
+                        {v.foto ? 'Trocar' : 'Upload'}
+                        <input type="file" accept="image/*" className="hidden" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => updateVendedor(v.id, { foto: reader.result as string } as any);
+                          reader.readAsDataURL(file);
+                        }} />
+                      </label>
+                    </div>
                   </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -324,6 +358,37 @@ export default function SettingsPage() {
           </table>
         </div>
       </div>
+
+      {/* Commission Tiers */}
+      {isAdmin && tiers.length > 0 && (
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-semibold text-foreground">Premiações por Nível</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Edite o valor da premiação para cada faixa de meta atingida. As % são fixas.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {tiers.map(t => (
+              <div key={t.id} className="p-3 rounded-lg bg-secondary/30 border border-border/30 text-center">
+                <p className="text-xs text-muted-foreground">{t.faixa_nome}</p>
+                <p className="text-sm font-semibold text-foreground mb-2">{t.pct_meta}%</p>
+                <div className="flex items-center gap-1 justify-center">
+                  <span className="text-xs text-muted-foreground">R$</span>
+                  <Input
+                    type="number"
+                    defaultValue={t.premiacao}
+                    onBlur={e => {
+                      const val = Number(e.target.value);
+                      if (val !== t.premiacao && val >= 0) handleUpdateTierPremiacao(t.id, val);
+                    }}
+                    className="bg-secondary border-border/50 w-20 text-center text-sm h-8"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Campaign-Vendor Links */}
       {isAdmin && (

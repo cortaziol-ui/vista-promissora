@@ -248,7 +248,7 @@ export default function FinancialPage() {
       });
 
       const receita = ent + p1 + p2;
-      const cst = custos.filter(c => c.mes_referencia === m).reduce((s, c) => s + c.valor, 0);
+      const cst = custos.filter(c => c.mes_referencia === m && c.pago).reduce((s, c) => s + c.valor, 0);
       result.push({ mes: monthLabel(m), receita, custos: cst, lucro: receita - cst });
     }
     return result;
