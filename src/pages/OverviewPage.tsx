@@ -31,6 +31,7 @@ export default function OverviewPage() {
     metaEmpresaVendas,
     vendedorStats,
     dailyEvolution,
+    vendorGoals: monthlyVendorGoals,
   } = useMonthlyData(selectedMonth);
 
   const availableMonths = useAvailableMonths(clientes);
@@ -204,7 +205,7 @@ export default function OverviewPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta} vendas</td>
+                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</td>
                     <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
                     <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
                     <td className="py-3 px-2 text-center">
@@ -235,12 +236,12 @@ export default function OverviewPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
                   <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
-                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</span>
                 </div>
                 <CommissionProgress
                   vendedorNome={stat.vendedor.nome}
                   vendas={stat.vendas}
-                  meta={stat.vendedor.meta}
+                  meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
                   month={selectedMonth}
                 />
               </div>

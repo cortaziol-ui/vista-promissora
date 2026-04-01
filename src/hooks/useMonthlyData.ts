@@ -15,6 +15,7 @@ export interface MonthlyData {
   ticketPorDia: { dia: string; ticketMedio: number }[];
   metaEmpresaVendas: number;
   metaComercialVendas: number;
+  vendorGoals: Map<number, number>;
 }
 
 export function useMonthlyData(month: string): MonthlyData {
@@ -136,5 +137,6 @@ export function useMonthlyData(month: string): MonthlyData {
     ticketPorDia,
     metaEmpresaVendas,
     metaComercialVendas,
+    vendorGoals,
   };
 }

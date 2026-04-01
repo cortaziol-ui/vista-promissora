@@ -29,6 +29,7 @@ export default function SalesPage() {
     metaEmpresaVendas,
     pctMeta,
     projecao,
+    vendorGoals: monthlyVendorGoals,
   } = useMonthlyData(selectedMonth);
 
   const availableMonths = useAvailableMonths(clientes);
@@ -247,7 +248,8 @@ export default function SalesPage() {
     // Per-vendor computation
     const vendorData = new Map<number, VendorWeeklyData>();
     vendedorStats.forEach(stat => {
-      vendorData.set(stat.vendedor.id, computeVendorWeeks(stat.vendedor.meta, stat.vendedor.nome));
+      const vMeta = monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta;
+      vendorData.set(stat.vendedor.id, computeVendorWeeks(vMeta, stat.vendedor.nome));
     });
 
     return {
@@ -257,7 +259,7 @@ export default function SalesPage() {
       currentWeekIdx: globalData.currentWeekIdx,
       vendorData,
     };
-  }, [selectedMonth, localMetaVendas, filteredClientes, filterVendedor, vendedorStats]);
+  }, [selectedMonth, localMetaVendas, filteredClientes, filterVendedor, vendedorStats, monthlyVendorGoals]);
 
   const dailySales = useMemo(() => {
     const byDay: Record<string, number> = {};
@@ -494,7 +496,7 @@ export default function SalesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta}</td>
+                      <td className="py-3 px-2 text-right text-kpi-goal font-medium">{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}</td>
                       <td className="py-3 px-2 text-right">
                         {(() => {
                           const vd = weeklyEngine.vendorData.get(stat.vendedor.id);
@@ -593,12 +595,12 @@ export default function SalesPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
                   <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
-                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{stat.vendedor.meta} vendas</span>
+                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</span>
                 </div>
                 <CommissionProgress
                   vendedorNome={stat.vendedor.nome}
                   vendas={stat.vendas}
-                  meta={stat.vendedor.meta}
+                  meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
                   month={selectedMonth}
                 />
               </div>
