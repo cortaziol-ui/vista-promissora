@@ -273,7 +273,22 @@ export default function SettingsPage() {
       {/* Vendedores */}
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Vendedores</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-foreground">Vendedores</h2>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[140px] h-8 bg-secondary border-border/50 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MESES.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><UserPlus className="w-4 h-4 mr-2" />Adicionar</Button>
@@ -315,7 +330,7 @@ export default function SettingsPage() {
               <tr className="text-muted-foreground border-b border-border/50">
                 <th className="text-left py-3 px-2">Nome</th>
                 <th className="text-left py-3 px-2">Cargo</th>
-                <th className="text-right py-3 px-2">Meta</th>
+                <th className="text-right py-3 px-2">Meta ({MESES.find(m => m.value === selectedMonth)?.label?.slice(0, 3)})</th>
                 <th className="text-center py-3 px-2">Aniversário</th>
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
