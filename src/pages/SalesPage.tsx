@@ -140,11 +140,18 @@ export default function SalesPage() {
     }
     const totalWorkingDays = workingDaysList.length;
 
-    // Split into weeks of 5 working days, last week gets remainder
+    // Split into exactly 4 weeks based on working days
     const weekRanges: { fromDay: number; toDay: number; days: number[] }[] = [];
-    for (let i = 0; i < totalWorkingDays; i += 5) {
-      const chunk = workingDaysList.slice(i, i + 5);
-      weekRanges.push({ fromDay: chunk[0], toDay: chunk[chunk.length - 1], days: chunk });
+    const baseSize = Math.floor(totalWorkingDays / 4);
+    const extra = totalWorkingDays % 4;
+    let offset = 0;
+    for (let w = 0; w < 4; w++) {
+      const size = baseSize + (w < extra ? 1 : 0);
+      const chunk = workingDaysList.slice(offset, offset + size);
+      if (chunk.length > 0) {
+        weekRanges.push({ fromDay: chunk[0], toDay: chunk[chunk.length - 1], days: chunk });
+      }
+      offset += size;
     }
 
     // Helper: count sales in day range for a vendor
@@ -218,15 +225,14 @@ export default function SalesPage() {
         });
       }
 
-      // Current week's daily goal
+      // Daily goal: remaining monthly sales / remaining working days in month
       const cw = weeks[currentWeekIdx];
       let dailyGoal = 0;
-      if (cw && isCurrentMonth) {
-        const salesSoFar = cw.sales;
-        const remaining = Math.max(0, cw.adjustedMeta - salesSoFar);
-        // Remaining working days from today (inclusive) to end of current week
-        const remainingDays = cw.days ? cw.days.filter(d => d >= today).length : 0;
-        dailyGoal = remainingDays > 0 ? Math.ceil(remaining / remainingDays) : 0;
+      if (isCurrentMonth) {
+        const totalSales = weeks.reduce((s, w) => s + w.sales, 0);
+        const remainingSales = Math.max(0, meta - totalSales);
+        const remainingDaysInMonth = workingDaysList.filter(d => d >= today).length;
+        dailyGoal = remainingDaysInMonth > 0 ? Math.ceil(remainingSales / remainingDaysInMonth) : 0;
       }
 
       return { weeks, currentWeekMeta: cw?.adjustedMeta ?? 0, dailyGoal, currentWeekIdx };
@@ -451,7 +457,9 @@ export default function SalesPage() {
                   <th className="text-left py-3 px-2">#</th>
                   <th className="text-left py-3 px-2">Vendedor</th>
                   <th className="text-right py-3 px-2">MM</th>
-                  <th className="text-right py-3 px-2">MS</th>
+                  <th className="text-right py-3 px-2 cursor-help" title={weeklyEngine.weeks[weeklyEngine.currentWeekIdx]?.label ?? ''}>
+                    MS{weeklyEngine.currentWeekIdx + 1}
+                  </th>
                   <th className="text-right py-3 px-2">MD</th>
                   <th className="text-right py-3 px-2">Vendas</th>
                   <th className="text-right py-3 px-2">Leads</th>
@@ -484,7 +492,20 @@ export default function SalesPage() {
                         </div>
                       </td>
                       <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta}</td>
-                      <td className="py-3 px-2 text-right text-muted-foreground">{weeklyEngine.vendorData.get(stat.vendedor.id)?.currentWeekMeta ?? '—'}</td>
+                      <td className="py-3 px-2 text-right">
+                        {(() => {
+                          const vd = weeklyEngine.vendorData.get(stat.vendedor.id);
+                          const cw = vd?.weeks[vd.currentWeekIdx];
+                          if (!cw) return <span className="text-muted-foreground">—</span>;
+                          return cw.completed ? (
+                            <span className="inline-flex items-center gap-1 text-green-500 font-medium">
+                              {cw.adjustedMeta} <CheckCircle2 className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">{cw.sales}/{cw.adjustedMeta}</span>
+                          );
+                        })()}
+                      </td>
                       <td className="py-3 px-2 text-right text-muted-foreground">{weeklyEngine.vendorData.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
                       <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
                       <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
@@ -513,10 +534,10 @@ export default function SalesPage() {
                 <tr className="text-muted-foreground border-b border-border/50">
                   <th className="text-left py-3 px-2">Vendedor</th>
                   {weeklyEngine.weeks.map(w => (
-                    <th key={w.weekNum} className={`text-center py-3 px-2 ${w.isCurrent ? 'text-primary' : ''}`}>
-                      <div className="text-xs leading-tight">S{w.weekNum}</div>
-                      <div className="text-[10px] text-muted-foreground/70 leading-tight">
-                        {String(w.fromDay).padStart(2, '0')}-{String(w.toDay).padStart(2, '0')}
+                    <th key={w.weekNum} className={`text-center py-3 px-3 ${w.isCurrent ? 'text-primary bg-primary/5' : ''}`}>
+                      <div className="text-sm font-semibold leading-tight">S{w.weekNum}</div>
+                      <div className="text-[11px] text-muted-foreground/70 leading-tight">
+                        {String(w.fromDay).padStart(2, '0')}/{String(selectedMonth.split('-')[1]).padStart(2, '0')} - {String(w.toDay).padStart(2, '0')}/{String(selectedMonth.split('-')[1]).padStart(2, '0')}
                       </div>
                     </th>
                   ))}
@@ -535,28 +556,19 @@ export default function SalesPage() {
                           <span className="font-medium text-foreground text-xs">{stat.vendedor.nome}</span>
                         </div>
                       </td>
-                      {(vd?.weeks ?? []).map(w => {
-                        const pct = w.adjustedMeta > 0 ? (w.sales / w.adjustedMeta) * 100 : (w.sales > 0 ? 100 : 0);
-                        return (
-                          <td key={w.weekNum} className="py-3 px-2 text-center">
-                            <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center gap-1">
-                                <span className="font-semibold text-foreground text-xs">{w.sales}</span>
-                                <span className="text-muted-foreground/60 text-[10px]">/{w.adjustedMeta}</span>
-                              </div>
-                              {w.completed ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                              ) : w.isCurrent ? (
-                                <span className="text-[10px] text-primary font-medium">Em curso</span>
-                              ) : pct > 0 ? (
-                                <span className="text-[10px] text-amber-400">{pct.toFixed(0)}%</span>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground/40">—</span>
-                              )}
+                      {(vd?.weeks ?? []).map(w => (
+                        <td key={w.weekNum} className={`py-3 px-3 text-center ${w.isCurrent ? 'bg-primary/5' : ''}`}>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-foreground text-sm">{w.sales}</span>
+                              <span className="text-muted-foreground text-xs">/{w.adjustedMeta}</span>
                             </div>
-                          </td>
-                        );
-                      })}
+                            {w.completed && (
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                        </td>
+                      ))}
                       <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
                       <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
                     </tr>
