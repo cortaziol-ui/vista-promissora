@@ -83,8 +83,31 @@ export default function SettingsPage() {
 
   const fetchTiers = useCallback(async () => {
     const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('month', monthYM).is('vendedor_id', null).order('sort_order');
-    if (data) setTiers(data as Tier[]);
-  }, [monthYM]);
+    if (data && data.length > 0) {
+      setTiers(data as Tier[]);
+      return;
+    }
+    // No tiers for this month — copy from previous month
+    const prevDate = new Date(year, Number(selectedMonth) - 2, 1);
+    const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('month', prevYM).is('vendedor_id', null).order('sort_order');
+    if (prevData && prevData.length > 0) {
+      const inserts = prevData.map((t: any) => ({
+        month: monthYM,
+        vendedor_id: null,
+        faixa_nome: t.faixa_nome,
+        pct_meta: t.pct_meta,
+        premiacao: t.premiacao,
+        sort_order: t.sort_order,
+      }));
+      await (supabase.from as any)('commission_tiers').insert(inserts);
+      // Re-fetch after insert
+      const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+      if (newData) setTiers(newData as Tier[]);
+    } else {
+      setTiers([]);
+    }
+  }, [monthYM, year, selectedMonth]);
 
   useEffect(() => { fetchTiers(); }, [fetchTiers]);
 

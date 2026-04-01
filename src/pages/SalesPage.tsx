@@ -124,6 +124,8 @@ export default function SalesPage() {
     currentWeekMeta: number;
     dailyGoal: number;
     currentWeekIdx: number;
+    baseDailyGoal: number;
+    currentWeekSales: number;
   }
 
   const weeklyEngine = useMemo(() => {
@@ -226,17 +228,25 @@ export default function SalesPage() {
         });
       }
 
-      // Daily goal: remaining monthly sales / remaining working days in month
+      // Daily goal: never goes below base, only goes up when behind
       const cw = weeks[currentWeekIdx];
-      let dailyGoal = 0;
+      const baseDailyGoal = Math.ceil(dailyBase); // floor daily goal (never decreases)
+      let dailyGoal = baseDailyGoal;
       if (isCurrentMonth) {
         const totalSales = weeks.reduce((s, w) => s + w.sales, 0);
         const remainingSales = Math.max(0, meta - totalSales);
         const remainingDaysInMonth = workingDaysList.filter(d => d >= today).length;
-        dailyGoal = remainingDaysInMonth > 0 ? Math.ceil(remainingSales / remainingDaysInMonth) : 0;
+        const dynamicDaily = remainingDaysInMonth > 0 ? Math.ceil(remainingSales / remainingDaysInMonth) : 0;
+        // Only goes UP, never below the base
+        dailyGoal = Math.max(baseDailyGoal, dynamicDaily);
+        // If total sales already met the monthly goal, show 0
+        if (totalSales >= meta) dailyGoal = 0;
       }
 
-      return { weeks, currentWeekMeta: cw?.adjustedMeta ?? 0, dailyGoal, currentWeekIdx };
+      // Current week sales for display
+      const currentWeekSales = cw ? cw.sales : 0;
+
+      return { weeks, currentWeekMeta: cw?.adjustedMeta ?? 0, dailyGoal, currentWeekIdx, baseDailyGoal, currentWeekSales };
     };
 
     // Global computation
@@ -255,6 +265,7 @@ export default function SalesPage() {
     return {
       weeklyGoal: globalData.currentWeekMeta,
       dailyGoal: globalData.dailyGoal,
+      currentWeekSales: globalData.currentWeekSales,
       weeks: globalData.weeks,
       currentWeekIdx: globalData.currentWeekIdx,
       vendorData,
@@ -366,8 +377,8 @@ export default function SalesPage() {
       </div>
 
       <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}>
-        <KpiCard title="Meta Mensal (MM)" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-        <KpiCard title="Meta Semanal (MS)" value={`${weeklyEngine.weeklyGoal} vendas`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+        <KpiCard title="Meta Mensal (MM)" value={`${localTotalVendas}/${localMetaVendas}`} subtitle={`${Math.max(0, localMetaVendas - localTotalVendas)} restantes`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+        <KpiCard title={`Meta Semanal (S${weeklyEngine.currentWeekIdx + 1})`} value={`${weeklyEngine.currentWeekSales}/${weeklyEngine.weeklyGoal}`} subtitle={weeklyEngine.currentWeekSales >= weeklyEngine.weeklyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.weeklyGoal - weeklyEngine.currentWeekSales)} restantes`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
         <KpiCard title="Meta Diária (MD)" value={`${weeklyEngine.dailyGoal} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
