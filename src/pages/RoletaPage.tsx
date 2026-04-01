@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useMonthlyData } from '@/hooks/useMonthlyData';
+import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -143,7 +145,8 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 }
 
 export default function RoletaPage() {
-  const { vendedores, clientes, vendedorStats } = useSalesData();
+  const { vendedores, clientes } = useSalesData();
+  const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller } = useAuth();
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');

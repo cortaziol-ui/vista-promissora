@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useAccountContext } from '@/contexts/AccountContext';
-import { useSalesData } from '@/contexts/SalesDataContext';
+import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { supabase } from '@/integrations/supabase/client';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -46,7 +46,8 @@ export default function MarketingPage() {
   const [month, setMonth] = useState(now.getMonth());
 
   const { activeAccount } = useAccountContext();
-  const { totalVendas } = useSalesData();
+  const marketingMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const { totalVendas } = useMonthlyData(marketingMonth);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [metaConnected, setMetaConnected] = useState(false);
   const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);

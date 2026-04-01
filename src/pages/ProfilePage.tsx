@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useSalesData } from '@/contexts/SalesDataContext';
+import { useMonthlyData } from '@/hooks/useMonthlyData';
+import { getCurrentMonth } from '@/lib/dateUtils';
 import { CommissionSummary } from '@/components/CommissionSummary';
 import { CommissionProgress } from '@/components/CommissionProgress';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const { vendedorStats, selectedMonth } = useSalesData();
+  const selectedMonth = getCurrentMonth();
+  const { vendedorStats } = useMonthlyData(selectedMonth);
   const navigate = useNavigate();
 
   if (!user) return null;

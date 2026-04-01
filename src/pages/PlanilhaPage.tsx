@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSalesData, Cliente } from '@/contexts/SalesDataContext';
+import { getCurrentMonth } from '@/lib/dateUtils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,8 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
 }
 
 export default function PlanilhaPage() {
-  const { clientes, vendedores, addCliente, updateCliente, deleteCliente, selectedMonth, setSelectedMonth } = useSalesData();
+  const { clientes, vendedores, addCliente, updateCliente, deleteCliente } = useSalesData();
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
   const [filterVendedor, setFilterVendedor] = useState('all');
   const [filterServico, setFilterServico] = useState('all');

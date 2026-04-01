@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import MetaAdsIntegration from '@/components/MetaAdsIntegration';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useMonthlyGoals } from '@/hooks/useMonthlyGoals';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
@@ -37,8 +38,7 @@ const MESES = [
 export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
   const {
-    vendedores, metaEmpresaVendas, setMetaEmpresaVendas,
-    metaComercialVendas, setMetaComercialVendas,
+    vendedores,
     addVendedor, updateVendedor, deleteVendedor,
   } = useSalesData();
   const { activeAccount } = useAccountContext();
@@ -52,6 +52,13 @@ export default function SettingsPage() {
   const year = new Date().getFullYear();
   const monthYM = `${year}-${selectedMonth}`;
 
+  // Per-month goals
+  const {
+    metaEmpresaVendas, metaComercialVendas,
+    setMetaEmpresaVendas, setMetaComercialVendas,
+    vendorGoals, setVendorGoal,
+  } = useMonthlyGoals(monthYM);
+
   // Inline editing state
   const [editingMetaEmpresa, setEditingMetaEmpresa] = useState(false);
   const [metaEmpresaDraft, setMetaEmpresaDraft] = useState(metaEmpresaVendas);
@@ -59,6 +66,16 @@ export default function SettingsPage() {
   const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
+
+  // Sync drafts when month-specific goals load
+  useEffect(() => {
+    setMetaEmpresaDraft(metaEmpresaVendas);
+    setEditingMetaEmpresa(false);
+  }, [metaEmpresaVendas]);
+  useEffect(() => {
+    setMetaComercialDraft(metaComercialVendas);
+    setEditingMetaComercial(false);
+  }, [metaComercialVendas]);
 
   // Commission tiers state
   interface Tier { id: string; faixa_nome: string; pct_meta: number; premiacao: number; sort_order: number; }
@@ -144,15 +161,15 @@ export default function SettingsPage() {
     setEditingMetaComercial(false);
   };
 
-  const handleStartEditVendor = (id: number, currentMeta: number) => {
+  const handleStartEditVendor = (id: number) => {
     setEditingVendorId(id);
-    setVendorMetaDraft(currentMeta);
+    setVendorMetaDraft(vendorGoals.get(id) ?? vendedores.find(v => v.id === id)?.meta ?? 0);
   };
 
   const handleSaveVendorMeta = (id: number, nome: string) => {
     if (vendorMetaDraft >= 0) {
-      updateVendedor(id, { meta: vendorMetaDraft });
-      toast({ title: 'Meta atualizada', description: `Meta de ${nome} alterada para ${vendorMetaDraft} vendas` });
+      setVendorGoal(id, vendorMetaDraft);
+      toast({ title: 'Meta atualizada', description: `Meta de ${nome} alterada para ${vendorMetaDraft} vendas (${MESES.find(m => m.value === selectedMonth)?.label})` });
     }
     setEditingVendorId(null);
   };
@@ -179,7 +196,7 @@ export default function SettingsPage() {
     setNewUser({ name: '', email: '', monthlyGoal: 10, aniversario: '', foto: '' });
   };
 
-  const somaMetasIndividuais = vendedores.reduce((s, v) => s + v.meta, 0);
+  const somaMetasIndividuais = vendedores.reduce((s, v) => s + (vendorGoals.get(v.id) ?? v.meta), 0);
 
   if (!isAdmin && !isManager) {
     return (
@@ -330,7 +347,7 @@ export default function SettingsPage() {
                         <Button size="sm" variant="ghost" onClick={() => setEditingVendorId(null)}><X className="w-3.5 h-3.5 text-red-400" /></Button>
                       </div>
                     ) : (
-                      <span className="text-foreground">{v.meta} vendas</span>
+                      <span className="text-foreground">{vendorGoals.get(v.id) ?? v.meta} vendas</span>
                     )}
                   </td>
                   <td className="py-3 px-2 text-center">
@@ -338,7 +355,7 @@ export default function SettingsPage() {
                   </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id, v.meta)}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
                       {isAdmin && (
                         <Button variant="ghost" size="sm" onClick={async () => { const ok = await deleteVendedor(v.id); if (ok) { toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); } else { toast({ title: 'Erro', description: `${v.nome} tem clientes vinculados.`, variant: 'destructive' }); } }}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />

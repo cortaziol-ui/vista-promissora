@@ -4,6 +4,9 @@ import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CommissionProgress } from '@/components/CommissionProgress';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useMonthlyData } from '@/hooks/useMonthlyData';
+import { useAvailableMonths } from '@/hooks/useAvailableMonths';
+import { getCurrentMonth, monthLabel } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,26 +20,18 @@ import { VendorAvatar } from '@/components/VendorAvatar';
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
 
-/** Build a label like "Mar/2026" from "2026-03" */
-function monthLabel(ym: string): string {
-  const [y, m] = ym.split('-');
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  return `${months[Number(m) - 1]}/${y}`;
-}
-
 export default function SalesPage() {
+  const { clientes, vendedores } = useSalesData();
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const {
-    clientes,
     filteredClientes,
-    vendedores,
     vendedorStats,
     metaEmpresaVendas,
     pctMeta,
     projecao,
-    selectedMonth,
-    setSelectedMonth,
-  } = useSalesData();
+  } = useMonthlyData(selectedMonth);
 
+  const availableMonths = useAvailableMonths(clientes);
   const [filterVendedor, setFilterVendedor] = useState('all');
 
   const { activeAccount } = useAccountContext();
@@ -75,19 +70,6 @@ export default function SalesPage() {
     () => getLeadsByVendor(links, metaCampaigns),
     [links, metaCampaigns]
   );
-
-  // Derive available months from all clientes
-  const availableMonths = useMemo(() => {
-    const set = new Set<string>();
-    clientes.forEach(c => {
-      const parts = (c.data || '').split('/');
-      if (parts.length === 3) {
-        const [, mm, yyyy] = parts;
-        if (yyyy && mm) set.add(`${yyyy}-${mm.padStart(2, '0')}`);
-      }
-    });
-    return Array.from(set).sort().reverse();
-  }, [clientes]);
 
   // Local filtering by vendedor (uses filteredClientes which is already month-filtered)
   const localClientes = useMemo(() => {

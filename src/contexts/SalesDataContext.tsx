@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Parcela {
@@ -52,25 +52,14 @@ interface SalesDataContextType {
   setMetaEmpresaVendas: (v: number) => void;
   metaComercialVendas: number;
   setMetaComercialVendas: (v: number) => void;
-  selectedMonth: string;
-  setSelectedMonth: (v: string) => void;
   vendedores: Vendedor[];
   addVendedor: (v: Omit<Vendedor, 'id'>) => Promise<Vendedor | null>;
   updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
   deleteVendedor: (id: number) => Promise<boolean>;
   clientes: Cliente[];
-  filteredClientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
   deleteCliente: (id: number) => void;
-  faturamento: number;
-  totalVendas: number;
-  ticketMedio: number;
-  pctMeta: number;
-  projecao: number;
-  vendedorStats: VendedorStats[];
-  dailyEvolution: { dia: string; dataFull: string; vendas: number }[];
-  ticketPorDia: { dia: string; ticketMedio: number }[];
   loading: boolean;
 }
 
@@ -128,34 +117,6 @@ function mapClienteToRow(c: Partial<Cliente>) {
   return row;
 }
 
-/** Parse "DD/MM/YYYY" into "YYYY-MM" */
-function parseMonthFromData(data: string): string | null {
-  if (!data) return null;
-  const parts = data.split('/');
-  if (parts.length !== 3) return null;
-  const [, mm, yyyy] = parts;
-  if (!yyyy || !mm) return null;
-  return `${yyyy}-${mm.padStart(2, '0')}`;
-}
-
-/** Count weekdays (Mon-Fri) from fromDay to toDay (inclusive) in a given year/month (1-indexed month) */
-function countWeekdays(year: number, month: number, fromDay: number, toDay: number): number {
-  let count = 0;
-  for (let d = fromDay; d <= toDay; d++) {
-    const dayOfWeek = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
-  }
-  return count;
-}
-
-/** Get current month as "YYYY-MM" */
-function getCurrentMonth(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-}
-
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
@@ -164,7 +125,6 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(450000);
   const [metaEmpresaVendas, setMetaEmpresaVendasState] = useState<number>(30);
   const [metaComercialVendas, setMetaComercialVendasState] = useState<number>(30);
-  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [loading, setLoading] = useState(true);
 
   // Helper to fetch all clientes
@@ -298,7 +258,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     const vendedor = vendedores.find(v => v.id === id);
     if (vendedor) {
       const hasClientes = clientes.some(c => c.vendedor === vendedor.nome);
-      if (hasClientes) return false; // Has linked clients, caller should warn user
+      if (hasClientes) return false;
     }
     setVendedores(prev => prev.filter(v => v.id !== id));
     await supabase.from('vendedores').delete().eq('id', id);
@@ -319,7 +279,6 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
   const addCliente = useCallback(async (c: Omit<Cliente, 'id'>) => {
     const row = mapClienteToRow(c as Partial<Cliente>);
-    // Ensure required fields
     row.data = c.data;
     row.nome = c.nome;
     row.vendedor = c.vendedor;
@@ -351,126 +310,15 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('clientes').delete().eq('id', id);
   }, []);
 
-  // Filter clientes by selectedMonth
-  const filteredClientes = useMemo(() => {
-    return clientes.filter(c => {
-      const month = parseMonthFromData(c.data);
-      return month === selectedMonth;
-    });
-  }, [clientes, selectedMonth]);
-
-  // All computed values use filteredClientes
-  const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + (c.entrada || 0), 0), [filteredClientes]);
-  const totalVendas = filteredClientes.length;
-  const ticketMedio = useMemo(() => totalVendas > 0 ? faturamento / totalVendas : 0, [faturamento, totalVendas]);
-
-  // Global pctMeta is now sales-count based against metaEmpresaVendas
-  const pctMeta = useMemo(() => metaEmpresaVendas > 0 ? (totalVendas / metaEmpresaVendas) * 100 : 0, [totalVendas, metaEmpresaVendas]);
-
-  const projecao = useMemo(() => {
-    const now = new Date();
-    const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
-    const lastDayOfMonth = new Date(selYear, selMonthStr, 0).getDate();
-    const weekdaysInMonth = countWeekdays(selYear, selMonthStr, 1, lastDayOfMonth);
-
-    const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
-
-    let weekdaysPassed: number;
-    if (isCurrentMonth) {
-      weekdaysPassed = countWeekdays(selYear, selMonthStr, 1, now.getDate());
-    } else {
-      // For past/future months, use the last day that has data, or the full month
-      const daysWithData = filteredClientes
-        .map(c => {
-          const parts = c.data.split('/');
-          return parts.length === 3 ? parseInt(parts[0], 10) : 0;
-        })
-        .filter(d => d > 0);
-      const lastDataDay = daysWithData.length > 0 ? Math.max(...daysWithData) : lastDayOfMonth;
-      weekdaysPassed = countWeekdays(selYear, selMonthStr, 1, lastDataDay);
-    }
-
-    if (weekdaysPassed <= 0) return 0;
-    const ritmo = totalVendas / weekdaysPassed;
-    return ritmo * weekdaysInMonth;
-  }, [filteredClientes, totalVendas, selectedMonth]);
-
-  const vendedorStats = useMemo<VendedorStats[]>(() => {
-    const now = new Date();
-    const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
-    const lastDayOfMonth = new Date(selYear, selMonthStr, 0).getDate();
-    const weekdaysInMonth = countWeekdays(selYear, selMonthStr, 1, lastDayOfMonth);
-    const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
-
-    return vendedores.map(v => {
-      const cv = filteredClientes.filter(c => c.vendedor === v.nome);
-      const fat = cv.reduce((s, c) => s + (c.entrada || 0), 0);
-      const vendas = cv.length;
-      const ticket = vendas > 0 ? fat / vendas : 0;
-
-      // Meta is now number of sales
-      const pct = v.meta > 0 ? (vendas / v.meta) * 100 : 0;
-      const faltam = Math.max(0, v.meta - vendas);
-
-      // Per-vendor projection using business days
-      let weekdaysPassed: number;
-      if (isCurrentMonth) {
-        weekdaysPassed = countWeekdays(selYear, selMonthStr, 1, now.getDate());
-      } else {
-        const daysWithData = cv
-          .map(c => {
-            const parts = c.data.split('/');
-            return parts.length === 3 ? parseInt(parts[0], 10) : 0;
-          })
-          .filter(d => d > 0);
-        const lastDataDay = daysWithData.length > 0 ? Math.max(...daysWithData) : lastDayOfMonth;
-        weekdaysPassed = countWeekdays(selYear, selMonthStr, 1, lastDataDay);
-      }
-
-      const ritmo = weekdaysPassed > 0 ? vendas / weekdaysPassed : 0;
-      const projecaoVendas = Math.round(ritmo * weekdaysInMonth);
-      const dentroProjecao = projecaoVendas >= v.meta;
-
-      return { vendedor: v, faturamento: fat, vendas, ticketMedio: ticket, pctMeta: pct, faltam, projecaoVendas, dentroProjecao };
-    }).sort((a, b) => b.vendas - a.vendas);
-  }, [filteredClientes, vendedores, selectedMonth]);
-
-  const dailyEvolution = useMemo(() => {
-    const byDay: Record<string, { vendas: number; dataFull: string }> = {};
-    filteredClientes.forEach(c => {
-      const day = c.data?.split('/')[0] || '00';
-      if (!byDay[day]) byDay[day] = { vendas: 0, dataFull: c.data };
-      byDay[day].vendas++;
-    });
-    return Object.entries(byDay)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dia, d]) => ({ dia, dataFull: d.dataFull, vendas: d.vendas }));
-  }, [filteredClientes]);
-
-  const ticketPorDia = useMemo(() => {
-    const byDay: Record<string, { total: number; count: number }> = {};
-    filteredClientes.forEach(c => {
-      const day = c.data?.split('/')[0] || '00';
-      if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-      byDay[day].total += (c.entrada || 0);
-      byDay[day].count++;
-    });
-    return Object.entries(byDay)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dia, d]) => ({ dia, ticketMedio: d.count > 0 ? d.total / d.count : 0 }));
-  }, [filteredClientes]);
-
   return (
     <SalesDataContext.Provider value={{
       metaMensalGlobal, setMetaMensalGlobal,
       metaEmpresaVendas, setMetaEmpresaVendas,
       metaComercialVendas, setMetaComercialVendas,
-      selectedMonth, setSelectedMonth,
       vendedores, addVendedor, updateVendedor, deleteVendedor,
-      clientes, filteredClientes,
+      clientes,
       addCliente, updateCliente, deleteCliente,
-      faturamento, totalVendas, ticketMedio, pctMeta, projecao,
-      vendedorStats, dailyEvolution, ticketPorDia, loading,
+      loading,
     }}>
       {children}
     </SalesDataContext.Provider>

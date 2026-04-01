@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
 import { useSalesData, type Cliente } from '@/contexts/SalesDataContext';
+import { useMonthlyData } from '@/hooks/useMonthlyData';
+import { getCurrentMonth } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +65,9 @@ function subMonths(ym: string, n: number): string {
 }
 
 export default function FinancialPage() {
-  const { clientes, filteredClientes, selectedMonth, setSelectedMonth } = useSalesData();
+  const { clientes } = useSalesData();
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const { filteredClientes } = useMonthlyData(selectedMonth);
   const { toast } = useToast();
 
   // Custos state
