@@ -457,8 +457,11 @@ export default function SalesPage() {
                   <th className="text-left py-3 px-2">#</th>
                   <th className="text-left py-3 px-2">Vendedor</th>
                   <th className="text-right py-3 px-2">MM</th>
-                  <th className="text-right py-3 px-2 cursor-help" title={weeklyEngine.weeks[weeklyEngine.currentWeekIdx]?.label ?? ''}>
+                  <th className="text-right py-3 px-2 relative group">
                     MS{weeklyEngine.currentWeekIdx + 1}
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 rounded bg-popover border border-border text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-lg">
+                      {weeklyEngine.weeks[weeklyEngine.currentWeekIdx]?.label ?? ''}
+                    </span>
                   </th>
                   <th className="text-right py-3 px-2">MD</th>
                   <th className="text-right py-3 px-2">Vendas</th>
