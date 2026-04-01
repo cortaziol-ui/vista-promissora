@@ -203,39 +203,44 @@ export default function FinancialPage() {
   }, [selectedMonth, receitaMes, clientesPorMes]);
 
   // === INADIMPLÊNCIA ===
-  const inadimplentes = useMemo(() => {
+  const { venceHoje, inadimplentes } = useMemo(() => {
     const hoje = new Date();
-    const result: { cliente: Cliente; parcela: string; valor: number; diasAtraso: number; vencimento: Date }[] = [];
+    hoje.setHours(0, 0, 0, 0);
+    const venceHojeList: { cliente: Cliente; parcela: string; valor: number }[] = [];
+    const vencidasList: { cliente: Cliente; parcela: string; valor: number; diasAtraso: number; vencimento: Date }[] = [];
+
+    const checkParcela = (c: Cliente, dataVenda: Date, dias: number, label: string, valor: number) => {
+      const venc = new Date(dataVenda);
+      venc.setDate(venc.getDate() + dias);
+      venc.setHours(0, 0, 0, 0);
+      const diffMs = hoje.getTime() - venc.getTime();
+      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDias === 0) {
+        venceHojeList.push({ cliente: c, parcela: label, valor });
+      } else if (diffDias > 0) {
+        vencidasList.push({ cliente: c, parcela: label, valor, diasAtraso: diffDias, vencimento: venc });
+      }
+    };
 
     clientes.forEach(c => {
       const dataVenda = parseDate(c.data);
       if (!dataVenda) return;
-
-      // Parcela 1: vence 30 dias após venda
       if (c.parcela1.status === 'AGUARDANDO' && c.parcela1.valor > 0) {
-        const venc = new Date(dataVenda);
-        venc.setDate(venc.getDate() + 30);
-        if (venc < hoje) {
-          const dias = Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
-          result.push({ cliente: c, parcela: '1ª Parcela', valor: c.parcela1.valor, diasAtraso: dias, vencimento: venc });
-        }
+        checkParcela(c, dataVenda, 30, '1ª Parcela', c.parcela1.valor);
       }
-
-      // Parcela 2: vence 60 dias após venda
       if (c.parcela2.status === 'AGUARDANDO' && c.parcela2.valor > 0) {
-        const venc = new Date(dataVenda);
-        venc.setDate(venc.getDate() + 60);
-        if (venc < hoje) {
-          const dias = Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
-          result.push({ cliente: c, parcela: '2ª Parcela', valor: c.parcela2.valor, diasAtraso: dias, vencimento: venc });
-        }
+        checkParcela(c, dataVenda, 60, '2ª Parcela', c.parcela2.valor);
       }
     });
 
-    return result.sort((a, b) => b.diasAtraso - a.diasAtraso);
+    return {
+      venceHoje: venceHojeList,
+      inadimplentes: vencidasList.sort((a, b) => b.diasAtraso - a.diasAtraso),
+    };
   }, [clientes]);
 
   const totalInadimplente = inadimplentes.reduce((s, i) => s + i.valor, 0);
+  const totalVenceHoje = venceHoje.reduce((s, i) => s + i.valor, 0);
 
   // === COMPARATIVO MENSAL (últimos 3 meses) ===
   const comparativo = useMemo(() => {
@@ -407,7 +412,39 @@ export default function FinancialPage() {
         </div>
       </div>
 
-      {/* Inadimplência */}
+      {/* Vence Hoje — alerta amarelo */}
+      {venceHoje.length > 0 && (
+        <div className="glass-card p-5 border border-amber-500/30">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
+            <h3 className="text-sm font-semibold text-amber-400">Vence Hoje — {fmtFull(totalVenceHoje)}</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/50">
+                  <th className="text-left py-2 px-2">Cliente</th>
+                  <th className="text-left py-2 px-2">Vendedor</th>
+                  <th className="text-left py-2 px-2">Parcela</th>
+                  <th className="text-right py-2 px-2">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {venceHoje.map((item, i) => (
+                  <tr key={i} className="border-b border-border/30">
+                    <td className="py-2 px-2 font-medium">{item.cliente.nome}</td>
+                    <td className="py-2 px-2 text-muted-foreground">{item.cliente.vendedor}</td>
+                    <td className="py-2 px-2">{item.parcela}</td>
+                    <td className="py-2 px-2 text-right text-amber-400 font-medium">{fmtFull(item.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Parcelas Vencidas — alerta vermelho */}
       {inadimplentes.length > 0 && (
         <div className="glass-card p-5 border border-red-500/30">
           <div className="flex items-center gap-2 mb-4">
@@ -455,10 +492,10 @@ export default function FinancialPage() {
               <DialogHeader>
                 <DialogTitle>{editingCusto ? 'Editar Custo' : 'Novo Custo'}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-3">
+              <form autoComplete="off" className="space-y-3" onSubmit={e => { e.preventDefault(); handleSaveCusto(); }}>
                 <div>
                   <label className="text-sm text-muted-foreground">Nome</label>
-                  <Input value={custoForm.nome} onChange={e => setCustoForm({ ...custoForm, nome: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                  <Input value={custoForm.nome} onChange={e => setCustoForm({ ...custoForm, nome: e.target.value })} className="bg-secondary border-border/50 mt-1" autoComplete="new-password" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Tipo</label>
@@ -472,14 +509,14 @@ export default function FinancialPage() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Valor (R$)</label>
-                  <Input type="number" value={custoForm.valor} onChange={e => setCustoForm({ ...custoForm, valor: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" />
+                  <Input type="number" value={custoForm.valor} onChange={e => setCustoForm({ ...custoForm, valor: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" autoComplete="off" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Categoria (opcional)</label>
-                  <Input value={custoForm.categoria} onChange={e => setCustoForm({ ...custoForm, categoria: e.target.value })} placeholder="Ex: infraestrutura, marketing..." className="bg-secondary border-border/50 mt-1" />
+                  <Input value={custoForm.categoria} onChange={e => setCustoForm({ ...custoForm, categoria: e.target.value })} placeholder="Ex: infraestrutura, marketing..." className="bg-secondary border-border/50 mt-1" autoComplete="new-password" />
                 </div>
-                <Button onClick={handleSaveCusto} className="w-full">Salvar</Button>
-              </div>
+                <Button type="submit" className="w-full">Salvar</Button>
+              </form>
             </DialogContent>
           </Dialog>
         </div>

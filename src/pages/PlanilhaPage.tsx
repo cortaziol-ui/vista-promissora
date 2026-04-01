@@ -259,19 +259,19 @@ export default function PlanilhaPage() {
             <DialogTitle>{editingId !== null ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente abaixo.</DialogDescription>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1 pr-1">
+          <form autoComplete="off" className="overflow-y-auto flex-1 pr-1" onSubmit={e => { e.preventDefault(); handleSave(); }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
                 <Label>Data</Label>
-                <Input value={form.data} onChange={e => updateFormField('data', e.target.value)} placeholder="DD/MM/YYYY" />
+                <Input value={form.data} onChange={e => updateFormField('data', e.target.value)} placeholder="DD/MM/YYYY" autoComplete="off" />
               </div>
               <div className="space-y-2">
                 <Label>Nome Completo</Label>
-                <Input value={form.nome} onChange={e => updateFormField('nome', e.target.value.toUpperCase())} />
+                <Input value={form.nome} onChange={e => updateFormField('nome', e.target.value.toUpperCase())} autoComplete="new-password" />
               </div>
               <div className="space-y-2">
                 <Label>CPF / CNPJ</Label>
-                <Input value={form.cpf} onChange={e => updateFormField('cpf', e.target.value)} />
+                <Input value={form.cpf} onChange={e => updateFormField('cpf', e.target.value)} autoComplete="new-password" />
               </div>
               <div className="space-y-2">
                 <Label>Data de Nascimento</Label>
@@ -279,11 +279,11 @@ export default function PlanilhaPage() {
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={e => updateFormField('email', e.target.value)} />
+                <Input type="email" value={form.email} onChange={e => updateFormField('email', e.target.value)} autoComplete="new-password" />
               </div>
               <div className="space-y-2">
                 <Label>Telefone</Label>
-                <Input value={form.telefone} onChange={e => updateFormField('telefone', e.target.value)} />
+                <Input value={form.telefone} onChange={e => updateFormField('telefone', e.target.value)} autoComplete="new-password" />
               </div>
               <div className="space-y-2">
                 <Label>Serviço</Label>
@@ -361,7 +361,7 @@ export default function PlanilhaPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </form>
           <DialogFooter className="shrink-0 border-t border-border/30 pt-4">
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave}>Salvar</Button>

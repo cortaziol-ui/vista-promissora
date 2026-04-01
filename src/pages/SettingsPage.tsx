@@ -280,18 +280,18 @@ export default function SettingsPage() {
             </DialogTrigger>
             <DialogContent className="bg-card border-border">
               <DialogHeader><DialogTitle>Novo Vendedor</DialogTitle></DialogHeader>
-              <div className="space-y-3">
+              <form autoComplete="off" className="space-y-3" onSubmit={e => { e.preventDefault(); handleAddUser(); }}>
                 <div>
                   <label className="text-sm text-muted-foreground">Nome</label>
-                  <Input value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                  <Input value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} className="bg-secondary border-border/50 mt-1" autoComplete="new-password" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Meta Mensal (nº de vendas)</label>
-                  <Input type="number" value={newUser.monthlyGoal} onChange={e => setNewUser({ ...newUser, monthlyGoal: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" />
+                  <Input type="number" value={newUser.monthlyGoal} onChange={e => setNewUser({ ...newUser, monthlyGoal: Number(e.target.value) })} className="bg-secondary border-border/50 mt-1" autoComplete="off" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Aniversário</label>
-                  <Input type="date" value={newUser.aniversario} onChange={e => setNewUser({ ...newUser, aniversario: e.target.value })} className="bg-secondary border-border/50 mt-1" />
+                  <Input type="date" value={newUser.aniversario} onChange={e => setNewUser({ ...newUser, aniversario: e.target.value })} className="bg-secondary border-border/50 mt-1" autoComplete="off" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Foto</label>
@@ -303,8 +303,8 @@ export default function SettingsPage() {
                     reader.readAsDataURL(file);
                   }} />
                 </div>
-                <Button onClick={handleAddUser} className="w-full">Salvar Vendedor</Button>
-              </div>
+                <Button type="submit" className="w-full">Salvar Vendedor</Button>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
