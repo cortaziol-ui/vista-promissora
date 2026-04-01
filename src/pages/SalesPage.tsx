@@ -272,6 +272,11 @@ export default function SalesPage() {
     };
   }, [selectedMonth, localMetaVendas, filteredClientes, filterVendedor, vendedorStats, monthlyVendorGoals]);
 
+  const todaySalesCount = useMemo(() => {
+    const todayStr = String(new Date().getDate()).padStart(2, '0');
+    return localClientes.filter(c => c.data?.startsWith(todayStr + '/')).length;
+  }, [localClientes]);
+
   const dailySales = useMemo(() => {
     const byDay: Record<string, number> = {};
     localClientes.forEach(c => {
@@ -379,7 +384,7 @@ export default function SalesPage() {
       <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}>
         <KpiCard title="Meta Mensal (MM)" value={`${localTotalVendas}/${localMetaVendas}`} subtitle={`${Math.max(0, localMetaVendas - localTotalVendas)} restantes`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
         <KpiCard title={`Meta Semanal (S${weeklyEngine.currentWeekIdx + 1})`} value={`${weeklyEngine.currentWeekSales}/${weeklyEngine.weeklyGoal}`} subtitle={weeklyEngine.currentWeekSales >= weeklyEngine.weeklyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.weeklyGoal - weeklyEngine.currentWeekSales)} restantes`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
-        <KpiCard title="Meta Diária (MD)" value={`${weeklyEngine.dailyGoal} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+        <KpiCard title="Meta Diária (MD)" value={`${todaySalesCount}/${weeklyEngine.dailyGoal}`} subtitle={todaySalesCount >= weeklyEngine.dailyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.dailyGoal - todaySalesCount)} restantes`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
         <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
