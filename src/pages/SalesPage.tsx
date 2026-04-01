@@ -33,6 +33,7 @@ export default function SalesPage() {
 
   const availableMonths = useAvailableMonths(clientes);
   const [filterVendedor, setFilterVendedor] = useState('all');
+  const [tableView, setTableView] = useState<'geral' | 'semana'>('geral');
 
   const { activeAccount } = useAccountContext();
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -103,37 +104,52 @@ export default function SalesPage() {
     ? metaEmpresaVendas
     : filteredStats.length > 0 ? filteredStats[0].vendedor.meta : 0;
 
-  // Weekly and daily goal calculations
-  const weeklyDailyGoals = useMemo(() => {
+  // === WEEKLY / DAILY GOAL ENGINE WITH REDISTRIBUTION ===
+  interface WeekInfo {
+    weekNum: number;
+    label: string;        // "Semana 1 (01/04 - 04/04)"
+    fromDay: number;
+    toDay: number;
+    workingDays: number;
+    baseMeta: number;     // meta original (sem redistribuição)
+    adjustedMeta: number; // meta ajustada com carry-over
+    sales: number;
+    completed: boolean;   // meta semanal batida
+    isCurrent: boolean;
+  }
+
+  interface VendorWeeklyData {
+    weeks: WeekInfo[];
+    currentWeekMeta: number;
+    dailyGoal: number;
+    currentWeekIdx: number;
+  }
+
+  const weeklyEngine = useMemo(() => {
     const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
     const now = new Date();
     const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
     const lastDayOfMonth = new Date(selYear, selMonthStr, 0).getDate();
-
-    // Count weeks in the month (Mon-Sun blocks based on weekdays)
-    // A "week" = 5 working days. Total weeks = total weekdays / 5
-    const totalWeekdays = countWeekdays(selYear, selMonthStr, 1, lastDayOfMonth);
-    const weeksInMonth = Math.max(1, totalWeekdays / 5);
-
-    // Find current week boundaries (Mon-Fri)
     const today = isCurrentMonth ? now.getDate() : lastDayOfMonth;
-    const todayDate = new Date(selYear, selMonthStr - 1, today);
-    const dayOfWeek = todayDate.getDay(); // 0=Sun, 6=Sat
 
-    // Find Monday of current week
-    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const mondayDay = Math.max(1, today - daysFromMonday);
-    // Find Friday of current week
-    const fridayDay = Math.min(lastDayOfMonth, mondayDay + 4);
+    // Build list of working days in the month (actual calendar days that are Mon-Fri)
+    const workingDaysList: number[] = [];
+    for (let d = 1; d <= lastDayOfMonth; d++) {
+      const dow = new Date(selYear, selMonthStr - 1, d).getDay();
+      if (dow !== 0 && dow !== 6) workingDaysList.push(d);
+    }
+    const totalWorkingDays = workingDaysList.length;
 
-    // Remaining working days in week (from today to Friday, inclusive)
-    const remainingWeekDays = isCurrentMonth
-      ? countWeekdays(selYear, selMonthStr, today, fridayDay)
-      : 0;
+    // Split into weeks of 5 working days, last week gets remainder
+    const weekRanges: { fromDay: number; toDay: number; days: number[] }[] = [];
+    for (let i = 0; i < totalWorkingDays; i += 5) {
+      const chunk = workingDaysList.slice(i, i + 5);
+      weekRanges.push({ fromDay: chunk[0], toDay: chunk[chunk.length - 1], days: chunk });
+    }
 
-    // Helper: count sales for a vendor in a day range
-    const salesInRange = (clientes: typeof filteredClientes, vendorName: string | null, fromDay: number, toDay: number) => {
-      return clientes.filter(c => {
+    // Helper: count sales in day range for a vendor
+    const salesInRange = (vendorName: string | null, fromDay: number, toDay: number) => {
+      return filteredClientes.filter(c => {
         if (vendorName && c.vendedor !== vendorName) return false;
         const parts = c.data?.split('/');
         if (!parts || parts.length !== 3) return false;
@@ -142,24 +158,99 @@ export default function SalesPage() {
       }).length;
     };
 
-    // Global goals
-    const weeklyGoal = Math.ceil(localMetaVendas / weeksInMonth);
-    const salesThisWeek = salesInRange(filteredClientes, filterVendedor === 'all' ? null : filterVendedor, mondayDay, Math.min(today, fridayDay));
-    const remainingWeekGoal = Math.max(0, weeklyGoal - salesThisWeek);
-    const dailyGoal = remainingWeekDays > 0 ? Math.ceil(remainingWeekGoal / remainingWeekDays) : 0;
+    // Helper: format day as DD/MM
+    const fmtDay = (d: number) => `${String(d).padStart(2, '0')}/${String(selMonthStr).padStart(2, '0')}`;
 
-    // Per-vendor goals
-    const vendorGoals = new Map<number, { weeklyGoal: number; dailyGoal: number; salesThisWeek: number }>();
+    // Compute weeks for a given vendor (null = global)
+    const computeVendorWeeks = (meta: number, vendorName: string | null): VendorWeeklyData => {
+      const dailyBase = totalWorkingDays > 0 ? meta / totalWorkingDays : 0;
+      let carry = 0; // deficit from previous weeks
+      let currentWeekIdx = 0;
+
+      const weeks: WeekInfo[] = weekRanges.map((wr, idx) => {
+        const workingDays = wr.days.length;
+        const baseMeta = Math.round(dailyBase * workingDays);
+        const adjustedMeta = Math.round(baseMeta + carry);
+        const sales = salesInRange(vendorName, wr.fromDay, wr.toDay);
+        const isCurrent = isCurrentMonth && today >= wr.fromDay && today <= wr.toDay;
+        if (isCurrent) currentWeekIdx = idx;
+
+        // For past weeks, calculate carry-over for next week
+        const isPast = isCurrentMonth ? today > wr.toDay : true;
+        if (isPast) {
+          carry = Math.max(0, adjustedMeta - sales);
+        } else if (isCurrent) {
+          // Don't carry current week yet — it's in progress
+          carry = 0;
+        } else {
+          carry = 0; // future weeks don't carry yet
+        }
+
+        return {
+          weekNum: idx + 1,
+          label: `Semana ${idx + 1} (${fmtDay(wr.fromDay)} - ${fmtDay(wr.toDay)})`,
+          fromDay: wr.fromDay,
+          toDay: wr.toDay,
+          workingDays,
+          baseMeta,
+          adjustedMeta: Math.max(0, adjustedMeta),
+          sales,
+          completed: sales >= Math.max(0, adjustedMeta),
+          isCurrent,
+        };
+      });
+
+      // Recalculate: redistribute deficit from all past weeks into remaining weeks
+      let totalDeficit = 0;
+      weeks.forEach(w => {
+        if (!w.isCurrent && today > w.toDay) {
+          totalDeficit += Math.max(0, w.adjustedMeta - w.sales);
+        }
+      });
+      // Spread deficit across current + future weeks
+      const remainingWeeks = weeks.filter(w => w.isCurrent || (isCurrentMonth && today < w.fromDay));
+      const totalRemainingWorkingDays = remainingWeeks.reduce((s, w) => s + w.workingDays, 0);
+      if (totalDeficit > 0 && totalRemainingWorkingDays > 0) {
+        remainingWeeks.forEach(w => {
+          const share = Math.round((w.workingDays / totalRemainingWorkingDays) * totalDeficit);
+          w.adjustedMeta = Math.round((meta / totalWorkingDays) * w.workingDays) + share;
+          w.completed = w.sales >= w.adjustedMeta;
+        });
+      }
+
+      // Current week's daily goal
+      const cw = weeks[currentWeekIdx];
+      let dailyGoal = 0;
+      if (cw && isCurrentMonth) {
+        const salesSoFar = cw.sales;
+        const remaining = Math.max(0, cw.adjustedMeta - salesSoFar);
+        // Remaining working days from today (inclusive) to end of current week
+        const remainingDays = cw.days ? cw.days.filter(d => d >= today).length : 0;
+        dailyGoal = remainingDays > 0 ? Math.ceil(remaining / remainingDays) : 0;
+      }
+
+      return { weeks, currentWeekMeta: cw?.adjustedMeta ?? 0, dailyGoal, currentWeekIdx };
+    };
+
+    // Global computation
+    const globalData = computeVendorWeeks(
+      localMetaVendas,
+      filterVendedor === 'all' ? null : filterVendedor
+    );
+
+    // Per-vendor computation
+    const vendorData = new Map<number, VendorWeeklyData>();
     vendedorStats.forEach(stat => {
-      const vMeta = stat.vendedor.meta;
-      const vWeekly = Math.ceil(vMeta / weeksInMonth);
-      const vSalesWeek = salesInRange(filteredClientes, stat.vendedor.nome, mondayDay, Math.min(today, fridayDay));
-      const vRemaining = Math.max(0, vWeekly - vSalesWeek);
-      const vDaily = remainingWeekDays > 0 ? Math.ceil(vRemaining / remainingWeekDays) : 0;
-      vendorGoals.set(stat.vendedor.id, { weeklyGoal: vWeekly, dailyGoal: vDaily, salesThisWeek: vSalesWeek });
+      vendorData.set(stat.vendedor.id, computeVendorWeeks(stat.vendedor.meta, stat.vendedor.nome));
     });
 
-    return { weeklyGoal, dailyGoal, vendorGoals };
+    return {
+      weeklyGoal: globalData.currentWeekMeta,
+      dailyGoal: globalData.dailyGoal,
+      weeks: globalData.weeks,
+      currentWeekIdx: globalData.currentWeekIdx,
+      vendorData,
+    };
   }, [selectedMonth, localMetaVendas, filteredClientes, filterVendedor, vendedorStats]);
 
   const dailySales = useMemo(() => {
@@ -268,8 +359,8 @@ export default function SalesPage() {
 
       <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}>
         <KpiCard title="Meta Mensal (MM)" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-        <KpiCard title="Meta Semanal (MS)" value={`${weeklyDailyGoals.weeklyGoal} vendas`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
-        <KpiCard title="Meta Diária (MD)" value={`${weeklyDailyGoals.dailyGoal} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+        <KpiCard title="Meta Semanal (MS)" value={`${weeklyEngine.weeklyGoal} vendas`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+        <KpiCard title="Meta Diária (MD)" value={`${weeklyEngine.dailyGoal} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
         <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
@@ -334,68 +425,147 @@ export default function SalesPage() {
 
       {/* Seller Detail Table */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Performance por Vendedor</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b border-border/50">
-                <th className="text-left py-3 px-2">#</th>
-                <th className="text-left py-3 px-2">Vendedor</th>
-                <th className="text-right py-3 px-2">MM</th>
-                <th className="text-right py-3 px-2">MS</th>
-                <th className="text-right py-3 px-2">MD</th>
-                <th className="text-right py-3 px-2">Vendas</th>
-                <th className="text-right py-3 px-2">Leads</th>
-                <th className="text-right py-3 px-2">Conversao</th>
-                <th className="text-right py-3 px-2">Faltam</th>
-                <th className="text-center py-3 px-2">Projeção</th>
-                {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
-                {!isSeller && <th className="text-right py-3 px-2">Ticket Médio</th>}
-                <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStats.map((stat, i) => {
-                const vendorLeads = vendorLeadsMap[stat.vendedor.id];
-                const leadsCount = vendorLeads?.leads ?? 0;
-                const conversionRate = leadsCount > 0 ? (stat.vendas / leadsCount) * 100 : 0;
-
-                return (
-                  <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
-                    <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
-                      {i < 3 ? ['\u{1F947}', '\u{1F948}', '\u{1F949}'][i] : i + 1}
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-3">
-                        <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} size="lg" />
-                        <div>
-                          <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
-                          <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{weeklyDailyGoals.vendorGoals.get(stat.vendedor.id)?.weeklyGoal ?? '—'}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{weeklyDailyGoals.vendorGoals.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
-                    <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>
-                    <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
-                    <td className="py-3 px-2 text-center">
-                      {stat.dentroProjecao
-                        ? <CheckCircle2 className="w-5 h-5 text-green-500 inline-block" />
-                        : <XCircle className="w-5 h-5 text-red-500 inline-block" />
-                      }
-                    </td>
-                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
-                    {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
-                    <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Performance por Vendedor</h3>
+          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+            <button
+              onClick={() => setTableView('geral')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'geral' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Geral
+            </button>
+            <button
+              onClick={() => setTableView('semana')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'semana' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Por Semana
+            </button>
+          </div>
         </div>
+
+        {tableView === 'geral' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/50">
+                  <th className="text-left py-3 px-2">#</th>
+                  <th className="text-left py-3 px-2">Vendedor</th>
+                  <th className="text-right py-3 px-2">MM</th>
+                  <th className="text-right py-3 px-2">MS</th>
+                  <th className="text-right py-3 px-2">MD</th>
+                  <th className="text-right py-3 px-2">Vendas</th>
+                  <th className="text-right py-3 px-2">Leads</th>
+                  <th className="text-right py-3 px-2">Conversao</th>
+                  <th className="text-right py-3 px-2">Faltam</th>
+                  <th className="text-center py-3 px-2">Projeção</th>
+                  {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
+                  {!isSeller && <th className="text-right py-3 px-2">Ticket Médio</th>}
+                  <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStats.map((stat, i) => {
+                  const vendorLeads = vendorLeadsMap[stat.vendedor.id];
+                  const leadsCount = vendorLeads?.leads ?? 0;
+                  const conversionRate = leadsCount > 0 ? (stat.vendas / leadsCount) * 100 : 0;
+
+                  return (
+                    <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
+                      <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
+                        {i < 3 ? ['\u{1F947}', '\u{1F948}', '\u{1F949}'][i] : i + 1}
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-3">
+                          <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} size="lg" />
+                          <div>
+                            <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
+                            <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta}</td>
+                      <td className="py-3 px-2 text-right text-muted-foreground">{weeklyEngine.vendorData.get(stat.vendedor.id)?.currentWeekMeta ?? '—'}</td>
+                      <td className="py-3 px-2 text-right text-muted-foreground">{weeklyEngine.vendorData.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
+                      <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
+                      <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
+                      <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>
+                      <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
+                      <td className="py-3 px-2 text-center">
+                        {stat.dentroProjecao
+                          ? <CheckCircle2 className="w-5 h-5 text-green-500 inline-block" />
+                          : <XCircle className="w-5 h-5 text-red-500 inline-block" />
+                        }
+                      </td>
+                      {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
+                      {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
+                      <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* === WEEK VIEW === */
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/50">
+                  <th className="text-left py-3 px-2">Vendedor</th>
+                  {weeklyEngine.weeks.map(w => (
+                    <th key={w.weekNum} className={`text-center py-3 px-2 ${w.isCurrent ? 'text-primary' : ''}`}>
+                      <div className="text-xs leading-tight">S{w.weekNum}</div>
+                      <div className="text-[10px] text-muted-foreground/70 leading-tight">
+                        {String(w.fromDay).padStart(2, '0')}-{String(w.toDay).padStart(2, '0')}
+                      </div>
+                    </th>
+                  ))}
+                  <th className="text-right py-3 px-2">Total</th>
+                  <th className="text-left py-3 px-2 min-w-[100px]">% Meta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStats.map(stat => {
+                  const vd = weeklyEngine.vendorData.get(stat.vendedor.id);
+                  return (
+                    <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
+                          <span className="font-medium text-foreground text-xs">{stat.vendedor.nome}</span>
+                        </div>
+                      </td>
+                      {(vd?.weeks ?? []).map(w => {
+                        const pct = w.adjustedMeta > 0 ? (w.sales / w.adjustedMeta) * 100 : (w.sales > 0 ? 100 : 0);
+                        return (
+                          <td key={w.weekNum} className="py-3 px-2 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex items-center gap-1">
+                                <span className="font-semibold text-foreground text-xs">{w.sales}</span>
+                                <span className="text-muted-foreground/60 text-[10px]">/{w.adjustedMeta}</span>
+                              </div>
+                              {w.completed ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                              ) : w.isCurrent ? (
+                                <span className="text-[10px] text-primary font-medium">Em curso</span>
+                              ) : pct > 0 ? (
+                                <span className="text-[10px] text-amber-400">{pct.toFixed(0)}%</span>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/40">—</span>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
+                      <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Commission section - only visible for sellers */}
