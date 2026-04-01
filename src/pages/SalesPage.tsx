@@ -6,7 +6,7 @@ import { CommissionProgress } from '@/components/CommissionProgress';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { useAvailableMonths } from '@/hooks/useAvailableMonths';
-import { getCurrentMonth, monthLabel } from '@/lib/dateUtils';
+import { getCurrentMonth, monthLabel, countWeekdays } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,6 +102,65 @@ export default function SalesPage() {
   const localMetaVendas = filterVendedor === 'all'
     ? metaEmpresaVendas
     : filteredStats.length > 0 ? filteredStats[0].vendedor.meta : 0;
+
+  // Weekly and daily goal calculations
+  const weeklyDailyGoals = useMemo(() => {
+    const [selYear, selMonthStr] = selectedMonth.split('-').map(Number);
+    const now = new Date();
+    const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
+    const lastDayOfMonth = new Date(selYear, selMonthStr, 0).getDate();
+
+    // Count weeks in the month (Mon-Sun blocks based on weekdays)
+    // A "week" = 5 working days. Total weeks = total weekdays / 5
+    const totalWeekdays = countWeekdays(selYear, selMonthStr, 1, lastDayOfMonth);
+    const weeksInMonth = Math.max(1, totalWeekdays / 5);
+
+    // Find current week boundaries (Mon-Fri)
+    const today = isCurrentMonth ? now.getDate() : lastDayOfMonth;
+    const todayDate = new Date(selYear, selMonthStr - 1, today);
+    const dayOfWeek = todayDate.getDay(); // 0=Sun, 6=Sat
+
+    // Find Monday of current week
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mondayDay = Math.max(1, today - daysFromMonday);
+    // Find Friday of current week
+    const fridayDay = Math.min(lastDayOfMonth, mondayDay + 4);
+
+    // Remaining working days in week (from today to Friday, inclusive)
+    const remainingWeekDays = isCurrentMonth
+      ? countWeekdays(selYear, selMonthStr, today, fridayDay)
+      : 0;
+
+    // Helper: count sales for a vendor in a day range
+    const salesInRange = (clientes: typeof filteredClientes, vendorName: string | null, fromDay: number, toDay: number) => {
+      return clientes.filter(c => {
+        if (vendorName && c.vendedor !== vendorName) return false;
+        const parts = c.data?.split('/');
+        if (!parts || parts.length !== 3) return false;
+        const day = parseInt(parts[0], 10);
+        return day >= fromDay && day <= toDay;
+      }).length;
+    };
+
+    // Global goals
+    const weeklyGoal = Math.ceil(localMetaVendas / weeksInMonth);
+    const salesThisWeek = salesInRange(filteredClientes, filterVendedor === 'all' ? null : filterVendedor, mondayDay, Math.min(today, fridayDay));
+    const remainingWeekGoal = Math.max(0, weeklyGoal - salesThisWeek);
+    const dailyGoal = remainingWeekDays > 0 ? Math.ceil(remainingWeekGoal / remainingWeekDays) : 0;
+
+    // Per-vendor goals
+    const vendorGoals = new Map<number, { weeklyGoal: number; dailyGoal: number; salesThisWeek: number }>();
+    vendedorStats.forEach(stat => {
+      const vMeta = stat.vendedor.meta;
+      const vWeekly = Math.ceil(vMeta / weeksInMonth);
+      const vSalesWeek = salesInRange(filteredClientes, stat.vendedor.nome, mondayDay, Math.min(today, fridayDay));
+      const vRemaining = Math.max(0, vWeekly - vSalesWeek);
+      const vDaily = remainingWeekDays > 0 ? Math.ceil(vRemaining / remainingWeekDays) : 0;
+      vendorGoals.set(stat.vendedor.id, { weeklyGoal: vWeekly, dailyGoal: vDaily, salesThisWeek: vSalesWeek });
+    });
+
+    return { weeklyGoal, dailyGoal, vendorGoals };
+  }, [selectedMonth, localMetaVendas, filteredClientes, filterVendedor, vendedorStats]);
 
   const dailySales = useMemo(() => {
     const byDay: Record<string, number> = {};
@@ -207,8 +266,10 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSeller ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4`}>
-        <KpiCard title="Meta Mensal" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}>
+        <KpiCard title="Meta Mensal (MM)" value={`${localMetaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
+        <KpiCard title="Meta Semanal (MS)" value={`${weeklyDailyGoals.weeklyGoal} vendas`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+        <KpiCard title="Meta Diária (MD)" value={`${weeklyDailyGoals.dailyGoal} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
         <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
         <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
         <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
@@ -280,7 +341,9 @@ export default function SalesPage() {
               <tr className="text-muted-foreground border-b border-border/50">
                 <th className="text-left py-3 px-2">#</th>
                 <th className="text-left py-3 px-2">Vendedor</th>
-                <th className="text-right py-3 px-2">Meta</th>
+                <th className="text-right py-3 px-2">MM</th>
+                <th className="text-right py-3 px-2">MS</th>
+                <th className="text-right py-3 px-2">MD</th>
                 <th className="text-right py-3 px-2">Vendas</th>
                 <th className="text-right py-3 px-2">Leads</th>
                 <th className="text-right py-3 px-2">Conversao</th>
@@ -311,7 +374,9 @@ export default function SalesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta} vendas</td>
+                    <td className="py-3 px-2 text-right text-kpi-goal font-medium">{stat.vendedor.meta}</td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">{weeklyDailyGoals.vendorGoals.get(stat.vendedor.id)?.weeklyGoal ?? '—'}</td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">{weeklyDailyGoals.vendorGoals.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
                     <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
                     <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
                     <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>
