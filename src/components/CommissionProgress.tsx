@@ -106,7 +106,7 @@ export function CommissionProgress({
       </div>
 
       {/* Tier labels */}
-      <div className="relative w-full mt-1" style={{ height: '2.2rem' }}>
+      <div className="relative w-full mt-1" style={{ height: '3.2rem' }}>
         {tiers.map((tier) => {
           const left = toPos(tier.pct_meta);
           return (
@@ -121,6 +121,13 @@ export function CommissionProgress({
                 }`}
               >
                 {tier.pct_meta}%
+              </p>
+              <p
+                className={`text-[10px] leading-tight ${
+                  tier.unlocked ? 'text-kpi-success/70' : 'text-muted-foreground/50'
+                }`}
+              >
+                {tier.vendasNecessarias} vendas
               </p>
               <p
                 className={`text-[10px] leading-tight ${
