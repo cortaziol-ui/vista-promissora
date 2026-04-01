@@ -79,7 +79,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) {
-    const defaultRoute = user.role === 'admin' ? '/' : '/vendas';
+    const defaultRoute = (user.role === 'admin' || user.role === 'manager') ? '/' : '/vendas';
     return <Navigate to={defaultRoute} replace />;
   }
   return <DashboardLayout>{children}</DashboardLayout>;
@@ -87,7 +87,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  const defaultRoute = user?.role === 'admin' ? '/' : '/vendas';
+  const defaultRoute = (user?.role === 'admin' || user?.role === 'manager') ? '/' : '/vendas';
 
   if (loading) {
     return (
@@ -102,7 +102,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to={defaultRoute} replace /> : <LoginPage />} />
       
       {/* Admin only */}
-      <Route path="/" element={<ProtectedRoute roles={['admin']}><OverviewPage /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute roles={['admin', 'manager']}><OverviewPage /></ProtectedRoute>} />
       <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager']}><MarketingPage /></ProtectedRoute>} />
       <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager']}><SatisfactionPage /></ProtectedRoute>} />
       <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager']}><PlanilhaPage /></ProtectedRoute>} />
@@ -113,7 +113,7 @@ function AppRoutes() {
       
       {/* All roles */}
       <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><SalesPage /></ProtectedRoute>} />
-      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'seller']}><RoletaPage /></ProtectedRoute>} />
+      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       
       <Route path="*" element={<NotFound />} />

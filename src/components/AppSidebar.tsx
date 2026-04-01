@@ -18,13 +18,13 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin'] },
+  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin', 'manager'] },
   { title: 'Vendas', url: '/vendas', icon: BarChart3, roles: ['admin', 'manager', 'seller'] },
   { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager'] },
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin'] },
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager'] },
-  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'seller'] },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller'] },
 ];
 
 const adminItems: NavItem[] = [

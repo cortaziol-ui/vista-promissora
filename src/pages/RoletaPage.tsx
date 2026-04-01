@@ -147,7 +147,7 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 export default function RoletaPage() {
   const { vendedores, clientes } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
-  const { isSeller } = useAuth();
+  const { isSeller, isManager } = useAuth();
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
   const [spinning, setSpinning] = useState(false);
@@ -500,7 +500,7 @@ export default function RoletaPage() {
                     <div className="w-3 h-3 rounded-full" style={{ background: p.color }} />
                     <span className="text-foreground">{p.label}</span>
                   </div>
-                  {!isSeller && <span className="text-xs text-muted-foreground">{p.peso}%</span>}
+                  {!isSeller && !isManager && <span className="text-xs text-muted-foreground">{p.peso}%</span>}
                 </div>
               ))}
             </div>
@@ -520,7 +520,7 @@ export default function RoletaPage() {
           </div>
 
           {/* History — hidden for sellers */}
-          {!isSeller && <div className="glass-card p-5">
+          {!isSeller && !isManager && <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
               <History className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Últimas Giradas</h3>
