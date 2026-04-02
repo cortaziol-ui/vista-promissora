@@ -66,20 +66,33 @@ export default function SettingsPage() {
   const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
-  const [passwordVendorId, setPasswordVendorId] = useState<number | null>(null);
+  // User accounts state (for password management)
+  interface UserAccount { user_id: string; email: string; role: string; label: string; }
+  const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
+  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null);
   const [passwordDraft, setPasswordDraft] = useState('');
-  const [vendorUserIds, setVendorUserIds] = useState<Map<number, string>>(new Map());
 
-  // Fetch user_id for each vendedor (for password management)
   useEffect(() => {
-    (supabase.from as any)('vendedores').select('id, user_id').then(({ data }: any) => {
-      if (data) {
-        const map = new Map<number, string>();
-        data.forEach((v: any) => { if (v.user_id) map.set(v.id, v.user_id); });
-        setVendorUserIds(map);
+    async function fetchAccounts() {
+      const { data } = await (supabase.from as any)('user_roles').select('user_id, role');
+      if (!data) return;
+      // Get unique user_ids and their roles
+      const roleMap: Record<string, string> = { admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor' };
+      const accounts: UserAccount[] = [];
+      const seen = new Set<string>();
+      for (const row of data) {
+        if (seen.has(row.user_id)) continue;
+        seen.add(row.user_id);
+        // Get email from vendedores or infer
+        const { data: vendedor } = await (supabase.from as any)('vendedores').select('nome').eq('user_id', row.user_id).maybeSingle();
+        const label = vendedor?.nome || roleMap[row.role] || row.role;
+        // Get email from auth - we'll show user_id prefix as identifier
+        accounts.push({ user_id: row.user_id, email: '', role: row.role, label });
       }
-    });
-  }, [vendedores]);
+      setUserAccounts(accounts);
+    }
+    fetchAccounts();
+  }, []);
 
   // Sync drafts when month-specific goals load
   useEffect(() => {
@@ -182,15 +195,9 @@ export default function SettingsPage() {
   };
 
   // Password handler
-  const handleSavePassword = async (vendorId: number, nome: string) => {
+  const handleSavePassword = async (userId: string, label: string) => {
     if (!passwordDraft || passwordDraft.length < 6) {
       toast({ title: 'Erro', description: 'A senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
-      return;
-    }
-    const userId = vendorUserIds.get(vendorId);
-    if (!userId) {
-      toast({ title: 'Erro', description: `${nome} não tem conta vinculada.`, variant: 'destructive' });
-      setPasswordVendorId(null);
       return;
     }
     const { error } = await (supabase.rpc as any)('change_user_password', {
@@ -200,9 +207,9 @@ export default function SettingsPage() {
     if (error) {
       toast({ title: 'Erro', description: 'Falha ao alterar senha.', variant: 'destructive' });
     } else {
-      toast({ title: 'Senha alterada', description: `Senha de ${nome} atualizada com sucesso.` });
+      toast({ title: 'Senha alterada', description: `Senha de ${label} atualizada com sucesso.` });
     }
-    setPasswordVendorId(null);
+    setEditingPasswordUserId(null);
     setPasswordDraft('');
   };
 
@@ -394,7 +401,6 @@ export default function SettingsPage() {
                 <th className="text-left py-3 px-2">Cargo</th>
                 <th className="text-right py-3 px-2">Meta ({MESES.find(m => m.value === selectedMonth)?.label?.slice(0, 3)})</th>
                 <th className="text-center py-3 px-2">Aniversário</th>
-                {isAdmin && <th className="text-center py-3 px-2">Senha</th>}
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
             </thead>
@@ -431,30 +437,6 @@ export default function SettingsPage() {
                   <td className="py-3 px-2 text-center">
                     <Input type="date" value={v.aniversario || ''} onChange={e => updateVendedor(v.id, { aniversario: e.target.value } as any)} className="bg-secondary border-border/50 w-36 text-xs h-8" />
                   </td>
-                  {isAdmin && (
-                    <td className="py-3 px-2 text-center">
-                      {passwordVendorId === v.id ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Input
-                            type="password"
-                            placeholder="Nova senha"
-                            value={passwordDraft}
-                            onChange={e => setPasswordDraft(e.target.value)}
-                            className="bg-secondary border-border/50 w-28 text-xs h-8"
-                            autoFocus
-                            autoComplete="new-password"
-                            onKeyDown={e => e.key === 'Enter' && handleSavePassword(v.id, v.nome)}
-                          />
-                          <Button size="sm" variant="ghost" onClick={() => handleSavePassword(v.id, v.nome)}><Check className="w-3.5 h-3.5 text-green-500" /></Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setPasswordVendorId(null); setPasswordDraft(''); }}><X className="w-3.5 h-3.5 text-red-400" /></Button>
-                        </div>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => { setPasswordVendorId(v.id); setPasswordDraft(''); }} disabled={!vendorUserIds.has(v.id)}>
-                          <KeyRound className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </td>
-                  )}
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
@@ -599,6 +581,60 @@ export default function SettingsPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Contas de Acesso — Password management */}
+      {isAdmin && (
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <KeyRound className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold text-foreground">Contas de Acesso</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Altere a senha das contas de login do sistema.</p>
+          <div className="space-y-3">
+            {userAccounts.map(acc => {
+              const roleLabels: Record<string, string> = { admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor' };
+              return (
+                <div key={acc.user_id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">
+                      {acc.role === 'admin' ? '👑' : acc.role === 'manager' ? '📋' : '👤'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{acc.label}</p>
+                      <p className="text-xs text-muted-foreground">{roleLabels[acc.role] || acc.role}</p>
+                    </div>
+                  </div>
+                  <div>
+                    {editingPasswordUserId === acc.user_id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="Nova senha (mín. 6)"
+                          value={passwordDraft}
+                          onChange={e => setPasswordDraft(e.target.value)}
+                          className="bg-secondary border-border/50 w-44 text-sm h-8"
+                          autoFocus
+                          autoComplete="new-password"
+                          onKeyDown={e => e.key === 'Enter' && handleSavePassword(acc.user_id, acc.label)}
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => handleSavePassword(acc.user_id, acc.label)}><Check className="w-4 h-4 text-green-500" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingPasswordUserId(null); setPasswordDraft(''); }}><X className="w-4 h-4 text-red-400" /></Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => { setEditingPasswordUserId(acc.user_id); setPasswordDraft(''); }}>
+                        <KeyRound className="w-3.5 h-3.5 mr-2" />Alterar Senha
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {userAccounts.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Carregando contas...</p>
+            )}
+          </div>
         </div>
       )}
 
