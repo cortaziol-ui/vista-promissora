@@ -275,7 +275,12 @@ export default function PlanilhaPage() {
               </div>
               <div className="space-y-2">
                 <Label>Data de Nascimento</Label>
-                <Input value={form.nascimento} onChange={e => updateFormField('nascimento', e.target.value)} placeholder="DD/MM/YYYY" />
+                <Input value={form.nascimento} onChange={e => {
+                  let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                  if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                  else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                  updateFormField('nascimento', v);
+                }} placeholder="DD/MM/YYYY" maxLength={10} />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -311,7 +316,16 @@ export default function PlanilhaPage() {
               </div>
               <div className="space-y-2">
                 <Label>Situação</Label>
-                <Input value={form.situacao} onChange={e => updateFormField('situacao', e.target.value.toUpperCase())} />
+                <Select value={form.situacao} onValueChange={v => updateFormField('situacao', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="À ENVIAR">À Enviar</SelectItem>
+                    <SelectItem value="ENVIADO - AGUARDANDO LIMPAR">Enviado - Aguardando Limpar</SelectItem>
+                    <SelectItem value="ENVIADO - AGUARDANDO ATUALIZAR">Enviado - Aguardando Atualizar</SelectItem>
+                    <SelectItem value="NOME LIMPO ENTREGUE">Nome Limpo Entregue</SelectItem>
+                    <SelectItem value="RATING ATUALIZADO ENTREGUE">Rating Atualizado Entregue</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="col-span-full border-t border-border/30 pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Parcelas</p>
