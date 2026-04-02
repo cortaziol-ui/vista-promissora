@@ -10,7 +10,7 @@ import { matchAllCampaigns } from '@/lib/campaignMatcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound } from 'lucide-react';
 import { VendorAvatar } from '@/components/VendorAvatar';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -66,6 +66,20 @@ export default function SettingsPage() {
   const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
+  const [passwordVendorId, setPasswordVendorId] = useState<number | null>(null);
+  const [passwordDraft, setPasswordDraft] = useState('');
+  const [vendorUserIds, setVendorUserIds] = useState<Map<number, string>>(new Map());
+
+  // Fetch user_id for each vendedor (for password management)
+  useEffect(() => {
+    (supabase.from as any)('vendedores').select('id, user_id').then(({ data }: any) => {
+      if (data) {
+        const map = new Map<number, string>();
+        data.forEach((v: any) => { if (v.user_id) map.set(v.id, v.user_id); });
+        setVendorUserIds(map);
+      }
+    });
+  }, [vendedores]);
 
   // Sync drafts when month-specific goals load
   useEffect(() => {
@@ -165,6 +179,31 @@ export default function SettingsPage() {
     const linked = autoLinks.filter(l => l.vendedor_id);
     await saveBulkLinks(linked);
     toast({ title: 'Auto-detecção concluída', description: `${linked.length} campanhas vinculadas` });
+  };
+
+  // Password handler
+  const handleSavePassword = async (vendorId: number, nome: string) => {
+    if (!passwordDraft || passwordDraft.length < 6) {
+      toast({ title: 'Erro', description: 'A senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    const userId = vendorUserIds.get(vendorId);
+    if (!userId) {
+      toast({ title: 'Erro', description: `${nome} não tem conta vinculada.`, variant: 'destructive' });
+      setPasswordVendorId(null);
+      return;
+    }
+    const { error } = await (supabase.rpc as any)('change_user_password', {
+      target_user_id: userId,
+      new_password: passwordDraft,
+    });
+    if (error) {
+      toast({ title: 'Erro', description: 'Falha ao alterar senha.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Senha alterada', description: `Senha de ${nome} atualizada com sucesso.` });
+    }
+    setPasswordVendorId(null);
+    setPasswordDraft('');
   };
 
   // Meta handlers
@@ -355,6 +394,7 @@ export default function SettingsPage() {
                 <th className="text-left py-3 px-2">Cargo</th>
                 <th className="text-right py-3 px-2">Meta ({MESES.find(m => m.value === selectedMonth)?.label?.slice(0, 3)})</th>
                 <th className="text-center py-3 px-2">Aniversário</th>
+                {isAdmin && <th className="text-center py-3 px-2">Senha</th>}
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
             </thead>
@@ -391,6 +431,30 @@ export default function SettingsPage() {
                   <td className="py-3 px-2 text-center">
                     <Input type="date" value={v.aniversario || ''} onChange={e => updateVendedor(v.id, { aniversario: e.target.value } as any)} className="bg-secondary border-border/50 w-36 text-xs h-8" />
                   </td>
+                  {isAdmin && (
+                    <td className="py-3 px-2 text-center">
+                      {passwordVendorId === v.id ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Input
+                            type="password"
+                            placeholder="Nova senha"
+                            value={passwordDraft}
+                            onChange={e => setPasswordDraft(e.target.value)}
+                            className="bg-secondary border-border/50 w-28 text-xs h-8"
+                            autoFocus
+                            autoComplete="new-password"
+                            onKeyDown={e => e.key === 'Enter' && handleSavePassword(v.id, v.nome)}
+                          />
+                          <Button size="sm" variant="ghost" onClick={() => handleSavePassword(v.id, v.nome)}><Check className="w-3.5 h-3.5 text-green-500" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setPasswordVendorId(null); setPasswordDraft(''); }}><X className="w-3.5 h-3.5 text-red-400" /></Button>
+                        </div>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={() => { setPasswordVendorId(v.id); setPasswordDraft(''); }} disabled={!vendorUserIds.has(v.id)}>
+                          <KeyRound className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </td>
+                  )}
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
