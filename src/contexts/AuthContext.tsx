@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from "@/integrations/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-export type UserRole = "admin" | "manager" | "seller";
+export type UserRole = "admin" | "manager" | "seller" | "administrativo" | "financeiro";
 
 export interface User {
   id: string;
@@ -22,6 +22,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isManager: boolean;
   isSeller: boolean;
+  isAdministrativo: boolean;
+  isFinanceiro: boolean;
   loading: boolean;
 }
 
@@ -31,6 +33,8 @@ const POSITION_MAP: Record<UserRole, string> = {
   admin: "Administrador",
   manager: "Gerente / Vendedor",
   seller: "Vendedor(a)",
+  administrativo: "Administrativo",
+  financeiro: "Financeiro",
 };
 
 function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string): User {
@@ -41,7 +45,7 @@ function buildUser(supaUser: SupabaseUser, role: UserRole, sellerName?: string):
     name,
     email,
     role,
-    avatar: role === "admin" ? "/foto-caio.jpg" : "👨",
+    avatar: role === "admin" ? "/foto-caio.jpg" : role === "financeiro" ? "💰" : role === "administrativo" ? "📂" : "👨",
     position: POSITION_MAP[role],
     status: "active",
     sellerName,
@@ -114,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin: user?.role === "admin",
         isManager: user?.role === "manager",
         isSeller: user?.role === "seller",
+        isAdministrativo: user?.role === "administrativo",
+        isFinanceiro: user?.role === "financeiro",
         loading,
       }}
     >

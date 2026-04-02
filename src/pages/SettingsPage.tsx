@@ -66,32 +66,45 @@ export default function SettingsPage() {
   const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
-  // User accounts state (for password management)
-  interface UserAccount { user_id: string; email: string; role: string; label: string; }
-  const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
-  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null);
+  // User accounts — 5 fixed system accounts
+  const SYSTEM_ACCOUNTS = [
+    { email: 'caio@outcom.com', label: 'Caio (Dono)', role: 'admin', icon: '👑' },
+    { email: 'gerente@outcom.com', label: 'Gerente', role: 'manager', icon: '📋' },
+    { email: 'vendas@outcom.com', label: 'Vendas', role: 'seller', icon: '👤' },
+    { email: 'adm@outcom.com', label: 'Administrativo', role: 'administrativo', icon: '📂' },
+    { email: 'financeiro@outcom.com', label: 'Financeiro', role: 'financeiro', icon: '💰' },
+  ];
+  const [accountUserIds, setAccountUserIds] = useState<Map<string, string>>(new Map());
+  const [editingPasswordEmail, setEditingPasswordEmail] = useState<string | null>(null);
   const [passwordDraft, setPasswordDraft] = useState('');
 
+  // Fetch user_ids by matching emails via user_roles + vendedores
   useEffect(() => {
-    async function fetchAccounts() {
+    async function fetchAccountIds() {
       const { data } = await (supabase.from as any)('user_roles').select('user_id, role');
       if (!data) return;
-      // Get unique user_ids and their roles
-      const roleMap: Record<string, string> = { admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor' };
-      const accounts: UserAccount[] = [];
+      // We need to match user_ids to emails. Since we can't query auth.users from frontend,
+      // we store the mapping when we find matching roles.
+      const map = new Map<string, string>();
+      const roleToEmail: Record<string, string> = {
+        admin: 'caio@outcom.com',
+        manager: 'gerente@outcom.com',
+        seller: 'vendas@outcom.com',
+        administrativo: 'adm@outcom.com',
+        financeiro: 'financeiro@outcom.com',
+      };
+      // Group by role - take first user_id for each role
       const seen = new Set<string>();
       for (const row of data) {
-        if (seen.has(row.user_id)) continue;
-        seen.add(row.user_id);
-        // Get email from vendedores or infer
-        const { data: vendedor } = await (supabase.from as any)('vendedores').select('nome').eq('user_id', row.user_id).maybeSingle();
-        const label = vendedor?.nome || roleMap[row.role] || row.role;
-        // Get email from auth - we'll show user_id prefix as identifier
-        accounts.push({ user_id: row.user_id, email: '', role: row.role, label });
+        const email = roleToEmail[row.role];
+        if (email && !seen.has(row.role)) {
+          map.set(email, row.user_id);
+          seen.add(row.role);
+        }
       }
-      setUserAccounts(accounts);
+      setAccountUserIds(map);
     }
-    fetchAccounts();
+    fetchAccountIds();
   }, []);
 
   // Sync drafts when month-specific goals load
@@ -195,9 +208,15 @@ export default function SettingsPage() {
   };
 
   // Password handler
-  const handleSavePassword = async (userId: string, label: string) => {
+  const handleSavePassword = async (email: string, label: string) => {
     if (!passwordDraft || passwordDraft.length < 6) {
       toast({ title: 'Erro', description: 'A senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    const userId = accountUserIds.get(email);
+    if (!userId) {
+      toast({ title: 'Erro', description: `Conta ${email} ainda não foi criada no sistema.`, variant: 'destructive' });
+      setEditingPasswordEmail(null);
       return;
     }
     const { error } = await (supabase.rpc as any)('change_user_password', {
@@ -209,7 +228,7 @@ export default function SettingsPage() {
     } else {
       toast({ title: 'Senha alterada', description: `Senha de ${label} atualizada com sucesso.` });
     }
-    setEditingPasswordUserId(null);
+    setEditingPasswordEmail(null);
     setPasswordDraft('');
   };
 
@@ -593,47 +612,41 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground mb-4">Altere a senha das contas de login do sistema.</p>
           <div className="space-y-3">
-            {userAccounts.map(acc => {
-              const roleLabels: Record<string, string> = { admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor' };
-              return (
-                <div key={acc.user_id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">
-                      {acc.role === 'admin' ? '👑' : acc.role === 'manager' ? '📋' : '👤'}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{acc.label}</p>
-                      <p className="text-xs text-muted-foreground">{roleLabels[acc.role] || acc.role}</p>
-                    </div>
+            {SYSTEM_ACCOUNTS.map(acc => (
+              <div key={acc.email} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">
+                    {acc.icon}
                   </div>
                   <div>
-                    {editingPasswordUserId === acc.user_id ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="password"
-                          placeholder="Nova senha (mín. 6)"
-                          value={passwordDraft}
-                          onChange={e => setPasswordDraft(e.target.value)}
-                          className="bg-secondary border-border/50 w-44 text-sm h-8"
-                          autoFocus
-                          autoComplete="new-password"
-                          onKeyDown={e => e.key === 'Enter' && handleSavePassword(acc.user_id, acc.label)}
-                        />
-                        <Button size="sm" variant="ghost" onClick={() => handleSavePassword(acc.user_id, acc.label)}><Check className="w-4 h-4 text-green-500" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setEditingPasswordUserId(null); setPasswordDraft(''); }}><X className="w-4 h-4 text-red-400" /></Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => { setEditingPasswordUserId(acc.user_id); setPasswordDraft(''); }}>
-                        <KeyRound className="w-3.5 h-3.5 mr-2" />Alterar Senha
-                      </Button>
-                    )}
+                    <p className="text-sm font-medium text-foreground">{acc.label}</p>
+                    <p className="text-xs text-muted-foreground">{acc.email}</p>
                   </div>
                 </div>
-              );
-            })}
-            {userAccounts.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Carregando contas...</p>
-            )}
+                <div>
+                  {editingPasswordEmail === acc.email ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="password"
+                        placeholder="Nova senha (mín. 6)"
+                        value={passwordDraft}
+                        onChange={e => setPasswordDraft(e.target.value)}
+                        className="bg-secondary border-border/50 w-44 text-sm h-8"
+                        autoFocus
+                        autoComplete="new-password"
+                        onKeyDown={e => e.key === 'Enter' && handleSavePassword(acc.email, acc.label)}
+                      />
+                      <Button size="sm" variant="ghost" onClick={() => handleSavePassword(acc.email, acc.label)}><Check className="w-4 h-4 text-green-500" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingPasswordEmail(null); setPasswordDraft(''); }}><X className="w-4 h-4 text-red-400" /></Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => { setEditingPasswordEmail(acc.email); setPasswordDraft(''); }}>
+                      <KeyRound className="w-3.5 h-3.5 mr-2" />Alterar Senha
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -61,11 +61,9 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-type AllowedRole = 'admin' | 'manager' | 'seller';
-
-function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: AllowedRole[] }) {
+function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -79,15 +77,16 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) {
-    const defaultRoute = (user.role === 'admin' || user.role === 'manager') ? '/' : '/vendas';
-    return <Navigate to={defaultRoute} replace />;
+    const hasOverview = ['admin', 'manager', 'financeiro'].includes(user.role);
+    return <Navigate to={hasOverview ? '/' : '/vendas'} replace />;
   }
   return <DashboardLayout>{children}</DashboardLayout>;
 }
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  const defaultRoute = (user?.role === 'admin' || user?.role === 'manager') ? '/' : '/vendas';
+  const hasOverview = user && ['admin', 'manager', 'financeiro'].includes(user.role);
+  const defaultRoute = hasOverview ? '/' : '/vendas';
 
   if (loading) {
     return (
@@ -100,22 +99,17 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={defaultRoute} replace /> : <LoginPage />} />
-      
-      {/* Admin only */}
-      <Route path="/" element={<ProtectedRoute roles={['admin', 'manager']}><OverviewPage /></ProtectedRoute>} />
-      <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager']}><MarketingPage /></ProtectedRoute>} />
-      <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager']}><SatisfactionPage /></ProtectedRoute>} />
-      <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager']}><PlanilhaPage /></ProtectedRoute>} />
-      
-      {/* Admin only */}
-      <Route path="/financeiro" element={<ProtectedRoute roles={['admin']}><FinancialPage /></ProtectedRoute>} />
+
+      <Route path="/" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><OverviewPage /></ProtectedRoute>} />
+      <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><MarketingPage /></ProtectedRoute>} />
+      <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><SatisfactionPage /></ProtectedRoute>} />
+      <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><PlanilhaPage /></ProtectedRoute>} />
+      <Route path="/financeiro" element={<ProtectedRoute roles={['admin', 'financeiro']}><FinancialPage /></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute roles={['admin']}><SettingsPage /></ProtectedRoute>} />
-      
-      {/* All roles */}
-      <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><SalesPage /></ProtectedRoute>} />
-      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller']}><RoletaPage /></ProtectedRoute>} />
+      <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><SalesPage /></ProtectedRoute>} />
+      <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'financeiro']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

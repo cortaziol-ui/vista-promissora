@@ -14,17 +14,17 @@ interface NavItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles: ('admin' | 'manager' | 'seller')[];
+  roles: string[];
 }
 
 const allNavItems: NavItem[] = [
-  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin', 'manager'] },
-  { title: 'Vendas', url: '/vendas', icon: BarChart3, roles: ['admin', 'manager', 'seller'] },
-  { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager'] },
-  { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager'] },
-  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin'] },
-  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager'] },
-  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller'] },
+  { title: 'Visão Geral', url: '/', icon: Home, roles: ['admin', 'manager', 'financeiro'] },
+  { title: 'Vendas', url: '/vendas', icon: BarChart3, roles: ['admin', 'manager', 'seller', 'administrativo', 'financeiro'] },
+  { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager', 'financeiro'] },
+  { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
+  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
+  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
+  { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller', 'financeiro'] },
 ];
 
 const adminItems: NavItem[] = [
