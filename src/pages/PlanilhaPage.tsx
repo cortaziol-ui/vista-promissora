@@ -31,10 +31,8 @@ const parcelaIcon = (s: string) => s === 'PAGO' ? 'âœ…' : s === 'CANCELADO' ? 'â
 const ITEMS_PER_PAGE = 20;
 
 function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
-  const [y, m] = selectedMonth.split('-');
-  const defaultDate = `01/${m}/${y}`;
   return {
-    data: defaultDate,
+    data: new Date().toLocaleDateString('pt-BR'),
     nome: '', cpf: '', nascimento: '', email: '', telefone: '',
     servico: 'LIMPA NOME', vendedor: '', entrada: 179,
     parcela1: { valor: 250, status: 'AGUARDANDO' },
