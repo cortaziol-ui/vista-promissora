@@ -24,6 +24,8 @@ const situacaoColors: Record<string, string> = {
   'SERVIÇO RATING FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'SERVIÇO FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'CANCELADO': 'bg-red-500/20 text-red-400 border-red-500/30',
+  'RESERVA - LIMPA NOME': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  'RESERVA - RATING': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 };
 
 const parcelaIcon = (s: string) => s === 'PAGO' ? '✅' : s === 'CANCELADO' ? '❌' : '⏳';
@@ -322,6 +324,8 @@ export default function PlanilhaPage() {
                     <SelectItem value="ENVIADO - AGUARDANDO ATUALIZAR">Enviado - Aguardando Atualizar</SelectItem>
                     <SelectItem value="NOME LIMPO ENTREGUE">Nome Limpo Entregue</SelectItem>
                     <SelectItem value="RATING ATUALIZADO ENTREGUE">Rating Atualizado Entregue</SelectItem>
+                    <SelectItem value="RESERVA - LIMPA NOME">Reserva - Limpa Nome</SelectItem>
+                    <SelectItem value="RESERVA - RATING">Reserva - Rating</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
