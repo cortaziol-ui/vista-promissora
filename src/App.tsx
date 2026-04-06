@@ -37,22 +37,45 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary] Crash detected:", error, info);
-    // Prevent infinite reload loop
-    const lastCrash = Number(sessionStorage.getItem('lastCrashTime') || '0');
-    const now = Date.now();
-    if (now - lastCrash > 5000) {
-      sessionStorage.setItem('lastCrashTime', String(now));
+    const attempts = Number(sessionStorage.getItem('crashAttempts') || '0');
+    if (attempts < 2) {
+      sessionStorage.setItem('crashAttempts', String(attempts + 1));
       setTimeout(() => window.location.reload(), 1000);
     }
   }
 
+  componentDidMount() {
+    // App loaded without crash — reset counter
+    sessionStorage.removeItem('crashAttempts');
+  }
+
   render() {
     if (this.state.hasError) {
+      const attempts = Number(sessionStorage.getItem('crashAttempts') || '0');
+      const gaveUp = attempts >= 2;
       return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
           <div className="text-center space-y-2">
-            <p className="text-lg font-semibold">Recuperando dados…</p>
-            <p className="text-sm text-muted-foreground">A página será recarregada automaticamente.</p>
+            {gaveUp ? (
+              <>
+                <p className="text-lg font-semibold">Algo deu errado</p>
+                <p className="text-sm text-muted-foreground">Tente recarregar a página manualmente ou entre em contato com o suporte.</p>
+                <button
+                  className="mt-3 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm"
+                  onClick={() => {
+                    sessionStorage.removeItem('crashAttempts');
+                    window.location.reload();
+                  }}
+                >
+                  Tentar novamente
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold">Recuperando dados…</p>
+                <p className="text-sm text-muted-foreground">A página será recarregada automaticamente.</p>
+              </>
+            )}
           </div>
         </div>
       );

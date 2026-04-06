@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { DollarSign, Target, TrendingUp, Receipt, ShoppingCart, BarChart3, Trophy, CalendarDays, CheckCircle2, XCircle, Users, MousePointerClick, Megaphone, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { VendorAvatar } from '@/components/VendorAvatar';
@@ -49,26 +49,36 @@ export default function OverviewPage() {
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
   }, []);
 
-  const syncMeta = useCallback(async () => {
-    if (!accessToken || !activeAccount?.ad_account_id) return;
-    const [selYear, selMonthStr] = selectedMonth.split('-');
-    const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
-    const since = `${selYear}-${selMonthStr}-01`;
-    const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
-    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
-    if (!result.error) {
-      setMetaInsights(result.insights);
-    }
-  }, [selectedMonth, accessToken, activeAccount]);
-
   useEffect(() => {
-    if (accessToken && activeAccount) {
-      setMetaConnected(true);
-      syncMeta();
-    } else {
+    if (!accessToken || !activeAccount?.ad_account_id) {
       setMetaConnected(false);
+      return;
     }
-  }, [accessToken, activeAccount, syncMeta]);
+    setMetaConnected(true);
+    let cancelled = false;
+
+    async function sync() {
+      try {
+        const [selYear, selMonthStr] = selectedMonth.split('-');
+        const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
+        const since = `${selYear}-${selMonthStr}-01`;
+        const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
+        const result = await fetchCampaignInsights(accessToken!, activeAccount!.ad_account_id, { since, until });
+        if (!cancelled) {
+          if (!result.error) {
+            setMetaInsights(result.insights);
+          } else {
+            setMetaInsights(null);
+          }
+        }
+      } catch {
+        if (!cancelled) setMetaInsights(null);
+      }
+    }
+
+    sync();
+    return () => { cancelled = true; };
+  }, [selectedMonth, accessToken, activeAccount]);
 
   const sellerChart = useMemo(() =>
     vendedorStats.map(s => ({ name: s.vendedor.nome, value: s.vendas })),
@@ -240,6 +250,7 @@ export default function OverviewPage() {
                 </div>
                 <CommissionProgress
                   vendedorNome={stat.vendedor.nome}
+                  vendedorId={stat.vendedor.id}
                   vendas={stat.vendas}
                   meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
                   month={selectedMonth}
