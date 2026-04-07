@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/components/ui/sonner';
 
 export interface RoletaSpinRecord {
   id: string;
@@ -17,6 +18,7 @@ export interface RoletaSpinRecord {
 const LOCAL_KEY_SPINS = 'roleta_historico_v2';
 const LOCAL_KEY_LIMITS = 'roleta_limites_v2';
 const MIGRATION_FLAG = 'roleta_migrated_to_supabase';
+const RECOVERY_FLAG = 'roleta_recovery_20260407';
 
 const COOLDOWN_HOURS: Record<string, number> = {
   volume_diario: 24,
@@ -152,7 +154,63 @@ export function useRoletaSpins() {
     }
   }, []);
 
-  // --- Init: migrate + fetch ---
+  // --- Recover local spins that failed to save to Supabase (one-time) ---
+  const recoverLocalSpins = useCallback(async (userId: string) => {
+    if (localStorage.getItem(RECOVERY_FLAG)) return;
+
+    const localSpins = loadLocalSpins();
+    if (localSpins.length === 0) {
+      localStorage.setItem(RECOVERY_FLAG, 'true');
+      return;
+    }
+
+    // Fetch existing spins to avoid duplicates
+    let existingKeys = new Set<string>();
+    try {
+      const { data } = await (supabase.from as any)('roleta_spins')
+        .select('vendedor, motivo, data, hora')
+        .limit(200);
+      if (data) {
+        existingKeys = new Set(
+          (data as Array<{ vendedor: string; motivo: string; data: string; hora: string }>)
+            .map(r => `${r.vendedor}_${r.motivo}_${r.data}_${r.hora}`)
+        );
+      }
+    } catch {
+      // Can't check — skip recovery this time, will retry on next load
+      return;
+    }
+
+    let recovered = 0;
+    for (const s of localSpins) {
+      const key = `${s.vendedor}_${s.motivo}_${s.data}_${s.hora}`;
+      if (existingKeys.has(key)) continue;
+
+      try {
+        const { error } = await (supabase.from as any)('roleta_spins').insert({
+          vendedor: s.vendedor,
+          motivo: s.motivo,
+          motivo_titulo: s.motivoTitulo,
+          premio: s.premio,
+          data: s.data,
+          hora: s.hora,
+          status: s.status,
+          created_by: userId,
+          created_at: parseLocalDateTime(s.data, s.hora),
+        });
+        if (!error) recovered++;
+      } catch {
+        // Skip individual failures
+      }
+    }
+
+    if (recovered > 0) {
+      toast.success(`${recovered} girada(s) recuperada(s) com sucesso!`);
+    }
+    localStorage.setItem(RECOVERY_FLAG, 'true');
+  }, []);
+
+  // --- Init: migrate + recover + fetch ---
   useEffect(() => {
     if (!user) return;
     if (migratedRef.current) return;
@@ -160,14 +218,28 @@ export function useRoletaSpins() {
 
     (async () => {
       await migrateLocalStorage(user.id);
+      await recoverLocalSpins(user.id);
       await fetchSpins();
     })();
-  }, [user, migrateLocalStorage, fetchSpins]);
+  }, [user, migrateLocalStorage, recoverLocalSpins, fetchSpins]);
 
   // --- Save a new spin ---
   const saveSpin = useCallback(
     async (record: Omit<RoletaSpinRecord, 'id' | 'createdAt'>): Promise<RoletaSpinRecord | null> => {
       const now = new Date();
+
+      if (!user?.id) {
+        console.error('[useRoletaSpins] saveSpin: user not authenticated');
+        toast.error('Erro ao salvar girada: usuário não autenticado.');
+        const fallback: RoletaSpinRecord = { ...record, id: `local_${Date.now()}` };
+        const updated = [fallback, ...spins].slice(0, 50);
+        setSpins(updated);
+        saveLocalSpins(updated);
+        const limits = loadLocalLimits();
+        limits[`${record.vendedor}_${record.motivo}`] = now.toISOString();
+        saveLocalLimits(limits);
+        return fallback;
+      }
 
       // Try Supabase first
       try {
@@ -180,7 +252,7 @@ export function useRoletaSpins() {
             data: record.data,
             hora: record.hora,
             status: record.status,
-            created_by: user?.id ?? null,
+            created_by: user.id,
           })
           .select()
           .single();
@@ -198,6 +270,7 @@ export function useRoletaSpins() {
         return saved;
       } catch (err) {
         console.error('[useRoletaSpins] saveSpin Supabase error, saving to localStorage:', err);
+        toast.warning('Girada salva localmente. Será sincronizada na próxima vez.');
 
         // Fallback to localStorage
         const fallback: RoletaSpinRecord = {
