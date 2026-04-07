@@ -149,17 +149,6 @@ export default function RoletaPage() {
     }).then(() => setPendingSpin(null));
   }, [pendingSpin, saveSpin]);
 
-  if (loading || spinsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-2">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
-
   const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
   const currentPrizes = useMemo(() => PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO, [selectedMotivo]);
 
@@ -386,6 +375,17 @@ export default function RoletaPage() {
   }, []);
 
   const recentSpins = spins.slice(0, 10);
+
+  if (loading || spinsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
