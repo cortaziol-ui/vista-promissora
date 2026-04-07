@@ -145,9 +145,20 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 }
 
 export default function RoletaPage() {
-  const { vendedores, clientes } = useSalesData();
+  const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller, isManager } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
   const [spinning, setSpinning] = useState(false);
@@ -165,8 +176,9 @@ export default function RoletaPage() {
 
   // Draw wheel
   const drawWheel = useCallback((angle: number, prizes: PrizeOption[]) => {
+    try {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || prizes.length === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -266,6 +278,9 @@ export default function RoletaPage() {
     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 1;
     ctx.stroke();
+    } catch (e) {
+      console.error('[RoletaPage] drawWheel error:', e);
+    }
   }, []);
 
   useEffect(() => {
