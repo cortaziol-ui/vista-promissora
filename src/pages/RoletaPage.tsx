@@ -344,7 +344,7 @@ export default function RoletaPage() {
 
     const prizes = PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO;
     const prize = weightedRandom(prizes);
-    const motive = MOTIVES.find(m => m.id === selectedMotivo)!;
+    const motive = MOTIVES.find(m => m.id === selectedMotivo) ?? MOTIVES[0];
     targetPrizeRef.current = prize;
 
     const prizeIndex = prizes.indexOf(prize);

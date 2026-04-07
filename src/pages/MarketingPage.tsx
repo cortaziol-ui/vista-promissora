@@ -63,21 +63,65 @@ export default function MarketingPage() {
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
   }, []);
 
+  useEffect(() => {
+    if (!accessToken || !activeAccount?.ad_account_id) {
+      setMetaConnected(false);
+      return;
+    }
+    setMetaConnected(true);
+    let cancelled = false;
+
+    async function sync() {
+      setSyncing(true);
+      setSyncError(null);
+      try {
+        const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        const result = await fetchCampaignInsights(accessToken!, activeAccount!.ad_account_id, { since, until });
+        if (!cancelled) {
+          setSyncing(false);
+          if (result.error) {
+            setSyncError(result.error);
+          } else {
+            setMetaInsights(result.insights);
+            setMetaCampaigns(result.campaigns);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setSyncing(false);
+          setSyncError('Erro ao buscar dados do Meta Ads');
+        }
+      }
+    }
+
+    sync();
+    return () => { cancelled = true; };
+  }, [year, month, accessToken, activeAccount]);
+
+  // Manual refresh for button clicks
   const syncMeta = useCallback(async () => {
     if (!accessToken || !activeAccount?.ad_account_id) return;
     setSyncing(true);
     setSyncError(null);
-    const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
-    setSyncing(false);
-    if (result.error) { setSyncError(result.error); } else { setMetaInsights(result.insights); setMetaCampaigns(result.campaigns); }
+    try {
+      const since = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const until = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
+      setSyncing(false);
+      if (result.error) {
+        setSyncError(result.error);
+      } else {
+        setMetaInsights(result.insights);
+        setMetaCampaigns(result.campaigns);
+      }
+    } catch {
+      setSyncing(false);
+      setSyncError('Erro ao buscar dados do Meta Ads');
+    }
   }, [year, month, accessToken, activeAccount]);
-
-  useEffect(() => {
-    if (accessToken && activeAccount) { setMetaConnected(true); syncMeta(); } else { setMetaConnected(false); }
-  }, [accessToken, activeAccount, syncMeta]);
 
   const impressions = metaInsights?.impressions ?? 0;
   const clicks = metaInsights?.clicks ?? 0;

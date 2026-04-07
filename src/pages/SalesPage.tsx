@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
 import { ProgressBar } from '@/components/ProgressBar';
@@ -47,23 +47,32 @@ export default function SalesPage() {
   }, []);
 
   // Fetch campaigns for selected month
-  const syncMeta = useCallback(async () => {
-    if (!accessToken || !activeAccount?.ad_account_id) return;
-    const [selYear, selMonthStr] = selectedMonth.split('-');
-    const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
-    const since = `${selYear}-${selMonthStr}-01`;
-    const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
-    const result = await fetchCampaignInsights(accessToken, activeAccount.ad_account_id, { since, until });
-    if (!result.error) {
-      setMetaCampaigns(result.campaigns);
-    }
-  }, [selectedMonth, accessToken, activeAccount]);
-
   useEffect(() => {
-    if (accessToken && activeAccount) {
-      syncMeta();
+    if (!accessToken || !activeAccount?.ad_account_id) return;
+    let cancelled = false;
+
+    async function sync() {
+      try {
+        const [selYear, selMonthStr] = selectedMonth.split('-');
+        const lastDay = new Date(Number(selYear), Number(selMonthStr), 0).getDate();
+        const since = `${selYear}-${selMonthStr}-01`;
+        const until = `${selYear}-${selMonthStr}-${String(lastDay).padStart(2, '0')}`;
+        const result = await fetchCampaignInsights(accessToken!, activeAccount!.ad_account_id, { since, until });
+        if (!cancelled) {
+          if (!result.error) {
+            setMetaCampaigns(result.campaigns);
+          } else {
+            setMetaCampaigns([]);
+          }
+        }
+      } catch {
+        if (!cancelled) setMetaCampaigns([]);
+      }
     }
-  }, [accessToken, activeAccount, syncMeta]);
+
+    sync();
+    return () => { cancelled = true; };
+  }, [selectedMonth, accessToken, activeAccount]);
 
   // Campaign links and vendor leads
   const { links } = useCampaignLinks({ campaigns: metaCampaigns, vendedores, month: selectedMonth });
@@ -615,6 +624,7 @@ export default function SalesPage() {
                 </div>
                 <CommissionProgress
                   vendedorNome={stat.vendedor.nome}
+                  vendedorId={stat.vendedor.id}
                   vendas={stat.vendas}
                   meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
                   month={selectedMonth}

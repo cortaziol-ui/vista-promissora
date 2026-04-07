@@ -75,6 +75,7 @@ export default function ProfilePage() {
             <h2 className="text-lg font-semibold text-foreground mb-4">Progresso de Premiação</h2>
             <CommissionProgress
               vendedorNome={myStats.vendedor.nome}
+              vendedorId={myStats.vendedor.id}
               vendas={myStats.vendas}
               meta={myStats.vendedor.meta}
               month={selectedMonth}
