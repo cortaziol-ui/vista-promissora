@@ -361,7 +361,7 @@ export default function SalesPage() {
   }, [vendedores]);
 
   return (
-    <div className={isVertical ? 'h-[calc(100vh-3.5rem-3rem)] flex flex-col gap-5 overflow-hidden' : 'space-y-6'}>
+    <div className={isVertical ? 'h-[calc(100vh-3.5rem-3rem)] flex flex-col gap-5 overflow-y-auto' : 'space-y-6'}>
       {/* Birthday banner */}
       {aniversariantes.length > 0 && !isVertical && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
@@ -427,10 +427,10 @@ export default function SalesPage() {
         )}
       </div>
 
-      <div className={`grid ${isVertical ? 'grid-cols-3 gap-5 flex-1 min-h-0' : 'grid-cols-1 lg:grid-cols-3 gap-4'}`}>
-        <div className={`${isVertical ? 'col-span-2 flex flex-col' : 'lg:col-span-2'} glass-card ${isVertical ? 'p-5' : 'p-5'}`}>
+      <div className={`grid ${isVertical ? 'grid-cols-3 gap-5' : 'grid-cols-1 lg:grid-cols-3 gap-4'}`}>
+        <div className={`${isVertical ? 'col-span-2' : 'lg:col-span-2'} glass-card p-5`}>
           <h3 className={`${isVertical ? 'text-lg' : 'text-sm'} font-semibold text-foreground mb-4`}>Vendas por Dia</h3>
-          <div className={isVertical ? 'flex-1 min-h-0' : 'h-64'}>
+          <div className={isVertical ? 'h-80' : 'h-64'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailySales}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
@@ -486,7 +486,7 @@ export default function SalesPage() {
       </div>
 
       {/* Seller Detail Table */}
-      <div className={`glass-card ${isVertical ? 'p-5' : 'p-5'} ${isVertical ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+      <div className={`glass-card p-5`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className={`${isVertical ? 'text-lg' : 'text-sm'} font-semibold text-foreground`}>Performance por Vendedor</h3>
           {!isVertical && (
@@ -508,7 +508,7 @@ export default function SalesPage() {
         </div>
 
         {(isVertical || tableView === 'geral') ? (
-          <div className={`overflow-x-auto ${isVertical ? 'flex-1 min-h-0 overflow-y-auto' : ''}`}>
+          <div className="overflow-x-auto">
             <table className={`w-full ${isVertical ? 'text-lg' : 'text-sm'}`}>
               <thead>
                 <tr className="text-muted-foreground border-b border-border/50">
@@ -641,17 +641,17 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* Commission section - only visible for sellers, hidden in vertical mode */}
-      {commissionStats.length > 0 && !isVertical && (
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Premiacoes por Vendedor</h3>
-          <div className="space-y-4">
+      {/* Commission section - visible for sellers */}
+      {commissionStats.length > 0 && (
+        <div className={`glass-card ${isVertical ? 'p-5' : 'p-5'}`}>
+          <h3 className={`${isVertical ? 'text-lg' : 'text-sm'} font-semibold text-foreground mb-4`}>Premiacoes por Vendedor</h3>
+          <div className={`${isVertical ? 'space-y-5' : 'space-y-4'}`}>
             {commissionStats.map(stat => (
-              <div key={stat.vendedor.id} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
-                <div className="flex items-center gap-2 mb-3">
+              <div key={stat.vendedor.id} className={`${isVertical ? 'p-5' : 'p-4'} rounded-lg bg-secondary/30 border border-border/30`}>
+                <div className={`flex items-center gap-2 ${isVertical ? 'mb-4' : 'mb-3'}`}>
                   <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
-                  <span className="font-medium text-foreground">{stat.vendedor.nome}</span>
-                  <span className="text-xs text-muted-foreground">— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</span>
+                  <span className={`font-medium text-foreground ${isVertical ? 'text-lg' : ''}`}>{stat.vendedor.nome}</span>
+                  <span className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground`}>— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</span>
                 </div>
                 <CommissionProgress
                   vendedorNome={stat.vendedor.nome}
