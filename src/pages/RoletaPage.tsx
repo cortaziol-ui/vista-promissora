@@ -3,6 +3,7 @@ import { useSalesData } from '@/contexts/SalesDataContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRoletaSpins } from '@/hooks/useRoletaSpins';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -101,38 +102,6 @@ const MOTIVES: MotiveConfig[] = [
   },
 ];
 
-interface SpinRecord {
-  id: string;
-  vendedor: string;
-  motivo: string;
-  motivoTitulo: string;
-  premio: string;
-  data: string;
-  hora: string;
-  status: 'pendente' | 'pago';
-}
-
-const STORAGE_KEY_SPINS = 'roleta_historico_v2';
-const STORAGE_KEY_LIMITS = 'roleta_limites_v2';
-
-function loadSpins(): SpinRecord[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_SPINS);
-    return saved ? JSON.parse(saved) : [];
-  } catch { return []; }
-}
-function saveSpins(spins: SpinRecord[]) {
-  localStorage.setItem(STORAGE_KEY_SPINS, JSON.stringify(spins));
-}
-function loadLimits(): Record<string, string> {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_LIMITS);
-    return saved ? JSON.parse(saved) : {};
-  } catch { return {}; }
-}
-function saveLimits(limits: Record<string, string>) {
-  localStorage.setItem(STORAGE_KEY_LIMITS, JSON.stringify(limits));
-}
 
 function weightedRandom(prizes: PrizeOption[]): PrizeOption {
   const totalWeight = prizes.reduce((s, p) => s + p.peso, 0);
@@ -148,8 +117,39 @@ export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller, isManager } = useAuth();
+  const { spins, loading: spinsLoading, saveSpin, checkRateLimit } = useRoletaSpins();
 
-  if (loading) {
+  const [selectedVendedor, setSelectedVendedor] = useState('');
+  const [selectedMotivo, setSelectedMotivo] = useState('');
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState<{ prize: PrizeOption; motive: MotiveConfig } | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [pendingSpin, setPendingSpin] = useState<{
+    vendedor: string; motivo: string; motivoTitulo: string;
+    premio: string; timestamp: Date;
+  } | null>(null);
+  const [validationError, setValidationError] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animFrameRef = useRef<number>(0);
+  const [wheelAngle, setWheelAngle] = useState(0);
+  const targetPrizeRef = useRef<PrizeOption | null>(null);
+
+  // Save spin to Supabase after animation completes
+  useEffect(() => {
+    if (!pendingSpin) return;
+    const { vendedor, motivo, motivoTitulo, premio, timestamp } = pendingSpin;
+    saveSpin({
+      vendedor,
+      motivo,
+      motivoTitulo,
+      premio,
+      data: timestamp.toLocaleDateString('pt-BR'),
+      hora: timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      status: 'pendente',
+    }).then(() => setPendingSpin(null));
+  }, [pendingSpin, saveSpin]);
+
+  if (loading || spinsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-2">
@@ -159,17 +159,6 @@ export default function RoletaPage() {
       </div>
     );
   }
-  const [selectedVendedor, setSelectedVendedor] = useState('');
-  const [selectedMotivo, setSelectedMotivo] = useState('');
-  const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<{ prize: PrizeOption; motive: MotiveConfig } | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [spins, setSpins] = useState<SpinRecord[]>(loadSpins);
-  const [validationError, setValidationError] = useState('');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animFrameRef = useRef<number>(0);
-  const [wheelAngle, setWheelAngle] = useState(0);
-  const targetPrizeRef = useRef<PrizeOption | null>(null);
 
   const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
   const currentPrizes = useMemo(() => PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO, [selectedMotivo]);
@@ -291,28 +280,16 @@ export default function RoletaPage() {
     drawWheel(0, currentPrizes);
   }, [drawWheel, currentPrizes]);
 
-  const validateSpin = useCallback((): string | null => {
+  const validateSpin = useCallback(async (): Promise<string | null> => {
     if (!selectedVendedor) return 'Selecione um vendedor';
     if (!selectedMotivo) return 'Selecione um motivo';
 
     const vendedor = vendedores.find(v => v.nome === selectedVendedor);
     if (!vendedor) return 'Vendedor não encontrado';
 
-    const limits = loadLimits();
-    const limitKey = `${selectedVendedor}_${selectedMotivo}`;
-    const lastSpin = limits[limitKey];
-
-    if (lastSpin) {
-      const lastDate = new Date(lastSpin);
-      const now = new Date();
-      const diffHours = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60);
-
-      if (selectedMotivo === 'volume_diario' && diffHours < 24) {
-        return `Próxima girada disponível em ${Math.ceil(24 - diffHours)}h`;
-      }
-      if (['meta_semanal_100', 'meta_mensal_70', 'meta_mensal_100'].includes(selectedMotivo) && diffHours < 168) {
-        return `Próxima girada disponível em ${Math.ceil(168 - diffHours)}h`;
-      }
+    const { allowed, hoursRemaining } = await checkRateLimit(selectedVendedor, selectedMotivo);
+    if (!allowed) {
+      return `Próxima girada disponível em ${Math.ceil(hoursRemaining)}h`;
     }
 
     const today = new Date().toLocaleDateString('pt-BR');
@@ -347,10 +324,10 @@ export default function RoletaPage() {
     }
 
     return null;
-  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats]);
+  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats, checkRateLimit]);
 
-  const handleSpin = useCallback(() => {
-    const error = validateSpin();
+  const handleSpin = useCallback(async () => {
+    const error = await validateSpin();
     if (error) {
       setValidationError(error);
       return;
@@ -389,30 +366,18 @@ export default function RoletaPage() {
         setSpinning(false);
         setResult({ prize, motive });
         setShowResult(true);
-
-        const now = new Date();
-        const record: SpinRecord = {
-          id: `${Date.now()}`,
+        setPendingSpin({
           vendedor: selectedVendedor,
           motivo: selectedMotivo,
           motivoTitulo: motive.titulo,
           premio: prize.label,
-          data: now.toLocaleDateString('pt-BR'),
-          hora: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          status: 'pendente',
-        };
-        const updated = [record, ...spins].slice(0, 50);
-        setSpins(updated);
-        saveSpins(updated);
-
-        const limits = loadLimits();
-        limits[`${selectedVendedor}_${selectedMotivo}`] = now.toISOString();
-        saveLimits(limits);
+          timestamp: new Date(),
+        });
       }
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, [selectedVendedor, selectedMotivo, wheelAngle, spins, validateSpin]);
+  }, [selectedVendedor, selectedMotivo, wheelAngle, validateSpin]);
 
   useEffect(() => {
     return () => {
