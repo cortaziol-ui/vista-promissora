@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { getLeadsByVendor } from '@/lib/vendorLeads';
-import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3 } from 'lucide-react';
+import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3, Monitor, MonitorSmartphone } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VendorAvatar } from '@/components/VendorAvatar';
 
@@ -35,6 +35,15 @@ export default function SalesPage() {
   const availableMonths = useAvailableMonths(clientes);
   const [filterVendedor, setFilterVendedor] = useState('all');
   const [tableView, setTableView] = useState<'geral' | 'semana'>('geral');
+  const [viewMode, setViewMode] = useState<'desktop' | 'vertical'>(() => {
+    return (localStorage.getItem('salesViewMode') as 'desktop' | 'vertical') || 'desktop';
+  });
+  const isVertical = viewMode === 'vertical';
+
+  const handleViewMode = (mode: 'desktop' | 'vertical') => {
+    setViewMode(mode);
+    localStorage.setItem('salesViewMode', mode);
+  };
 
   const { activeAccount } = useAccountContext();
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -352,9 +361,9 @@ export default function SalesPage() {
   }, [vendedores]);
 
   return (
-    <div className="space-y-6">
+    <div className={isVertical ? 'h-[calc(100vh-3.5rem-3rem)] flex flex-col gap-3 overflow-hidden' : 'space-y-6'}>
       {/* Birthday banner */}
-      {aniversariantes.length > 0 && (
+      {aniversariantes.length > 0 && !isVertical && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
           <span className="text-lg">🎂</span>
           <p className="text-sm text-foreground">
@@ -369,6 +378,22 @@ export default function SalesPage() {
           <p className="text-muted-foreground text-sm">Analise detalhada de performance — {monthLabel(selectedMonth)}</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+            <button
+              onClick={() => handleViewMode('desktop')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${viewMode === 'desktop' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              Desktop
+            </button>
+            <button
+              onClick={() => handleViewMode('vertical')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${viewMode === 'vertical' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <MonitorSmartphone className="w-3.5 h-3.5" />
+              Vertical
+            </button>
+          </div>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-[160px] bg-secondary border-border/50">
               <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -390,45 +415,49 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}>
-        <KpiCard title="Meta Mensal (MM)" value={`${localTotalVendas}/${localMetaVendas}`} subtitle={`${Math.max(0, localMetaVendas - localTotalVendas)} restantes`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" />
-        <KpiCard title={`Meta Semanal (S${weeklyEngine.currentWeekIdx + 1})`} value={`${weeklyEngine.currentWeekSales}/${weeklyEngine.weeklyGoal}`} subtitle={weeklyEngine.currentWeekSales >= weeklyEngine.weeklyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.weeklyGoal - weeklyEngine.currentWeekSales)} restantes`} icon={<CalendarDays className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
-        <KpiCard title="Meta Diária (MD)" value={`${todaySalesCount}/${weeklyEngine.dailyGoal}`} subtitle={todaySalesCount >= weeklyEngine.dailyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.dailyGoal - todaySalesCount)} restantes`} icon={<BarChart3 className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
-        <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className="w-5 h-5 text-kpi-goal-pct" />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" />
-        <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className="w-5 h-5 text-kpi-sales" />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" />
-        <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className="w-5 h-5 text-kpi-projection" />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" />
+      <div className={`grid ${isVertical ? 'grid-cols-3 gap-3' : `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-6' : 'xl:grid-cols-7'} gap-4`}`}>
+        <KpiCard title="Meta Mensal (MM)" value={`${localTotalVendas}/${localMetaVendas}`} subtitle={`${Math.max(0, localMetaVendas - localTotalVendas)} restantes`} icon={<Target className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-goal`} />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" size={isVertical ? 'large' : 'default'} />
+        <KpiCard title={`Meta Semanal (S${weeklyEngine.currentWeekIdx + 1})`} value={`${weeklyEngine.currentWeekSales}/${weeklyEngine.weeklyGoal}`} subtitle={weeklyEngine.currentWeekSales >= weeklyEngine.weeklyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.weeklyGoal - weeklyEngine.currentWeekSales)} restantes`} icon={<CalendarDays className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-projection`} />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" size={isVertical ? 'large' : 'default'} />
+        <KpiCard title="Meta Diária (MD)" value={`${todaySalesCount}/${weeklyEngine.dailyGoal}`} subtitle={todaySalesCount >= weeklyEngine.dailyGoal ? 'Meta batida!' : `${Math.max(0, weeklyEngine.dailyGoal - todaySalesCount)} restantes`} icon={<BarChart3 className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-revenue`} />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" size={isVertical ? 'large' : 'default'} />
+        <KpiCard title="% da Meta" value={`${localPctMeta.toFixed(1)}%`} subtitle={`Faltam ${Math.max(0, localMetaVendas - localTotalVendas)} vendas`} icon={<TrendingUp className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-goal-pct`} />} glowClass="kpi-glow-pct" colorClass="bg-kpi-goal-pct/15" size={isVertical ? 'large' : 'default'} />
+        <KpiCard title="Total Vendas" value={String(localTotalVendas)} icon={<ShoppingCart className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-sales`} />} glowClass="kpi-glow-sales" colorClass="bg-kpi-sales/15" size={isVertical ? 'large' : 'default'} />
+        <KpiCard title="Projeção" value={`${Math.round(projecao)} vendas`} icon={<BarChart3 className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-projection`} />} glowClass="kpi-glow-projection" colorClass="bg-kpi-projection/15" size={isVertical ? 'large' : 'default'} />
         {!isSeller && (
-          <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className="w-5 h-5 text-kpi-revenue" />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" />
+          <KpiCard title="Faturamento" value={fmtFull(localFaturamento)} icon={<DollarSign className={`${isVertical ? 'w-7 h-7' : 'w-5 h-5'} text-kpi-revenue`} />} glowClass="kpi-glow-revenue" colorClass="bg-kpi-revenue/15" size={isVertical ? 'large' : 'default'} />
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Vendas por Dia</h3>
-          <div className="h-64">
+      <div className={`grid ${isVertical ? 'grid-cols-3 gap-3' : 'grid-cols-1 lg:grid-cols-3 gap-4'}`}>
+        <div className={`${isVertical ? 'col-span-2' : 'lg:col-span-2'} glass-card ${isVertical ? 'p-4' : 'p-5'}`}>
+          <h3 className={`${isVertical ? 'text-base' : 'text-sm'} font-semibold text-foreground mb-4`}>Vendas por Dia</h3>
+          <div className={isVertical ? 'h-52' : 'h-64'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailySales}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
-                <XAxis dataKey="day" stroke="hsl(215, 20%, 65%)" fontSize={12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={12} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9' }} formatter={(v: number) => [v, 'Vendas']} />
+                <XAxis dataKey="day" stroke="hsl(215, 20%, 65%)" fontSize={isVertical ? 14 : 12} />
+                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={isVertical ? 14 : 12} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9', fontSize: isVertical ? '14px' : '12px' }} formatter={(v: number) => [v, 'Vendas']} />
                 <Bar dataKey="value" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
         {/* Top 3 do mês anterior */}
-        <div className="glass-card p-5 bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Top 3 Vendedores</h3>
-          <p className="text-xs text-muted-foreground mb-5">{prevMonthLabel}</p>
+        <div className={`glass-card ${isVertical ? 'p-4' : 'p-5'} bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20`}>
+          <h3 className={`${isVertical ? 'text-base' : 'text-sm'} font-semibold text-foreground mb-1`}>Top 3 Vendedores</h3>
+          <p className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground mb-5`}>{prevMonthLabel}</p>
           {top3PrevMonth.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
+            <p className={`${isVertical ? 'text-base' : 'text-sm'} text-muted-foreground text-center py-8`}>Sem dados do mês anterior</p>
           ) : (
-            <div className="flex flex-col items-center gap-4">
+            <div className={`flex flex-col items-center ${isVertical ? 'gap-5' : 'gap-4'}`}>
               {top3PrevMonth.map((v, i) => {
                 const medals = ['🥇', '🥈', '🥉'];
-                const sizes = ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
-                const nameSizes = ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
+                const sizes = isVertical
+                  ? ['w-20 h-20 text-4xl', 'w-16 h-16 text-3xl', 'w-16 h-16 text-3xl']
+                  : ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
+                const nameSizes = isVertical
+                  ? ['text-lg font-bold', 'text-base font-semibold', 'text-base font-semibold']
+                  : ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
                 const glows = [
                   'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
                   'ring-2 ring-gray-400/30',
@@ -436,7 +465,7 @@ export default function SalesPage() {
                 ];
                 return (
                   <div key={v.nome} className="flex items-center gap-4 w-full">
-                    <span className="text-2xl w-8 text-center">{medals[i]}</span>
+                    <span className={`${isVertical ? 'text-3xl' : 'text-2xl'} w-8 text-center`}>{medals[i]}</span>
                     <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
                       {v.foto ? (
                         <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
@@ -446,7 +475,7 @@ export default function SalesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
-                      <p className="text-xs text-muted-foreground">{v.vendas} vendas</p>
+                      <p className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground`}>{v.vendas} vendas</p>
                     </div>
                   </div>
                 );
@@ -457,48 +486,50 @@ export default function SalesPage() {
       </div>
 
       {/* Seller Detail Table */}
-      <div className="glass-card p-5">
+      <div className={`glass-card ${isVertical ? 'p-4' : 'p-5'} ${isVertical ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-foreground">Performance por Vendedor</h3>
-          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
-            <button
-              onClick={() => setTableView('geral')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'geral' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              Geral
-            </button>
-            <button
-              onClick={() => setTableView('semana')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'semana' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              Por Semana
-            </button>
-          </div>
+          <h3 className={`${isVertical ? 'text-base' : 'text-sm'} font-semibold text-foreground`}>Performance por Vendedor</h3>
+          {!isVertical && (
+            <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+              <button
+                onClick={() => setTableView('geral')}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'geral' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Geral
+              </button>
+              <button
+                onClick={() => setTableView('semana')}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${tableView === 'semana' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Por Semana
+              </button>
+            </div>
+          )}
         </div>
 
-        {tableView === 'geral' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        {(isVertical || tableView === 'geral') ? (
+          <div className={`overflow-x-auto ${isVertical ? 'flex-1 min-h-0 overflow-y-auto' : ''}`}>
+            <table className={`w-full ${isVertical ? 'text-base' : 'text-sm'}`}>
               <thead>
                 <tr className="text-muted-foreground border-b border-border/50">
-                  <th className="text-left py-3 px-2">#</th>
-                  <th className="text-left py-3 px-2">Vendedor</th>
-                  <th className="text-right py-3 px-2">MM</th>
-                  <th className="text-right py-3 px-2 relative group">
+                  <th className={`text-left ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>#</th>
+                  <th className={`text-left ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>Vendedor</th>
+                  <th className={`text-right ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>MM</th>
+                  <th className={`text-right ${isVertical ? 'py-2 px-2' : 'py-3 px-2'} relative group`}>
                     MS{weeklyEngine.currentWeekIdx + 1}
                     <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 rounded bg-popover border border-border text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-lg">
                       {weeklyEngine.weeks[weeklyEngine.currentWeekIdx]?.label ?? ''}
                     </span>
                   </th>
-                  <th className="text-right py-3 px-2">MD</th>
-                  <th className="text-right py-3 px-2">Vendas</th>
-                  <th className="text-right py-3 px-2">Leads</th>
-                  <th className="text-right py-3 px-2">Conversao</th>
-                  <th className="text-right py-3 px-2">Faltam</th>
-                  <th className="text-center py-3 px-2">Projeção</th>
-                  {!isSeller && <th className="text-right py-3 px-2">Faturamento</th>}
-                  {!isSeller && <th className="text-right py-3 px-2">Ticket Médio</th>}
-                  <th className="text-left py-3 px-2 min-w-[140px]">% Meta</th>
+                  <th className={`text-right ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>MD</th>
+                  <th className={`text-right ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>Vendas</th>
+                  {!isVertical && <th className="text-right py-3 px-2">Leads</th>}
+                  {!isVertical && <th className="text-right py-3 px-2">Conversao</th>}
+                  <th className={`text-right ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>Faltam</th>
+                  <th className={`text-center ${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>Projeção</th>
+                  {!isSeller && !isVertical && <th className="text-right py-3 px-2">Faturamento</th>}
+                  {!isSeller && !isVertical && <th className="text-right py-3 px-2">Ticket Médio</th>}
+                  <th className={`text-left ${isVertical ? 'py-2 px-2 min-w-[120px]' : 'py-3 px-2 min-w-[140px]'}`}>% Meta</th>
                 </tr>
               </thead>
               <tbody>
@@ -509,47 +540,47 @@ export default function SalesPage() {
 
                   return (
                     <tr key={stat.vendedor.id} className="border-b border-border/30 hover:bg-secondary/50 transition-colors">
-                      <td className={`py-3 px-2 font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} font-bold ${i < 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][i] : 'text-muted-foreground'}`}>
                         {i < 3 ? ['\u{1F947}', '\u{1F948}', '\u{1F949}'][i] : i + 1}
                       </td>
-                      <td className="py-3 px-2">
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}>
                         <div className="flex items-center gap-3">
                           <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} size="lg" />
                           <div>
-                            <p className="font-medium text-foreground">{stat.vendedor.nome}</p>
-                            <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>
+                            <p className={`font-medium text-foreground ${isVertical ? 'text-base' : ''}`}>{stat.vendedor.nome}</p>
+                            {!isVertical && <p className="text-xs text-muted-foreground">{stat.vendedor.cargo}</p>}
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-right text-kpi-goal font-medium">{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}</td>
-                      <td className="py-3 px-2 text-right">
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-right text-kpi-goal font-medium`}>{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}</td>
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-right`}>
                         {(() => {
                           const vd = weeklyEngine.vendorData.get(stat.vendedor.id);
                           const cw = vd?.weeks[vd.currentWeekIdx];
                           if (!cw) return <span className="text-muted-foreground">—</span>;
                           return cw.completed ? (
                             <span className="inline-flex items-center gap-1 text-green-500 font-medium">
-                              {cw.adjustedMeta} <CheckCircle2 className="w-3.5 h-3.5" />
+                              {cw.adjustedMeta} <CheckCircle2 className={isVertical ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
                             </span>
                           ) : (
                             <span className="text-muted-foreground">{cw.sales}/{cw.adjustedMeta}</span>
                           );
                         })()}
                       </td>
-                      <td className="py-3 px-2 text-right text-muted-foreground">{weeklyEngine.vendorData.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-foreground">{stat.vendas}</td>
-                      <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>
-                      <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>
-                      <td className="py-3 px-2 text-right text-muted-foreground">{stat.faltam} vendas</td>
-                      <td className="py-3 px-2 text-center">
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-right text-muted-foreground`}>{weeklyEngine.vendorData.get(stat.vendedor.id)?.dailyGoal ?? '—'}</td>
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-right font-semibold text-foreground`}>{stat.vendas}</td>
+                      {!isVertical && <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads ? leadsCount : '\u2014'}</td>}
+                      {!isVertical && <td className="py-3 px-2 text-right text-muted-foreground">{vendorLeads && leadsCount > 0 ? `${conversionRate.toFixed(1)}%` : '\u2014'}</td>}
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-right text-muted-foreground`}>{stat.faltam} vendas</td>
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'} text-center`}>
                         {stat.dentroProjecao
-                          ? <CheckCircle2 className="w-5 h-5 text-green-500 inline-block" />
-                          : <XCircle className="w-5 h-5 text-red-500 inline-block" />
+                          ? <CheckCircle2 className={`${isVertical ? 'w-6 h-6' : 'w-5 h-5'} text-green-500 inline-block`} />
+                          : <XCircle className={`${isVertical ? 'w-6 h-6' : 'w-5 h-5'} text-red-500 inline-block`} />
                         }
                       </td>
-                      {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
-                      {!isSeller && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
-                      <td className="py-3 px-2"><ProgressBar value={stat.pctMeta} /></td>
+                      {!isSeller && !isVertical && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.faturamento)}</td>}
+                      {!isSeller && !isVertical && <td className="py-3 px-2 text-right text-muted-foreground">{fmtFull(stat.ticketMedio)}</td>}
+                      <td className={`${isVertical ? 'py-2 px-2' : 'py-3 px-2'}`}><ProgressBar value={stat.pctMeta} /></td>
                     </tr>
                   );
                 })}
@@ -610,8 +641,8 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* Commission section - only visible for sellers */}
-      {commissionStats.length > 0 && (
+      {/* Commission section - only visible for sellers, hidden in vertical mode */}
+      {commissionStats.length > 0 && !isVertical && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">Premiacoes por Vendedor</h3>
           <div className="space-y-4">
