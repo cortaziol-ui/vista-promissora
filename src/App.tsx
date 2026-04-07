@@ -24,58 +24,44 @@ const queryClient = new QueryClient();
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; errorMessage: string }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, errorMessage: '' };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMessage: `${error.name}: ${error.message}` };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary] Crash detected:", error, info);
-    const attempts = Number(sessionStorage.getItem('crashAttempts') || '0');
-    if (attempts < 2) {
-      sessionStorage.setItem('crashAttempts', String(attempts + 1));
-      setTimeout(() => window.location.reload(), 1000);
-    }
   }
 
   componentDidMount() {
-    // App loaded without crash — reset counter
     sessionStorage.removeItem('crashAttempts');
   }
 
   render() {
     if (this.state.hasError) {
-      const attempts = Number(sessionStorage.getItem('crashAttempts') || '0');
-      const gaveUp = attempts >= 2;
       return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-          <div className="text-center space-y-2">
-            {gaveUp ? (
-              <>
-                <p className="text-lg font-semibold">Algo deu errado</p>
-                <p className="text-sm text-muted-foreground">Tente recarregar a página manualmente ou entre em contato com o suporte.</p>
-                <button
-                  className="mt-3 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm"
-                  onClick={() => {
-                    sessionStorage.removeItem('crashAttempts');
-                    window.location.reload();
-                  }}
-                >
-                  Tentar novamente
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-semibold">Recuperando dados…</p>
-                <p className="text-sm text-muted-foreground">A página será recarregada automaticamente.</p>
-              </>
-            )}
+          <div className="text-center space-y-3 max-w-md px-4">
+            <p className="text-lg font-semibold">Algo deu errado</p>
+            <p className="text-xs text-muted-foreground font-mono bg-secondary/50 p-3 rounded-lg text-left break-all">
+              {this.state.errorMessage}
+            </p>
+            <p className="text-sm text-muted-foreground">Tire um print desta tela e envie para o suporte.</p>
+            <button
+              className="mt-3 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm"
+              onClick={() => {
+                this.setState({ hasError: false, errorMessage: '' });
+                window.location.reload();
+              }}
+            >
+              Tentar novamente
+            </button>
           </div>
         </div>
       );
