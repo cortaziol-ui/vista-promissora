@@ -18,7 +18,7 @@ export function KpiCard({ title, value, change, icon, glowClass, colorClass, sub
 
   return (
     <div
-      className={`glass-card ${isLarge ? 'p-8' : 'p-5'} hover-lift ${glowClass} animate-in`}
+      className={`glass-card ${isLarge ? 'p-5' : 'p-5'} hover-lift ${glowClass} animate-in`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className={`flex items-start justify-between ${isLarge ? 'mb-5' : 'mb-3'}`}>
