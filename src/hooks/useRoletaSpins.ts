@@ -129,23 +129,26 @@ export function useRoletaSpins() {
     }
 
     try {
-      const rows = localSpins.map((s) => ({
-        vendedor: s.vendedor,
-        motivo: s.motivo,
-        motivo_titulo: s.motivoTitulo,
-        premio: s.premio,
-        data: s.data,
-        hora: s.hora,
-        status: s.status,
-        created_by: userId,
-        created_at: parseLocalDateTime(s.data, s.hora),
-      }));
-
-      await (supabase.from as any)('roleta_spins').insert(rows);
+      for (const s of localSpins) {
+        try {
+          await (supabase.from as any)('roleta_spins').insert({
+            vendedor: s.vendedor,
+            motivo: s.motivo,
+            motivo_titulo: s.motivoTitulo,
+            premio: s.premio,
+            data: s.data,
+            hora: s.hora,
+            status: s.status,
+            created_by: userId,
+            created_at: parseLocalDateTime(s.data, s.hora),
+          });
+        } catch {
+          // Skip individual failures (duplicates, etc)
+        }
+      }
       localStorage.setItem(MIGRATION_FLAG, 'true');
     } catch (err) {
       console.error('[useRoletaSpins] migration error:', err);
-      // Don't set flag — will retry next time
     }
   }, []);
 

@@ -269,6 +269,13 @@ export default function RoletaPage() {
     drawWheel(0, currentPrizes);
   }, [drawWheel, currentPrizes]);
 
+  // Re-draw wheel after loading finishes (canvas not in DOM during loading)
+  useEffect(() => {
+    if (!loading && !spinsLoading) {
+      drawWheel(wheelAngle, currentPrizes);
+    }
+  }, [loading, spinsLoading, drawWheel, wheelAngle, currentPrizes]);
+
   const validateSpin = useCallback(async (): Promise<string | null> => {
     if (!selectedVendedor) return 'Selecione um vendedor';
     if (!selectedMotivo) return 'Selecione um motivo';
