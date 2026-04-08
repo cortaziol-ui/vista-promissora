@@ -59,6 +59,7 @@ interface SalesDataContextType {
   clientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
+  bulkUpdateClientes: (ids: number[], c: Partial<Cliente>) => Promise<void>;
   deleteCliente: (id: number) => void;
   loading: boolean;
 }
@@ -305,6 +306,12 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     await supabase.from('clientes').update(row).eq('id', id);
   }, []);
 
+  const bulkUpdateClientes = useCallback(async (ids: number[], partial: Partial<Cliente>) => {
+    setClientes(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...partial } : c));
+    const row = mapClienteToRow(partial);
+    await supabase.from('clientes').update(row).in('id', ids);
+  }, []);
+
   const deleteCliente = useCallback(async (id: number) => {
     setClientes(prev => prev.filter(c => c.id !== id));
     await supabase.from('clientes').delete().eq('id', id);
@@ -317,7 +324,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       metaComercialVendas, setMetaComercialVendas,
       vendedores, addVendedor, updateVendedor, deleteVendedor,
       clientes,
-      addCliente, updateCliente, deleteCliente,
+      addCliente, updateCliente, bulkUpdateClientes, deleteCliente,
       loading,
     }}>
       {children}

@@ -7,6 +7,7 @@ interface CommissionProgressProps {
   vendas: number;
   meta: number;
   month: string;
+  size?: 'default' | 'large';
 }
 
 export function CommissionProgress({
@@ -15,7 +16,9 @@ export function CommissionProgress({
   vendas,
   meta,
   month,
+  size = 'default',
 }: CommissionProgressProps) {
+  const isLarge = size === 'large';
   const { tiers, currentTier, loading } = useCommissionTiers({
     vendedorId,
     month,
@@ -55,19 +58,19 @@ export function CommissionProgress({
   return (
     <div className="w-full px-6">
       {/* Progress track */}
-      <div className="relative w-full h-8 flex items-center">
+      <div className={`relative w-full ${isLarge ? 'h-10' : 'h-8'} flex items-center`}>
         {/* Background track */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary" />
+        <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 ${isLarge ? 'h-3' : 'h-2'} rounded-full bg-secondary`} />
 
         {/* Filled track */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 left-0 h-2 rounded-full bg-gradient-to-r from-kpi-sales to-kpi-success progress-animate"
+          className={`absolute top-1/2 -translate-y-1/2 left-0 ${isLarge ? 'h-3' : 'h-2'} rounded-full bg-gradient-to-r from-kpi-sales to-kpi-success progress-animate`}
           style={{ width: `${barProgress}%` }}
         />
 
         {/* Current position indicator */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-5 rounded-sm bg-foreground/90 shadow-lg z-20 transition-all duration-500"
+          className={`absolute top-1/2 -translate-y-1/2 ${isLarge ? 'w-3 h-6' : 'w-2.5 h-5'} rounded-sm bg-foreground/90 shadow-lg z-20 transition-all duration-500`}
           style={{ left: `calc(${barProgress}% - 5px)` }}
         />
 
@@ -85,7 +88,7 @@ export function CommissionProgress({
             >
               <div
                 className={`
-                  w-7 h-7 rounded-full flex items-center justify-center
+                  ${isLarge ? 'w-9 h-9' : 'w-7 h-7'} rounded-full flex items-center justify-center
                   transition-all duration-300 border-2
                   ${isUnlocked
                     ? 'bg-kpi-success text-white border-kpi-success shadow-[0_0_10px_hsl(var(--kpi-success)/0.5)]'
@@ -95,9 +98,9 @@ export function CommissionProgress({
                 `}
               >
                 {isUnlocked ? (
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className={isLarge ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} />
                 ) : (
-                  <Lock className="w-3 h-3" />
+                  <Lock className={isLarge ? 'w-4 h-4' : 'w-3 h-3'} />
                 )}
               </div>
             </div>
@@ -106,7 +109,7 @@ export function CommissionProgress({
       </div>
 
       {/* Tier labels */}
-      <div className="relative w-full mt-1" style={{ height: '3.2rem' }}>
+      <div className="relative w-full mt-1" style={{ height: isLarge ? '4.5rem' : '3.2rem' }}>
         {tiers.map((tier) => {
           const left = toPos(tier.pct_meta);
           return (
@@ -116,21 +119,21 @@ export function CommissionProgress({
               style={{ left: `${left}%` }}
             >
               <p
-                className={`text-[11px] font-semibold leading-tight ${
+                className={`${isLarge ? 'text-sm' : 'text-[11px]'} font-semibold leading-tight ${
                   tier.unlocked ? 'text-kpi-success' : 'text-muted-foreground'
                 }`}
               >
                 {tier.pct_meta}%
               </p>
               <p
-                className={`text-[10px] leading-tight ${
+                className={`${isLarge ? 'text-xs' : 'text-[10px]'} leading-tight ${
                   tier.unlocked ? 'text-kpi-success/70' : 'text-muted-foreground/50'
                 }`}
               >
                 {tier.vendasNecessarias} vendas
               </p>
               <p
-                className={`text-[10px] leading-tight ${
+                className={`${isLarge ? 'text-xs font-medium' : 'text-[10px]'} leading-tight ${
                   tier.unlocked ? 'text-foreground/80' : 'text-muted-foreground/60'
                 }`}
               >

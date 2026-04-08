@@ -15,7 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -45,7 +46,7 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
 }
 
 export default function PlanilhaPage() {
-  const { clientes, vendedores, addCliente, updateCliente, deleteCliente } = useSalesData();
+  const { clientes, vendedores, addCliente, updateCliente, bulkUpdateClientes, deleteCliente } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
   const [filterVendedor, setFilterVendedor] = useState('all');
@@ -56,6 +57,75 @@ export default function PlanilhaPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<Omit<Cliente, 'id'>>(makeEmptyCliente(selectedMonth));
+
+  // Bulk edit state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkServico, setBulkServico] = useState('');
+  const [bulkVendedor, setBulkVendedor] = useState('');
+  const [bulkSituacao, setBulkSituacao] = useState('');
+  const [bulkP1Status, setBulkP1Status] = useState('');
+  const [bulkP2Status, setBulkP2Status] = useState('');
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+
+  const toggleBulkMode = () => {
+    setBulkMode(prev => !prev);
+    setSelectedIds(new Set());
+    setBulkServico(''); setBulkVendedor(''); setBulkSituacao('');
+    setBulkP1Status(''); setBulkP2Status('');
+  };
+
+  const toggleId = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllPage = () => {
+    const pageIds = paginated.map(c => c.id);
+    const allSelected = pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      pageIds.forEach(id => allSelected ? next.delete(id) : next.add(id));
+      return next;
+    });
+  };
+
+  const handleBulkApply = async () => {
+    const changes: Partial<Cliente> = {};
+    if (bulkServico) changes.servico = bulkServico as Cliente['servico'];
+    if (bulkVendedor) changes.vendedor = bulkVendedor;
+    if (bulkSituacao) changes.situacao = bulkSituacao;
+    if (bulkP1Status) changes.parcela1 = { valor: 0, status: bulkP1Status as any };
+    if (bulkP2Status) changes.parcela2 = { valor: 0, status: bulkP2Status as any };
+
+    // For parcela status, we only want to update the status, keeping existing valor
+    // So we need to handle it per-client
+    const ids = Array.from(selectedIds);
+    if (bulkP1Status || bulkP2Status) {
+      // Update parcela status individually to preserve valor
+      for (const id of ids) {
+        const cliente = clientes.find(c => c.id === id);
+        if (!cliente) continue;
+        const clienteChanges: Partial<Cliente> = {};
+        if (bulkServico) clienteChanges.servico = bulkServico as Cliente['servico'];
+        if (bulkVendedor) clienteChanges.vendedor = bulkVendedor;
+        if (bulkSituacao) clienteChanges.situacao = bulkSituacao;
+        if (bulkP1Status) clienteChanges.parcela1 = { ...cliente.parcela1, status: bulkP1Status as any };
+        if (bulkP2Status) clienteChanges.parcela2 = { ...cliente.parcela2, status: bulkP2Status as any };
+        await updateCliente(id, clienteChanges);
+      }
+    } else {
+      await bulkUpdateClientes(ids, changes);
+    }
+
+    toast.success(`${ids.length} registros atualizados`);
+    setBulkConfirmOpen(false);
+    toggleBulkMode();
+  };
 
   // Month navigation helpers
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -148,7 +218,11 @@ export default function PlanilhaPage() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
+          <Button variant={bulkMode ? 'destructive' : 'outline'} onClick={toggleBulkMode} className="gap-2">
+            {bulkMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+            {bulkMode ? 'Cancelar' : 'Editar em Massa'}
+          </Button>
+          {!bulkMode && <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>}
           <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Exportar CSV</Button>
         </div>
       </div>
@@ -190,6 +264,16 @@ export default function PlanilhaPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur">
               <tr className="text-muted-foreground border-b border-border/50 text-xs uppercase tracking-wider">
+                {bulkMode && (
+                  <th className="py-3 px-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={paginated.length > 0 && paginated.every(c => selectedIds.has(c.id))}
+                      onChange={toggleAllPage}
+                      className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="text-left py-3 px-3">#</th>
                 <th className="text-left py-3 px-3">Data</th>
                 <th className="text-left py-3 px-3 min-w-[200px]">Cliente</th>
@@ -207,7 +291,17 @@ export default function PlanilhaPage() {
             </thead>
             <tbody>
               {paginated.map((c, i) => (
-                <tr key={c.id} className={`border-b border-border/20 hover:bg-secondary/40 transition-colors ${i % 2 === 0 ? 'bg-card/40' : 'bg-card/20'}`}>
+                <tr key={c.id} className={`border-b border-border/20 hover:bg-secondary/40 transition-colors ${i % 2 === 0 ? 'bg-card/40' : 'bg-card/20'} ${bulkMode && selectedIds.has(c.id) ? 'bg-primary/10' : ''}`}>
+                  {bulkMode && (
+                    <td className="py-3 px-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(c.id)}
+                        onChange={() => toggleId(c.id)}
+                        className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="py-3 px-3 text-muted-foreground">{c.id}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.data}</td>
                   <td className="py-3 px-3 font-medium text-foreground">{c.nome}</td>
@@ -251,6 +345,86 @@ export default function PlanilhaPage() {
           </div>
         )}
       </div>
+
+      {/* Bulk Edit Toolbar */}
+      {bulkMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border p-4 shadow-lg">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-foreground whitespace-nowrap">{selectedIds.size} selecionados</span>
+            <div className="h-6 w-px bg-border" />
+            <Select value={bulkServico} onValueChange={setBulkServico}>
+              <SelectTrigger className="w-[150px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Serviço" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
+                <SelectItem value="RATING">Rating</SelectItem>
+                <SelectItem value="OUTROS">Outros</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={bulkVendedor} onValueChange={setBulkVendedor}>
+              <SelectTrigger className="w-[150px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Vendedor" /></SelectTrigger>
+              <SelectContent>
+                {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={bulkSituacao} onValueChange={setBulkSituacao}>
+              <SelectTrigger className="w-[200px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Situação" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="À ENVIAR">À Enviar</SelectItem>
+                <SelectItem value="ENVIADO - AGUARDANDO LIMPAR">Enviado - Aguardando Limpar</SelectItem>
+                <SelectItem value="ENVIADO - AGUARDANDO ATUALIZAR">Enviado - Aguardando Atualizar</SelectItem>
+                <SelectItem value="NOME LIMPO ENTREGUE">Nome Limpo Entregue</SelectItem>
+                <SelectItem value="RATING ATUALIZADO ENTREGUE">Rating Atualizado Entregue</SelectItem>
+                <SelectItem value="RESERVA - LIMPA NOME">Reserva - Limpa Nome</SelectItem>
+                <SelectItem value="RESERVA - RATING">Reserva - Rating</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={bulkP1Status} onValueChange={setBulkP1Status}>
+              <SelectTrigger className="w-[140px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Status P1" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                <SelectItem value="PAGO">Pago</SelectItem>
+                <SelectItem value="CANCELADO">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={bulkP2Status} onValueChange={setBulkP2Status}>
+              <SelectTrigger className="w-[140px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Status P2" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                <SelectItem value="PAGO">Pago</SelectItem>
+                <SelectItem value="CANCELADO">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="h-6 w-px bg-border" />
+            <Button
+              onClick={() => setBulkConfirmOpen(true)}
+              disabled={!bulkServico && !bulkVendedor && !bulkSituacao && !bulkP1Status && !bulkP2Status}
+            >
+              Aplicar Alterações
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Confirmation */}
+      <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar edição em massa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja alterar {selectedIds.size} registro(s)?
+              {bulkServico && <span className="block mt-1">Serviço → {bulkServico}</span>}
+              {bulkVendedor && <span className="block mt-1">Vendedor → {bulkVendedor}</span>}
+              {bulkSituacao && <span className="block mt-1">Situação → {bulkSituacao}</span>}
+              {bulkP1Status && <span className="block mt-1">Status 1ª Parcela → {bulkP1Status}</span>}
+              {bulkP2Status && <span className="block mt-1">Status 2ª Parcela → {bulkP2Status}</span>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkApply}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add/Edit Modal — properly centered */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

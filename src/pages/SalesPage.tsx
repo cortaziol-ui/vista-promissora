@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
+import { DailySalesGrid } from '@/components/DailySalesGrid';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CommissionProgress } from '@/components/CommissionProgress';
 import { useSalesData } from '@/contexts/SalesDataContext';
@@ -430,17 +430,7 @@ export default function SalesPage() {
       <div className={`grid ${isVertical ? 'grid-cols-3 gap-3' : 'grid-cols-1 lg:grid-cols-3 gap-4'}`}>
         <div className={`${isVertical ? 'col-span-2' : 'lg:col-span-2'} glass-card ${isVertical ? 'p-4' : 'p-5'}`}>
           <h3 className={`${isVertical ? 'text-base' : 'text-sm'} font-semibold text-foreground ${isVertical ? 'mb-2' : 'mb-4'}`}>Vendas por Dia</h3>
-          <div className={isVertical ? 'h-44' : 'h-64'}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailySales}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 20%, 18%)" />
-                <XAxis dataKey="day" stroke="hsl(215, 20%, 65%)" fontSize={isVertical ? 16 : 12} />
-                <YAxis stroke="hsl(215, 20%, 65%)" fontSize={isVertical ? 16 : 12} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'hsl(220, 39%, 10%)', border: '1px solid hsl(220, 20%, 18%)', borderRadius: '8px', color: '#f1f5f9', fontSize: isVertical ? '16px' : '12px' }} formatter={(v: number) => [v, 'Vendas']} />
-                <Bar dataKey="value" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <DailySalesGrid dailySales={dailySales} selectedMonth={selectedMonth} isVertical={isVertical} />
         </div>
         {/* Top 3 do mês anterior */}
         <div className={`glass-card ${isVertical ? 'p-4 flex flex-col justify-center' : 'p-5'} bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20`}>
@@ -657,6 +647,7 @@ export default function SalesPage() {
                   vendas={stat.vendas}
                   meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
                   month={selectedMonth}
+                  size={isVertical ? 'large' : 'default'}
                 />
               </div>
             ))}

@@ -18,6 +18,7 @@ import PlanilhaPage from "./pages/PlanilhaPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import RoletaPage from "./pages/RoletaPage";
+import FichaRatingPage from "./pages/FichaRatingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -118,6 +119,9 @@ function AppRoutes() {
       <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><SalesPage /></ProtectedRoute>} />
       <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'financeiro']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+
+      {/* Rota pública — formulário de ficha rating */}
+      <Route path="/form/:slug" element={<FichaRatingPage />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
