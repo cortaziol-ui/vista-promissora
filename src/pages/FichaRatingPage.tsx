@@ -89,19 +89,15 @@ export default function FichaRatingPage() {
   return (
     <div className="min-h-screen" style={{ background: '#f5f5f5', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div className="max-w-[640px] mx-auto px-4 pt-6 pb-12 space-y-3">
-        {/* Cabeçalho — card arredondado com formas geométricas */}
+        {/* Cabeçalho — card com formas geométricas à direita */}
         <div className="rounded-xl overflow-hidden shadow-sm relative" style={{ background: '#fff', height: '160px' }}>
-          {/* Forma azul esquerda — retângulo arredondado */}
-          <div className="absolute top-0 left-0 bottom-0 w-[90px] sm:w-[110px]" style={{ background: '#0a3d6b', borderRadius: '0 0 40px 0' }} />
           {/* Forma azul superior direita */}
           <div className="absolute top-0 right-0 w-[100px] sm:w-[120px]" style={{ background: '#0a3d6b', height: '110px', borderRadius: '0 0 0 20px' }} />
           {/* Forma cinza inferior direita */}
           <div className="absolute bottom-0 right-0 w-[80px] sm:w-[100px]" style={{ background: '#b0b8c1', height: '60px', borderRadius: '20px 0 0 0' }} />
-          {/* Logo centralizada com fundo branco para anular o cinza do PNG */}
+          {/* Logo centralizada */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '8px' }}>
-              <img src="/logo-outcom.png" alt="out.com" className="h-16 sm:h-20 object-contain" style={{ mixBlendMode: 'multiply' }} />
-            </div>
+            <img src="/logo-outcom.png" alt="out.com" className="h-24 sm:h-28 object-contain" style={{ mixBlendMode: 'multiply' }} />
           </div>
         </div>
         {/* Título */}
