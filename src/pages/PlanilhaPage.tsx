@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 const situacaoColors: Record<string, string> = {
-  'ENVIADO - AGUARDANDO LIMPAR': 'bg-green-500/20 text-green-400 border-green-500/30',
+  'ENVIADO - AGUARDANDO LIMPAR': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   'ENVIADO - AGUARDANDO ATUALIZAR': 'bg-green-500/20 text-green-400 border-green-500/30',
   'SERVIÇO RATING FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'SERVIÇO FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
