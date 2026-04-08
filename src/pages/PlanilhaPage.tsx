@@ -476,6 +476,12 @@ export default function PlanilhaPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {form.servico === 'RATING' && (
+                <div className="space-y-2">
+                  <Label>Link</Label>
+                  <Input value={form.link || ''} onChange={e => updateFormField('link', e.target.value)} placeholder="https://..." autoComplete="off" />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Vendedor</Label>
                 <Select value={form.vendedor} onValueChange={v => updateFormField('vendedor', v)}>

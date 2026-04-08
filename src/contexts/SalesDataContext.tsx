@@ -22,6 +22,7 @@ export interface Cliente {
   parcela2: Parcela;
   situacao: string;
   valorTotal: number;
+  link?: string;
 }
 
 export interface Vendedor {
@@ -89,6 +90,7 @@ function mapRowToCliente(row: any): Cliente {
     },
     situacao: row.situacao,
     valorTotal: Number(row.valor_total),
+    link: row.link || undefined,
   };
 }
 
@@ -115,6 +117,7 @@ function mapClienteToRow(c: Partial<Cliente>) {
   }
   if (c.situacao !== undefined) row.situacao = c.situacao;
   if (c.valorTotal !== undefined) row.valor_total = c.valorTotal;
+  if (c.link !== undefined) row.link = c.link || null;
   return row;
 }
 
