@@ -90,19 +90,18 @@ export default function FichaRatingPage() {
     <div className="min-h-screen" style={{ background: '#f5f5f5', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div className="max-w-[640px] mx-auto px-4 pt-6 pb-12 space-y-3">
         {/* Cabeçalho — card arredondado com formas geométricas */}
-        <div className="rounded-xl overflow-hidden shadow-sm relative" style={{ background: '#fff' }}>
-          <svg viewBox="0 0 640 160" className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-            <rect width="640" height="160" fill="#ffffff" />
-            {/* Forma azul esquerda */}
-            <path d="M0,0 L0,160 Q60,160 100,120 Q140,80 110,30 Q80,0 0,0 Z" fill="#0a3d6b" />
-            {/* Forma azul superior direita */}
-            <path d="M530,0 Q510,0 510,30 L510,80 Q510,110 540,110 L640,110 L640,0 Z" fill="#0a3d6b" />
-            {/* Forma cinza inferior direita */}
-            <path d="M550,110 Q540,110 540,130 Q540,160 570,160 L640,160 L640,110 Z" fill="#b0b8c1" />
-          </svg>
-          {/* Logo sobre o SVG — multiply remove o fundo cinza do PNG */}
+        <div className="rounded-xl overflow-hidden shadow-sm relative" style={{ background: '#fff', height: '160px' }}>
+          {/* Forma azul esquerda — retângulo arredondado */}
+          <div className="absolute top-0 left-0 bottom-0 w-[90px] sm:w-[110px]" style={{ background: '#0a3d6b', borderRadius: '0 0 40px 0' }} />
+          {/* Forma azul superior direita */}
+          <div className="absolute top-0 right-0 w-[100px] sm:w-[120px]" style={{ background: '#0a3d6b', height: '110px', borderRadius: '0 0 0 20px' }} />
+          {/* Forma cinza inferior direita */}
+          <div className="absolute bottom-0 right-0 w-[80px] sm:w-[100px]" style={{ background: '#b0b8c1', height: '60px', borderRadius: '20px 0 0 0' }} />
+          {/* Logo centralizada com fundo branco para anular o cinza do PNG */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <img src="/logo-outcom.png" alt="out.com" className="h-20 sm:h-24 object-contain" style={{ mixBlendMode: 'multiply' }} />
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '8px' }}>
+              <img src="/logo-outcom.png" alt="out.com" className="h-16 sm:h-20 object-contain" style={{ mixBlendMode: 'multiply' }} />
+            </div>
           </div>
         </div>
         {/* Título */}
