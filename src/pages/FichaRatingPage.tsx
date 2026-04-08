@@ -97,7 +97,7 @@ export default function FichaRatingPage() {
           <div className="absolute bottom-0 right-0 w-[80px] sm:w-[100px]" style={{ background: '#b0b8c1', height: '60px', borderRadius: '20px 0 0 0' }} />
           {/* Logo centralizada */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <img src="/logo-outcom.png" alt="out.com" className="h-24 sm:h-28 object-contain" style={{ mixBlendMode: 'multiply' }} />
+            <img src="/logo-outcom.png" alt="out.com" className="h-24 sm:h-28 object-contain" style={{ mixBlendMode: 'multiply', filter: 'contrast(1.5) brightness(1.3)' }} />
           </div>
         </div>
         {/* Título */}
