@@ -478,7 +478,7 @@ export default function PlanilhaPage() {
               </div>
               {form.servico === 'RATING' && (
                 <div className="space-y-2">
-                  <Label>Link</Label>
+                  <Label>Link Diagnóstico</Label>
                   <Input value={form.link || ''} onChange={e => updateFormField('link', e.target.value)} placeholder="https://..." autoComplete="off" />
                 </div>
               )}
