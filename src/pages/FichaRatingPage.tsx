@@ -90,7 +90,7 @@ export default function FichaRatingPage() {
     <div className="min-h-screen" style={{ background: '#f5f5f5', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div className="max-w-[640px] mx-auto px-4 pt-6 pb-12 space-y-3">
         {/* Cabeçalho — card arredondado com formas geométricas */}
-        <div className="rounded-xl overflow-hidden shadow-sm" style={{ background: '#fff' }}>
+        <div className="rounded-xl overflow-hidden shadow-sm relative" style={{ background: '#fff' }}>
           <svg viewBox="0 0 640 160" className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
             <rect width="640" height="160" fill="#ffffff" />
             {/* Forma azul esquerda */}
@@ -98,10 +98,12 @@ export default function FichaRatingPage() {
             {/* Forma azul superior direita */}
             <path d="M530,0 Q510,0 510,30 L510,80 Q510,110 540,110 L640,110 L640,0 Z" fill="#0a3d6b" />
             {/* Forma cinza inferior direita */}
-            <path d="M550,110 Q540,110 540,130 Q540,160 570,160 L640,160 L640,110 Z" fill="#a0a8b0" />
-            {/* Logo centralizada */}
-            <image href="/logo-outcom.png" x="220" y="25" width="200" height="110" preserveAspectRatio="xMidYMid meet" />
+            <path d="M550,110 Q540,110 540,130 Q540,160 570,160 L640,160 L640,110 Z" fill="#b0b8c1" />
           </svg>
+          {/* Logo sobre o SVG — multiply remove o fundo cinza do PNG */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img src="/logo-outcom.png" alt="out.com" className="h-20 sm:h-24 object-contain" style={{ mixBlendMode: 'multiply' }} />
+          </div>
         </div>
         {/* Título */}
         <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: '#fff', borderTop: '4px solid #0a3d6b' }}>
