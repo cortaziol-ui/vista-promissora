@@ -1,16 +1,13 @@
-import { useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useCallback, forwardRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { fichaRatingSchema, type FichaRatingData } from '@/lib/fichaRatingSchema';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Trash2, CheckCircle2, Loader2, Upload } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function FichaRatingPage() {
-  const { slug } = useParams<{ slug: string }>();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [files, setFiles] = useState<{ documento?: File; selfie?: File; comprovante?: File }>({});
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FichaRatingData>({
     resolver: zodResolver(fichaRatingSchema),
@@ -54,14 +51,6 @@ export default function FichaRatingPage() {
     } catch { /* ignore */ }
   }, [setValue]);
 
-  const uploadFile = async (file: File, folder: string): Promise<string> => {
-    const ext = file.name.split('.').pop();
-    const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from('fichas-anexos').upload(path, file, { upsert: false });
-    if (error) throw error;
-    return path;
-  };
-
   const addBanco = () => setValue('bancos', [...bancos, { banco: '', agencia: '', conta: '' }]);
   const removeBanco = (i: number) => setValue('bancos', bancos.filter((_, idx) => idx !== i));
   const addReferencia = () => setValue('referencias', [...referencias, { nome: '', celular: '', grau: '' }]);
@@ -70,20 +59,9 @@ export default function FichaRatingPage() {
   const onSubmit = async (data: FichaRatingData) => {
     setSubmitting(true);
     try {
-      let anexo_documento: string | null = null;
-      let anexo_selfie: string | null = null;
-      let anexo_comprovante: string | null = null;
-
-      if (files.documento) anexo_documento = await uploadFile(files.documento, slug || 'geral');
-      if (files.selfie) anexo_selfie = await uploadFile(files.selfie, slug || 'geral');
-      if (files.comprovante) anexo_comprovante = await uploadFile(files.comprovante, slug || 'geral');
-
       const { error } = await supabase.from('fichas_rating' as any).insert({
-        slug: slug || 'geral',
+        slug: 'geral',
         ...data,
-        anexo_documento,
-        anexo_selfie,
-        anexo_comprovante,
       } as any);
 
       if (error) throw error;
@@ -98,49 +76,56 @@ export default function FichaRatingPage() {
 
   if (submitted) {
     return (
-      <div className="light min-h-screen flex items-center justify-center p-4" style={{ background: '#f0ebf8' }}>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-10 max-w-lg text-center space-y-4">
-          <CheckCircle2 className="w-16 h-16 mx-auto" style={{ color: '#188038' }} />
-          <h2 className="text-2xl font-normal" style={{ color: '#202124' }}>Ficha Enviada!</h2>
-          <p style={{ color: '#5f6368' }}>Sua ficha foi enviada com sucesso. Entraremos em contato em breve.</p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#f5f5f5' }}>
+        <div className="rounded-xl shadow-sm p-10 max-w-lg text-center space-y-4" style={{ background: '#fff' }}>
+          <CheckCircle2 className="w-16 h-16 mx-auto" style={{ color: '#0a3d6b' }} />
+          <h2 className="text-2xl font-semibold" style={{ color: '#0a3d6b' }}>Ficha Enviada!</h2>
+          <p style={{ color: '#555' }}>Sua ficha foi enviada com sucesso. Entraremos em contato em breve.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="light min-h-screen" style={{ background: '#f0ebf8', fontFamily: "'Google Sans', Roboto, Arial, sans-serif" }}>
-      {/* Header banner — estilo Google Forms */}
-      <div className="w-full" style={{ background: 'linear-gradient(135deg, #0a3d6b 0%, #0e5a94 40%, #1a73b8 70%, #8fa8bf 90%, #b0b8c1 100%)' }}>
-        <div className="max-w-[640px] mx-auto px-4 py-8 flex items-center justify-center">
-          <img src="/logo-outcom.png" alt="out.com" className="h-12 sm:h-16 object-contain brightness-0 invert" />
-        </div>
+    <div className="min-h-screen" style={{ background: '#f5f5f5', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      {/* Cabeçalho — reproduz a imagem da out.com com SVG */}
+      <div className="w-full overflow-hidden" style={{ background: '#fff' }}>
+        <svg viewBox="0 0 1200 200" className="w-full h-auto" preserveAspectRatio="xMidYMid slice" style={{ maxHeight: '180px' }}>
+          {/* Forma azul escura esquerda */}
+          <path d="M0,0 L0,200 Q120,200 180,140 Q240,80 180,30 Q140,0 0,0 Z" fill="#0a3d6b" />
+          {/* Forma azul escura superior direita */}
+          <path d="M1050,0 Q1000,0 1000,50 L1000,100 Q1000,150 1050,150 L1200,150 L1200,0 Z" fill="#0a3d6b" />
+          {/* Forma cinza inferior direita */}
+          <path d="M1060,150 Q1060,200 1110,200 L1200,200 L1200,100 Q1200,150 1150,150 Q1100,150 1100,200" fill="#a0a8b0" />
+          <path d="M1100,150 L1200,150 L1200,200 L1100,200 Q1060,200 1060,160 Q1080,150 1100,150 Z" fill="#a0a8b0" />
+          {/* Fundo branco central com logo */}
+          <image href="/logo-outcom.png" x="500" y="40" width="200" height="120" preserveAspectRatio="xMidYMid meet" />
+        </svg>
       </div>
 
-      <div className="max-w-[640px] mx-auto px-4 py-3 pb-12 space-y-3">
-        {/* Title card — com borda roxa no topo (estilo Google Forms) */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden" style={{ borderTop: '10px solid #0a3d6b' }}>
-          <div className="p-6 pb-4">
-            <h1 className="text-[32px] font-normal mb-1" style={{ color: '#202124' }}>Ficha Rating — PF</h1>
-            <p className="text-sm" style={{ color: '#5f6368' }}>Parceiro: OUTCOM LTDA</p>
+      <div className="max-w-[640px] mx-auto px-4 py-6 pb-12 space-y-3">
+        {/* Título */}
+        <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: '#fff', borderTop: '4px solid #0a3d6b' }}>
+          <div className="px-6 py-5">
+            <h1 className="text-2xl font-semibold" style={{ color: '#0a3d6b' }}>Ficha Rating — PF</h1>
+            <p className="text-sm mt-1" style={{ color: '#888' }}>Parceiro: OUTCOM LTDA</p>
           </div>
         </div>
 
-        {/* Progress card */}
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        {/* Progresso */}
+        <div className="rounded-xl shadow-sm px-6 py-4" style={{ background: '#fff' }}>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm" style={{ color: '#5f6368' }}>
-              Preencha todos os campos abaixo com atenção. Campos marcados com <span style={{ color: '#d93025' }}>*</span> são obrigatórios.
+            <p className="text-sm" style={{ color: '#666' }}>
+              Campos marcados com <span style={{ color: '#d93025' }}>*</span> são obrigatórios.
             </p>
-            <span className="text-sm font-medium whitespace-nowrap ml-4" style={{ color: '#202124' }}>{progressPct}%</span>
+            <span className="text-sm font-semibold whitespace-nowrap ml-4" style={{ color: '#0a3d6b' }}>{progressPct}%</span>
           </div>
-          <div className="w-full h-1 rounded-full" style={{ background: '#e0e0e0' }}>
+          <div className="w-full h-1.5 rounded-full" style={{ background: '#e8e8e8' }}>
             <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progressPct}%`, background: '#0a3d6b' }} />
           </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          {/* Dados Pessoais */}
           <FormCard title="Dados Pessoais">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="sm:col-span-2">
@@ -151,69 +136,33 @@ export default function FichaRatingPage() {
               <FormField label="CPF" required error={errors.cpf?.message}>
                 <FormInput {...register('cpf')} hasError={!!errors.cpf} />
               </FormField>
-              <FormField label="RG">
-                <FormInput {...register('rg')} />
-              </FormField>
-              <FormField label="Título de eleitor">
-                <FormInput {...register('titulo_eleitor')} />
-              </FormField>
-              <FormField label="Data de expedição">
-                <FormInput type="date" {...register('data_expedicao')} />
-              </FormField>
-              <FormField label="Data de nascimento">
-                <FormInput type="date" {...register('data_nascimento')} />
-              </FormField>
+              <FormField label="RG"><FormInput {...register('rg')} /></FormField>
+              <FormField label="Título de eleitor"><FormInput {...register('titulo_eleitor')} /></FormField>
+              <FormField label="Data de expedição"><FormInput type="date" {...register('data_expedicao')} /></FormField>
+              <FormField label="Data de nascimento"><FormInput type="date" {...register('data_nascimento')} /></FormField>
               <FormField label="Estado civil">
-                <FormSelect
-                  value={watchAll.estado_civil || ''}
-                  onChange={v => setValue('estado_civil', v)}
-                  options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']}
-                />
+                <FormSelect value={watchAll.estado_civil || ''} onChange={v => setValue('estado_civil', v)} options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
               </FormField>
-              <FormField label="Nome do pai">
-                <FormInput {...register('nome_pai')} />
-              </FormField>
-              <FormField label="Nome da mãe">
-                <FormInput {...register('nome_mae')} />
-              </FormField>
+              <FormField label="Nome do pai"><FormInput {...register('nome_pai')} /></FormField>
+              <FormField label="Nome da mãe"><FormInput {...register('nome_mae')} /></FormField>
             </div>
           </FormCard>
 
-          {/* Endereço */}
           <FormCard title="Endereço">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="CEP">
-                <FormInput {...register('cep')} onBlur={e => fetchCep(e.target.value)} placeholder="00000-000" />
-              </FormField>
-              <div className="sm:col-span-2">
-                <FormField label="Endereço">
-                  <FormInput {...register('endereco')} />
-                </FormField>
-              </div>
-              <FormField label="Número">
-                <FormInput {...register('numero')} />
-              </FormField>
-              <FormField label="Bairro">
-                <FormInput {...register('bairro')} />
-              </FormField>
-              <FormField label="Cidade">
-                <FormInput {...register('cidade')} />
-              </FormField>
-              <FormField label="Estado">
-                <FormInput {...register('estado')} />
-              </FormField>
+              <FormField label="CEP"><FormInput {...register('cep')} onBlur={e => fetchCep(e.target.value)} placeholder="00000-000" /></FormField>
+              <div className="sm:col-span-2"><FormField label="Endereço"><FormInput {...register('endereco')} /></FormField></div>
+              <FormField label="Número"><FormInput {...register('numero')} /></FormField>
+              <FormField label="Bairro"><FormInput {...register('bairro')} /></FormField>
+              <FormField label="Cidade"><FormInput {...register('cidade')} /></FormField>
+              <FormField label="Estado"><FormInput {...register('estado')} /></FormField>
             </div>
           </FormCard>
 
-          {/* Contato */}
           <FormCard title="Contato">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Telefone residencial">
-                <FormInput {...register('tel_residencial')} />
-              </FormField>
-              <FormField label="Telefone celular">
-                <FormInput {...register('tel_celular')} />
-              </FormField>
+              <FormField label="Telefone residencial"><FormInput {...register('tel_residencial')} /></FormField>
+              <FormField label="Telefone celular"><FormInput {...register('tel_celular')} /></FormField>
               <div className="sm:col-span-2">
                 <FormField label="E-mail" error={errors.email?.message}>
                   <FormInput type="email" {...register('email')} hasError={!!errors.email} />
@@ -222,51 +171,31 @@ export default function FichaRatingPage() {
             </div>
           </FormCard>
 
-          {/* Dados Profissionais */}
           <FormCard title="Dados Profissionais">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="sm:col-span-2">
-                <FormField label="Empresa">
-                  <FormInput {...register('empresa')} />
-                </FormField>
-              </div>
-              <FormField label="Data de admissão">
-                <FormInput type="date" {...register('data_admissao')} />
-              </FormField>
-              <FormField label="Salário">
-                <FormInput type="number" step="0.01" placeholder="R$" {...register('salario', { valueAsNumber: true })} />
-              </FormField>
-              <FormField label="Renda familiar">
-                <FormInput type="number" step="0.01" placeholder="R$" {...register('renda_familiar', { valueAsNumber: true })} />
-              </FormField>
-              <FormField label="Faturamento">
-                <FormInput type="number" step="0.01" placeholder="R$" {...register('faturamento', { valueAsNumber: true })} />
-              </FormField>
+              <div className="sm:col-span-2"><FormField label="Empresa"><FormInput {...register('empresa')} /></FormField></div>
+              <FormField label="Data de admissão"><FormInput type="date" {...register('data_admissao')} /></FormField>
+              <FormField label="Salário"><FormInput type="number" step="0.01" placeholder="R$" {...register('salario', { valueAsNumber: true })} /></FormField>
+              <FormField label="Renda familiar"><FormInput type="number" step="0.01" placeholder="R$" {...register('renda_familiar', { valueAsNumber: true })} /></FormField>
+              <FormField label="Faturamento"><FormInput type="number" step="0.01" placeholder="R$" {...register('faturamento', { valueAsNumber: true })} /></FormField>
             </div>
           </FormCard>
 
-          {/* Bancos */}
           <FormCard title="Bancos e Instituições Financeiras">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: '#202124' }}>Bancos</span>
-                <button type="button" onClick={addBanco} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors" style={{ color: '#0a3d6b', borderColor: '#dadce0' }}>
+                <span className="text-sm font-medium" style={{ color: '#333' }}>Bancos</span>
+                <button type="button" onClick={addBanco} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors" style={{ color: '#0a3d6b', border: '1px solid #d0d0d0', background: '#fff' }}>
                   <Plus className="w-3.5 h-3.5" /> Adicionar
                 </button>
               </div>
-              {bancos.length === 0 && <p className="text-sm" style={{ color: '#80868b' }}>Nenhum item adicionado.</p>}
+              {bancos.length === 0 && <p className="text-sm" style={{ color: '#aaa' }}>Nenhum item adicionado.</p>}
               {bancos.map((_, i) => (
-                <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-4 rounded-lg" style={{ background: '#f8f9fa', border: '1px solid #e8eaed' }}>
-                  <FormField label="Banco" compact>
-                    <FormInput {...register(`bancos.${i}.banco`)} />
-                  </FormField>
-                  <FormField label="Agência" compact>
-                    <FormInput {...register(`bancos.${i}.agencia`)} />
-                  </FormField>
-                  <FormField label="Conta" compact>
-                    <FormInput {...register(`bancos.${i}.conta`)} />
-                  </FormField>
-                  <button type="button" onClick={() => removeBanco(i)} className="h-10 w-10 flex items-center justify-center rounded-full transition-colors hover:bg-red-50" style={{ color: '#d93025' }}>
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-4 rounded-lg" style={{ background: '#fafafa', border: '1px solid #eee' }}>
+                  <FormField label="Banco" compact><FormInput {...register(`bancos.${i}.banco`)} /></FormField>
+                  <FormField label="Agência" compact><FormInput {...register(`bancos.${i}.agencia`)} /></FormField>
+                  <FormField label="Conta" compact><FormInput {...register(`bancos.${i}.conta`)} /></FormField>
+                  <button type="button" onClick={() => removeBanco(i)} className="h-10 w-10 flex items-center justify-center rounded-full transition-colors" style={{ color: '#d93025' }}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -274,28 +203,21 @@ export default function FichaRatingPage() {
             </div>
           </FormCard>
 
-          {/* Referências */}
           <FormCard title="Referências Pessoais">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: '#202124' }}>Referências</span>
-                <button type="button" onClick={addReferencia} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors" style={{ color: '#0a3d6b', borderColor: '#dadce0' }}>
+                <span className="text-sm font-medium" style={{ color: '#333' }}>Referências</span>
+                <button type="button" onClick={addReferencia} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors" style={{ color: '#0a3d6b', border: '1px solid #d0d0d0', background: '#fff' }}>
                   <Plus className="w-3.5 h-3.5" /> Adicionar
                 </button>
               </div>
-              {referencias.length === 0 && <p className="text-sm" style={{ color: '#80868b' }}>Nenhum item adicionado.</p>}
+              {referencias.length === 0 && <p className="text-sm" style={{ color: '#aaa' }}>Nenhum item adicionado.</p>}
               {referencias.map((_, i) => (
-                <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-4 rounded-lg" style={{ background: '#f8f9fa', border: '1px solid #e8eaed' }}>
-                  <FormField label="Nome" compact>
-                    <FormInput {...register(`referencias.${i}.nome`)} />
-                  </FormField>
-                  <FormField label="Celular" compact>
-                    <FormInput {...register(`referencias.${i}.celular`)} />
-                  </FormField>
-                  <FormField label="Grau de relacionamento" compact>
-                    <FormInput {...register(`referencias.${i}.grau`)} />
-                  </FormField>
-                  <button type="button" onClick={() => removeReferencia(i)} className="h-10 w-10 flex items-center justify-center rounded-full transition-colors hover:bg-red-50" style={{ color: '#d93025' }}>
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-4 rounded-lg" style={{ background: '#fafafa', border: '1px solid #eee' }}>
+                  <FormField label="Nome" compact><FormInput {...register(`referencias.${i}.nome`)} /></FormField>
+                  <FormField label="Celular" compact><FormInput {...register(`referencias.${i}.celular`)} /></FormField>
+                  <FormField label="Grau de relacionamento" compact><FormInput {...register(`referencias.${i}.grau`)} /></FormField>
+                  <button type="button" onClick={() => removeReferencia(i)} className="h-10 w-10 flex items-center justify-center rounded-full transition-colors" style={{ color: '#d93025' }}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -303,19 +225,13 @@ export default function FichaRatingPage() {
             </div>
           </FormCard>
 
-          {/* Acesso Serasa */}
           <FormCard title="Acesso Serasa">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Login Serasa">
-                <FormInput {...register('login_serasa')} />
-              </FormField>
-              <FormField label="Senha Serasa">
-                <FormInput type="password" {...register('senha_serasa')} />
-              </FormField>
+              <FormField label="Login Serasa"><FormInput {...register('login_serasa')} /></FormField>
+              <FormField label="Senha Serasa"><FormInput type="password" {...register('senha_serasa')} /></FormField>
             </div>
           </FormCard>
 
-          {/* Bens e Patrimônio */}
           <FormCard title="Bens e Patrimônio">
             <div className="space-y-6">
               <ToggleSection label="Possui Imóvel 1?" checked={watchAll.possui_imovel1 || false} onChange={v => setValue('possui_imovel1', v)}>
@@ -358,27 +274,17 @@ export default function FichaRatingPage() {
             </div>
           </FormCard>
 
-          {/* Anexos */}
-          <FormCard title="Anexos">
-            <div className="space-y-5">
-              <FileUpload label="CNH ou RG" required onChange={f => setFiles(prev => ({ ...prev, documento: f }))} file={files.documento} />
-              <FileUpload label="Selfie segurando documento (CNH ou RG)" required onChange={f => setFiles(prev => ({ ...prev, selfie: f }))} file={files.selfie} />
-              <FileUpload label="Comprovante de residência" required onChange={f => setFiles(prev => ({ ...prev, comprovante: f }))} file={files.comprovante} />
-            </div>
-          </FormCard>
-
           {/* Submit */}
-          <div className="flex justify-between items-center pt-2">
+          <div className="pt-2">
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-md text-white font-medium text-sm transition-opacity disabled:opacity-60"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-10 py-3.5 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-60"
               style={{ background: '#0a3d6b' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {submitting ? 'Enviando...' : 'Enviar ficha'}
             </button>
-            <span className="text-xs" style={{ color: '#80868b' }}>Nunca envie senhas em formulários não confiáveis.</span>
           </div>
         </form>
       </div>
@@ -387,15 +293,14 @@ export default function FichaRatingPage() {
 }
 
 /* ================================================================
-   COMPONENTES NATIVOS — sem shadcn/ui, tudo com cores inline
-   para garantir que NUNCA herda o tema escuro do dashboard
+   COMPONENTES NATIVOS — cores inline, nunca herda tema escuro
    ================================================================ */
 
 function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg shadow-sm overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e0e0e0' }}>
-      <div className="p-6 space-y-5">
-        <h2 className="text-base font-medium pb-2" style={{ color: '#202124', borderBottom: '1px solid #e8eaed' }}>{title}</h2>
+    <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: '#fff' }}>
+      <div className="px-6 py-5 space-y-5">
+        <h2 className="text-[15px] font-semibold pb-3" style={{ color: '#0a3d6b', borderBottom: '1px solid #eee' }}>{title}</h2>
         {children}
       </div>
     </div>
@@ -405,16 +310,14 @@ function FormCard({ title, children }: { title: string; children: React.ReactNod
 function FormField({ label, required, error, compact, children }: { label: string; required?: boolean; error?: string; compact?: boolean; children: React.ReactNode }) {
   return (
     <div className={compact ? 'space-y-1' : 'space-y-2'}>
-      <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-normal`} style={{ color: '#202124' }}>
+      <label className={`block ${compact ? 'text-xs' : 'text-sm'} font-normal`} style={{ color: '#444' }}>
         {label} {required && <span style={{ color: '#d93025' }}>*</span>}
       </label>
       {children}
-      {error && <p className="text-xs" style={{ color: '#d93025' }}>{error}</p>}
+      {error && <p className="text-xs mt-1" style={{ color: '#d93025' }}>{error}</p>}
     </div>
   );
 }
-
-import { forwardRef } from 'react';
 
 interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean;
@@ -423,19 +326,16 @@ interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 const FormInput = forwardRef<HTMLInputElement, FormInputProps>(({ hasError, className, ...props }, ref) => (
   <input
     ref={ref}
-    className={`w-full px-0 py-2 text-sm bg-transparent outline-none transition-colors ${className || ''}`}
+    className={`w-full px-3 py-2.5 text-sm rounded-lg outline-none transition-all ${className || ''}`}
     style={{
-      color: '#202124',
-      borderBottom: `1px solid ${hasError ? '#d93025' : '#dadce0'}`,
-      borderTop: 'none',
-      borderLeft: 'none',
-      borderRight: 'none',
-      borderRadius: 0,
+      color: '#222',
+      background: '#fafafa',
+      border: `1.5px solid ${hasError ? '#d93025' : '#e0e0e0'}`,
     }}
-    onFocus={e => { e.target.style.borderBottomColor = '#0a3d6b'; e.target.style.borderBottomWidth = '2px'; }}
+    onFocus={e => { e.target.style.borderColor = '#0a3d6b'; e.target.style.background = '#fff'; }}
     onBlur={e => {
-      e.target.style.borderBottomColor = hasError ? '#d93025' : '#dadce0';
-      e.target.style.borderBottomWidth = '1px';
+      e.target.style.borderColor = hasError ? '#d93025' : '#e0e0e0';
+      e.target.style.background = '#fafafa';
       props.onBlur?.(e);
     }}
     {...props}
@@ -448,16 +348,16 @@ function FormSelect({ value, onChange, options }: { value: string; onChange: (v:
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="w-full px-0 py-2 text-sm bg-transparent outline-none cursor-pointer"
+      className="w-full px-3 py-2.5 text-sm rounded-lg outline-none cursor-pointer"
       style={{
-        color: value ? '#202124' : '#80868b',
-        borderBottom: '1px solid #dadce0',
-        borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-        borderRadius: 0, appearance: 'auto',
+        color: value ? '#222' : '#999',
+        background: '#fafafa',
+        border: '1.5px solid #e0e0e0',
+        appearance: 'auto',
       }}
     >
-      <option value="" style={{ color: '#80868b' }}>Selecione...</option>
-      {options.map(o => <option key={o} value={o} style={{ color: '#202124' }}>{o}</option>)}
+      <option value="" style={{ color: '#999' }}>Selecione...</option>
+      {options.map(o => <option key={o} value={o} style={{ color: '#222' }}>{o}</option>)}
     </select>
   );
 }
@@ -469,49 +369,16 @@ function ToggleSection({ label, checked, onChange, children }: { label: string; 
         <div
           onClick={() => onChange(!checked)}
           className="relative w-11 h-6 rounded-full transition-colors cursor-pointer"
-          style={{ background: checked ? '#0a3d6b' : '#dadce0' }}
+          style={{ background: checked ? '#0a3d6b' : '#d0d0d0' }}
         >
           <div
-            className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform"
-            style={{ transform: checked ? 'translateX(22px)' : 'translateX(2px)' }}
+            className="absolute top-0.5 w-5 h-5 rounded-full shadow-md transition-transform"
+            style={{ background: '#fff', transform: checked ? 'translateX(22px)' : 'translateX(2px)' }}
           />
         </div>
-        <span className="text-sm font-medium" style={{ color: '#202124' }}>{label}</span>
+        <span className="text-sm font-medium" style={{ color: '#333' }}>{label}</span>
       </label>
       {checked && <div className="pl-14">{children}</div>}
-    </div>
-  );
-}
-
-function FileUpload({ label, required, onChange, file }: { label: string; required?: boolean; onChange: (f: File) => void; file?: File }) {
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-normal" style={{ color: '#202124' }}>
-        {label} {required && <span style={{ color: '#d93025' }}>*</span>}
-      </label>
-      <label
-        className="flex flex-col items-center justify-center w-full py-6 px-4 rounded-lg cursor-pointer transition-colors"
-        style={{ border: '2px dashed #dadce0', background: file ? '#e8f0fe' : '#fafafa' }}
-      >
-        {file ? (
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5" style={{ color: '#188038' }} />
-            <span className="text-sm font-medium" style={{ color: '#202124' }}>{file.name}</span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1">
-            <Upload className="w-6 h-6" style={{ color: '#80868b' }} />
-            <span className="text-sm" style={{ color: '#5f6368' }}>Clique para enviar</span>
-            <span className="text-xs" style={{ color: '#80868b' }}>PDF, JPG, PNG</span>
-          </div>
-        )}
-        <input
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f); }}
-        />
-      </label>
     </div>
   );
 }

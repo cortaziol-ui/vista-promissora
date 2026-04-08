@@ -121,7 +121,7 @@ function AppRoutes() {
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
       {/* Rota pública — formulário de ficha rating */}
-      <Route path="/form/:slug" element={<FichaRatingPage />} />
+      <Route path="/ficha-rating" element={<FichaRatingPage />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
