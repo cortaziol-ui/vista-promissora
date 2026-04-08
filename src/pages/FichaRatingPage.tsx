@@ -88,22 +88,21 @@ export default function FichaRatingPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#f5f5f5', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-      {/* Cabeçalho — reproduz a imagem da out.com com SVG */}
-      <div className="w-full overflow-hidden" style={{ background: '#fff' }}>
-        <svg viewBox="0 0 1200 200" className="w-full h-auto" preserveAspectRatio="xMidYMid slice" style={{ maxHeight: '180px' }}>
-          {/* Forma azul escura esquerda */}
-          <path d="M0,0 L0,200 Q120,200 180,140 Q240,80 180,30 Q140,0 0,0 Z" fill="#0a3d6b" />
-          {/* Forma azul escura superior direita */}
-          <path d="M1050,0 Q1000,0 1000,50 L1000,100 Q1000,150 1050,150 L1200,150 L1200,0 Z" fill="#0a3d6b" />
-          {/* Forma cinza inferior direita */}
-          <path d="M1060,150 Q1060,200 1110,200 L1200,200 L1200,100 Q1200,150 1150,150 Q1100,150 1100,200" fill="#a0a8b0" />
-          <path d="M1100,150 L1200,150 L1200,200 L1100,200 Q1060,200 1060,160 Q1080,150 1100,150 Z" fill="#a0a8b0" />
-          {/* Fundo branco central com logo */}
-          <image href="/logo-outcom.png" x="500" y="40" width="200" height="120" preserveAspectRatio="xMidYMid meet" />
-        </svg>
-      </div>
-
-      <div className="max-w-[640px] mx-auto px-4 py-6 pb-12 space-y-3">
+      <div className="max-w-[640px] mx-auto px-4 pt-6 pb-12 space-y-3">
+        {/* Cabeçalho — card arredondado com formas geométricas */}
+        <div className="rounded-xl overflow-hidden shadow-sm" style={{ background: '#fff' }}>
+          <svg viewBox="0 0 640 160" className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+            <rect width="640" height="160" fill="#ffffff" />
+            {/* Forma azul esquerda */}
+            <path d="M0,0 L0,160 Q60,160 100,120 Q140,80 110,30 Q80,0 0,0 Z" fill="#0a3d6b" />
+            {/* Forma azul superior direita */}
+            <path d="M530,0 Q510,0 510,30 L510,80 Q510,110 540,110 L640,110 L640,0 Z" fill="#0a3d6b" />
+            {/* Forma cinza inferior direita */}
+            <path d="M550,110 Q540,110 540,130 Q540,160 570,160 L640,160 L640,110 Z" fill="#a0a8b0" />
+            {/* Logo centralizada */}
+            <image href="/logo-outcom.png" x="220" y="25" width="200" height="110" preserveAspectRatio="xMidYMid meet" />
+          </svg>
+        </div>
         {/* Título */}
         <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: '#fff', borderTop: '4px solid #0a3d6b' }}>
           <div className="px-6 py-5">
