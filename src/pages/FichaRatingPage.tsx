@@ -136,35 +136,35 @@ export default function FichaRatingPage() {
               <FormField label="CPF" required error={errors.cpf?.message}>
                 <FormInput {...register('cpf')} hasError={!!errors.cpf} />
               </FormField>
-              <FormField label="RG"><FormInput {...register('rg')} /></FormField>
-              <FormField label="Título de eleitor"><FormInput {...register('titulo_eleitor')} /></FormField>
-              <FormField label="Data de expedição"><FormInput type="date" {...register('data_expedicao')} /></FormField>
-              <FormField label="Data de nascimento"><FormInput type="date" {...register('data_nascimento')} /></FormField>
-              <FormField label="Estado civil">
+              <FormField label="RG" required error={errors.rg?.message}><FormInput {...register('rg')} hasError={!!errors.rg} /></FormField>
+              <FormField label="Título de eleitor" required error={errors.titulo_eleitor?.message}><FormInput {...register('titulo_eleitor')} hasError={!!errors.titulo_eleitor} /></FormField>
+              <FormField label="Data de expedição" required error={errors.data_expedicao?.message}><FormInput type="date" {...register('data_expedicao')} hasError={!!errors.data_expedicao} /></FormField>
+              <FormField label="Data de nascimento" required error={errors.data_nascimento?.message}><FormInput type="date" {...register('data_nascimento')} hasError={!!errors.data_nascimento} /></FormField>
+              <FormField label="Estado civil" required error={errors.estado_civil?.message}>
                 <FormSelect value={watchAll.estado_civil || ''} onChange={v => setValue('estado_civil', v)} options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
               </FormField>
-              <FormField label="Nome do pai"><FormInput {...register('nome_pai')} /></FormField>
-              <FormField label="Nome da mãe"><FormInput {...register('nome_mae')} /></FormField>
+              <FormField label="Nome do pai" required error={errors.nome_pai?.message}><FormInput {...register('nome_pai')} hasError={!!errors.nome_pai} /></FormField>
+              <FormField label="Nome da mãe" required error={errors.nome_mae?.message}><FormInput {...register('nome_mae')} hasError={!!errors.nome_mae} /></FormField>
             </div>
           </FormCard>
 
           <FormCard title="Endereço">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="CEP"><FormInput {...register('cep')} onBlur={e => fetchCep(e.target.value)} placeholder="00000-000" /></FormField>
-              <div className="sm:col-span-2"><FormField label="Endereço"><FormInput {...register('endereco')} /></FormField></div>
-              <FormField label="Número"><FormInput {...register('numero')} /></FormField>
-              <FormField label="Bairro"><FormInput {...register('bairro')} /></FormField>
-              <FormField label="Cidade"><FormInput {...register('cidade')} /></FormField>
-              <FormField label="Estado"><FormInput {...register('estado')} /></FormField>
+              <FormField label="CEP" required error={errors.cep?.message}><FormInput {...register('cep')} onBlur={e => fetchCep(e.target.value)} placeholder="00000-000" hasError={!!errors.cep} /></FormField>
+              <div className="sm:col-span-2"><FormField label="Endereço" required error={errors.endereco?.message}><FormInput {...register('endereco')} hasError={!!errors.endereco} /></FormField></div>
+              <FormField label="Número" required error={errors.numero?.message}><FormInput {...register('numero')} hasError={!!errors.numero} /></FormField>
+              <FormField label="Bairro" required error={errors.bairro?.message}><FormInput {...register('bairro')} hasError={!!errors.bairro} /></FormField>
+              <FormField label="Cidade" required error={errors.cidade?.message}><FormInput {...register('cidade')} hasError={!!errors.cidade} /></FormField>
+              <FormField label="Estado" required error={errors.estado?.message}><FormInput {...register('estado')} hasError={!!errors.estado} /></FormField>
             </div>
           </FormCard>
 
           <FormCard title="Contato">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Telefone residencial"><FormInput {...register('tel_residencial')} /></FormField>
-              <FormField label="Telefone celular"><FormInput {...register('tel_celular')} /></FormField>
+              <FormField label="Telefone residencial" required error={errors.tel_residencial?.message}><FormInput {...register('tel_residencial')} hasError={!!errors.tel_residencial} /></FormField>
+              <FormField label="Telefone celular" required error={errors.tel_celular?.message}><FormInput {...register('tel_celular')} hasError={!!errors.tel_celular} /></FormField>
               <div className="sm:col-span-2">
-                <FormField label="E-mail" error={errors.email?.message}>
+                <FormField label="E-mail" required error={errors.email?.message}>
                   <FormInput type="email" {...register('email')} hasError={!!errors.email} />
                 </FormField>
               </div>
@@ -173,11 +173,11 @@ export default function FichaRatingPage() {
 
           <FormCard title="Dados Profissionais">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="sm:col-span-2"><FormField label="Empresa"><FormInput {...register('empresa')} /></FormField></div>
-              <FormField label="Data de admissão"><FormInput type="date" {...register('data_admissao')} /></FormField>
-              <FormField label="Salário"><FormInput type="number" step="0.01" placeholder="R$" {...register('salario', { valueAsNumber: true })} /></FormField>
-              <FormField label="Renda familiar"><FormInput type="number" step="0.01" placeholder="R$" {...register('renda_familiar', { valueAsNumber: true })} /></FormField>
-              <FormField label="Faturamento"><FormInput type="number" step="0.01" placeholder="R$" {...register('faturamento', { valueAsNumber: true })} /></FormField>
+              <div className="sm:col-span-2"><FormField label="Empresa" required error={errors.empresa?.message}><FormInput {...register('empresa')} hasError={!!errors.empresa} /></FormField></div>
+              <FormField label="Data de admissão" required error={errors.data_admissao?.message}><FormInput type="date" {...register('data_admissao')} hasError={!!errors.data_admissao} /></FormField>
+              <FormField label="Salário" required error={errors.salario?.message}><FormInput type="number" step="0.01" placeholder="R$" {...register('salario', { valueAsNumber: true })} hasError={!!errors.salario} /></FormField>
+              <FormField label="Renda familiar" required error={errors.renda_familiar?.message}><FormInput type="number" step="0.01" placeholder="R$" {...register('renda_familiar', { valueAsNumber: true })} hasError={!!errors.renda_familiar} /></FormField>
+              <FormField label="Faturamento" required error={errors.faturamento?.message}><FormInput type="number" step="0.01" placeholder="R$" {...register('faturamento', { valueAsNumber: true })} hasError={!!errors.faturamento} /></FormField>
             </div>
           </FormCard>
 
@@ -227,8 +227,8 @@ export default function FichaRatingPage() {
 
           <FormCard title="Acesso Serasa">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Login Serasa"><FormInput {...register('login_serasa')} /></FormField>
-              <FormField label="Senha Serasa"><FormInput type="password" {...register('senha_serasa')} /></FormField>
+              <FormField label="Login Serasa" required error={errors.login_serasa?.message}><FormInput {...register('login_serasa')} hasError={!!errors.login_serasa} /></FormField>
+              <FormField label="Senha Serasa" required error={errors.senha_serasa?.message}><FormInput type="password" {...register('senha_serasa')} hasError={!!errors.senha_serasa} /></FormField>
             </div>
           </FormCard>
 

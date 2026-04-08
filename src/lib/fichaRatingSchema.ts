@@ -16,33 +16,33 @@ export const fichaRatingSchema = z.object({
   // Dados Pessoais
   nome: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   cpf: z.string().min(11, 'CPF inválido'),
-  rg: z.string().optional(),
-  titulo_eleitor: z.string().optional(),
-  data_expedicao: z.string().optional(),
-  data_nascimento: z.string().optional(),
-  estado_civil: z.string().optional(),
-  nome_pai: z.string().optional(),
-  nome_mae: z.string().optional(),
+  rg: z.string().min(1, 'Obrigatório'),
+  titulo_eleitor: z.string().min(1, 'Obrigatório'),
+  data_expedicao: z.string().min(1, 'Obrigatório'),
+  data_nascimento: z.string().min(1, 'Obrigatório'),
+  estado_civil: z.string().min(1, 'Obrigatório'),
+  nome_pai: z.string().min(1, 'Obrigatório'),
+  nome_mae: z.string().min(1, 'Obrigatório'),
 
   // Endereço
-  cep: z.string().optional(),
-  endereco: z.string().optional(),
-  numero: z.string().optional(),
-  bairro: z.string().optional(),
-  cidade: z.string().optional(),
-  estado: z.string().optional(),
+  cep: z.string().min(1, 'Obrigatório'),
+  endereco: z.string().min(1, 'Obrigatório'),
+  numero: z.string().min(1, 'Obrigatório'),
+  bairro: z.string().min(1, 'Obrigatório'),
+  cidade: z.string().min(1, 'Obrigatório'),
+  estado: z.string().min(1, 'Obrigatório'),
 
   // Contato
-  tel_residencial: z.string().optional(),
-  tel_celular: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  tel_residencial: z.string().min(1, 'Obrigatório'),
+  tel_celular: z.string().min(1, 'Obrigatório'),
+  email: z.string().min(1, 'Obrigatório').email('Email inválido'),
 
   // Dados Profissionais
-  empresa: z.string().optional(),
-  data_admissao: z.string().optional(),
-  salario: z.number().optional(),
-  renda_familiar: z.number().optional(),
-  faturamento: z.number().optional(),
+  empresa: z.string().min(1, 'Obrigatório'),
+  data_admissao: z.string().min(1, 'Obrigatório'),
+  salario: z.number({ required_error: 'Obrigatório' }).min(0, 'Obrigatório'),
+  renda_familiar: z.number({ required_error: 'Obrigatório' }).min(0, 'Obrigatório'),
+  faturamento: z.number({ required_error: 'Obrigatório' }).min(0, 'Obrigatório'),
 
   // Bancos
   bancos: z.array(bancoSchema).default([]),
@@ -51,8 +51,8 @@ export const fichaRatingSchema = z.object({
   referencias: z.array(referenciaSchema).default([]),
 
   // Acesso Serasa
-  login_serasa: z.string().optional(),
-  senha_serasa: z.string().optional(),
+  login_serasa: z.string().min(1, 'Obrigatório'),
+  senha_serasa: z.string().min(1, 'Obrigatório'),
 
   // Bens - Imóvel 1
   possui_imovel1: z.boolean().default(false),
