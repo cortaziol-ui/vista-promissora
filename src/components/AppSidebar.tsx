@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen, ChevronRight,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
+  SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 
 interface NavItem {
@@ -26,7 +30,6 @@ const allNavItems: NavItem[] = [
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
   { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller', 'financeiro'] },
   { title: 'Fichas Rating', url: '/fichas', icon: FileText, roles: ['admin', 'manager', 'financeiro'] },
-  { title: 'Documentos', url: '/documentos', icon: FolderOpen, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
 ];
 
 const adminItems: NavItem[] = [
@@ -38,6 +41,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const userRole = user?.role || 'seller';
 
@@ -84,6 +88,50 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Documentos — submenu colapsável */}
+              {['admin', 'manager', 'administrativo', 'financeiro'].includes(userRole) && (
+                <Collapsible defaultOpen={location.pathname.startsWith('/documentos')} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip="Documentos" className="hover:bg-sidebar-accent/50">
+                        <FolderOpen className="mr-2 h-4 w-4 shrink-0" />
+                        {!collapsed && (
+                          <>
+                            <span className="flex-1">Documentos</span>
+                            <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </>
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <NavLink to="/documentos" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                              Documentos
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <NavLink to="/documentos/rating" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                              Rating
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <NavLink to="/documentos/limpa-nome" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                              Limpa Nome
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
