@@ -104,13 +104,7 @@ export default function SalesPage() {
     return vendedorStats.filter(s => s.vendedor.nome === filterVendedor);
   }, [vendedorStats, filterVendedor]);
 
-  // Sellers see ALL vendors' commissions on this page; admin/manager don't see commission here (moved to OverviewPage)
-  const commissionStats = useMemo(() => {
-    if (isSeller) {
-      return vendedorStats;
-    }
-    return []; // admin/manager: commission section hidden on SalesPage
-  }, [isSeller, vendedorStats]);
+  const commissionStats = vendedorStats;
 
   // Local computed values based on vendedor filter
   const localFaturamento = useMemo(() => localClientes.reduce((s, c) => s + (c.entrada || 0), 0), [localClientes]);
