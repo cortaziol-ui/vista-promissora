@@ -4,10 +4,13 @@ import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRoletaSpins } from '@/hooks/useRoletaSpins';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface PrizeOption {
   label: string;
@@ -58,7 +61,7 @@ const PRIZES_POR_VENDA: PrizeOption[] = [
   { label: 'Puxar grito de guerra', peso: 40, color: '#9C27B0' },
 ];
 
-const PRIZE_MAP: Record<string, PrizeOption[]> = {
+const DEFAULT_PRIZE_MAP: Record<string, PrizeOption[]> = {
   por_venda: PRIZES_POR_VENDA,
   volume_diario: PRIZES_VOLUME_DIARIO,
   meta_semanal_100: PRIZES_META_SEMANAL,
@@ -132,7 +135,7 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
-  const { isSeller, isManager } = useAuth();
+  const { isSeller, isManager, isAdmin } = useAuth();
   const { spins, loading: spinsLoading, saveSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
 
   const [selectedVendedor, setSelectedVendedor] = useState('');
@@ -150,6 +153,75 @@ export default function RoletaPage() {
   const [wheelAngle, setWheelAngle] = useState(0);
   const targetPrizeRef = useRef<PrizeOption | null>(null);
 
+  // --- Custom prizes (persisted in company_settings) ---
+  const [prizeMap, setPrizeMap] = useState<Record<string, PrizeOption[]>>(DEFAULT_PRIZE_MAP);
+  const [editingPrize, setEditingPrize] = useState<{ motivo: string; index: number } | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editPeso, setEditPeso] = useState(0);
+
+  // Load custom prizes from DB
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('company_settings')
+          .select('value')
+          .eq('key', 'roleta_prizes')
+          .maybeSingle();
+        if (data?.value) {
+          const saved = data.value as Record<string, Array<{ label: string; peso: number; color: string }>>;
+          const merged = { ...DEFAULT_PRIZE_MAP };
+          for (const [motivo, prizes] of Object.entries(saved)) {
+            if (merged[motivo] && Array.isArray(prizes)) {
+              merged[motivo] = prizes.map((p, i) => ({
+                label: p.label,
+                peso: p.peso,
+                color: p.color || merged[motivo]?.[i]?.color || '#4CAF50',
+              }));
+            }
+          }
+          setPrizeMap(merged);
+        }
+      } catch {
+        // fallback to defaults
+      }
+    })();
+  }, []);
+
+  const savePrizeMap = useCallback(async (updated: Record<string, PrizeOption[]>) => {
+    setPrizeMap(updated);
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(updated).map(([k, v]) => [k, v.map(p => ({ label: p.label, peso: p.peso, color: p.color }))])
+      );
+      const { error } = await supabase
+        .from('company_settings')
+        .upsert({ key: 'roleta_prizes', value: payload as any, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
+      toast.success('Prêmio atualizado!');
+    } catch {
+      toast.error('Erro ao salvar prêmio.');
+    }
+  }, []);
+
+  const handleEditPrize = (motivo: string, index: number) => {
+    const prize = prizeMap[motivo]?.[index];
+    if (!prize) return;
+    setEditingPrize({ motivo, index });
+    setEditLabel(prize.label);
+    setEditPeso(prize.peso);
+  };
+
+  const handleSavePrize = () => {
+    if (!editingPrize) return;
+    const { motivo, index } = editingPrize;
+    const updated = { ...prizeMap };
+    updated[motivo] = [...updated[motivo]];
+    updated[motivo][index] = { ...updated[motivo][index], label: editLabel, peso: editPeso };
+    savePrizeMap(updated);
+    setEditingPrize(null);
+  };
+
   // Save spin to Supabase after animation completes
   useEffect(() => {
     if (!pendingSpin) return;
@@ -166,7 +238,7 @@ export default function RoletaPage() {
   }, [pendingSpin, saveSpin]);
 
   const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
-  const currentPrizes = useMemo(() => PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO, [selectedMotivo]);
+  const currentPrizes = useMemo(() => prizeMap[selectedMotivo] || prizeMap.volume_diario, [selectedMotivo, prizeMap]);
 
   // Draw wheel
   const drawWheel = useCallback((angle: number, prizes: PrizeOption[]) => {
@@ -364,7 +436,7 @@ export default function RoletaPage() {
     }
     setValidationError('');
 
-    const prizes = PRIZE_MAP[selectedMotivo] || PRIZES_VOLUME_DIARIO;
+    const prizes = prizeMap[selectedMotivo] || prizeMap.volume_diario;
     const prize = weightedRandom(prizes);
     const motive = MOTIVES.find(m => m.id === selectedMotivo) ?? MOTIVES[0];
     targetPrizeRef.current = prize;
@@ -523,13 +595,23 @@ export default function RoletaPage() {
               Prêmios — {currentMotive?.titulo || 'Volume Diário'}
             </h3>
             <div className="space-y-1.5">
-              {currentPrizes.map(p => (
-                <div key={p.label} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-sm">
+              {currentPrizes.map((p, i) => (
+                <div key={`${selectedMotivo}-${i}`} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ background: p.color }} />
                     <span className="text-foreground">{p.label}</span>
                   </div>
-                  {!isSeller && !isManager && <span className="text-xs text-muted-foreground">{p.peso}%</span>}
+                  <div className="flex items-center gap-2">
+                    {!isSeller && !isManager && <span className="text-xs text-muted-foreground">{p.peso}%</span>}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleEditPrize(selectedMotivo || 'volume_diario', i)}
+                        className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -606,6 +688,40 @@ export default function RoletaPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Prize Modal (admin only) */}
+      <Dialog open={!!editingPrize} onOpenChange={open => !open && setEditingPrize(null)}>
+        <DialogContent className="bg-card border-border sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Editar Prêmio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground">Nome do prêmio</label>
+              <Input
+                value={editLabel}
+                onChange={e => setEditLabel(e.target.value)}
+                className="bg-secondary border-border/50"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground">Peso (%)</label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={editPeso}
+                onChange={e => setEditPeso(Number(e.target.value))}
+                className="bg-secondary border-border/50"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPrize(null)}>Cancelar</Button>
+            <Button onClick={handleSavePrize} disabled={!editLabel.trim() || editPeso <= 0}>Salvar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
