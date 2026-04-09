@@ -11,7 +11,7 @@ import {
 import {
   ChevronLeft, ChevronRight, Folder, Upload, FileText, Image as ImageIcon,
   Search, Trash2, Download, Eye, Loader2, ArrowLeft, Plus, MoreVertical,
-  File, ExternalLink,
+  File, ExternalLink, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,6 +47,9 @@ export default function DocumentosPage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState('');
 
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -158,6 +161,49 @@ export default function DocumentosPage() {
     // Also remove placeholder
     await supabase.storage.from(BUCKET).remove([`${folderPath}/${PLACEHOLDER}`]);
     toast.success(`Pasta "${name}" excluída`);
+    fetchItems();
+  };
+
+  /* ── Rename folder ── */
+  const handleRenameFolder = async () => {
+    if (!renameTarget || !renameName.trim() || renameName.trim() === renameTarget) {
+      setRenameTarget(null);
+      return;
+    }
+    const newName = renameName.trim();
+    const oldBase = storagePath ? `${storagePath}/${renameTarget}` : renameTarget;
+    const newBase = storagePath ? `${storagePath}/${newName}` : newName;
+
+    setCreating(true);
+
+    // List all files inside the old folder
+    const { data: folderItems } = await supabase.storage.from(BUCKET).list(oldBase);
+    const allFiles = folderItems || [];
+
+    // Copy each file to the new path, then delete the old
+    for (const item of allFiles) {
+      const oldPath = `${oldBase}/${item.name}`;
+      const newPath = `${newBase}/${item.name}`;
+
+      if (!item.id) {
+        // It's a subfolder — list its contents too
+        const { data: subItems } = await supabase.storage.from(BUCKET).list(oldPath);
+        for (const sub of subItems || []) {
+          const { data: fileData } = await supabase.storage.from(BUCKET).download(`${oldPath}/${sub.name}`);
+          if (fileData) await supabase.storage.from(BUCKET).upload(`${newPath}/${sub.name}`, fileData, { upsert: true });
+          await supabase.storage.from(BUCKET).remove([`${oldPath}/${sub.name}`]);
+        }
+      } else {
+        const { data: fileData } = await supabase.storage.from(BUCKET).download(oldPath);
+        if (fileData) await supabase.storage.from(BUCKET).upload(newPath, fileData, { upsert: true });
+        await supabase.storage.from(BUCKET).remove([oldPath]);
+      }
+    }
+
+    toast.success(`Pasta renomeada para "${newName}"`);
+    setCreating(false);
+    setRenameTarget(null);
+    setRenameName('');
     fetchItems();
   };
 
@@ -357,6 +403,11 @@ export default function DocumentosPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                               <DropdownMenuItem
+                                onClick={() => { setRenameTarget(folder.name); setRenameName(folder.name); }}
+                              >
+                                <Pencil className="w-4 h-4 mr-2" /> Renomear
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onClick={() => handleDeleteFolder(folder.name)}
                               >
@@ -433,6 +484,29 @@ export default function DocumentosPage() {
             <Button onClick={handleCreateFolder} disabled={!newFolderName.trim() || creating}>
               {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
               Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename folder dialog */}
+      <Dialog open={!!renameTarget} onOpenChange={open => !open && setRenameTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renomear Pasta</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Novo nome"
+            value={renameName}
+            onChange={e => setRenameName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRenameFolder()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)}>Cancelar</Button>
+            <Button onClick={handleRenameFolder} disabled={!renameName.trim() || creating}>
+              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Pencil className="w-4 h-4 mr-1" />}
+              Renomear
             </Button>
           </DialogFooter>
         </DialogContent>
