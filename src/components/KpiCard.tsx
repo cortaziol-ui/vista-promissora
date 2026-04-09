@@ -20,17 +20,17 @@ export function KpiCard({ title, value, change, icon, glowClass, colorClass, sub
   if (isCompact) {
     return (
       <div
-        className={`glass-card px-3 py-2 hover-lift ${glowClass} animate-in`}
+        className={`glass-card px-2.5 py-1.5 hover-lift ${glowClass} animate-in`}
         style={{ animationDelay: `${delay}ms` }}
       >
-        <div className="flex items-center gap-2 mb-1">
-          <div className={`w-7 h-7 rounded-md flex items-center justify-center ${colorClass} bg-opacity-15 shrink-0`}>
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <div className={`w-6 h-6 rounded-md flex items-center justify-center ${colorClass} bg-opacity-15 shrink-0`}>
             {icon}
           </div>
-          <p className="text-[11px] text-muted-foreground truncate leading-tight">{title}</p>
+          <p className="text-[10px] text-muted-foreground truncate leading-tight">{title}</p>
         </div>
-        <p className="text-xl font-bold text-foreground tracking-tight leading-none">{value}</p>
-        {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{subtitle}</p>}
+        <p className="text-base font-bold text-foreground tracking-tight leading-none">{value}</p>
+        {subtitle && <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{subtitle}</p>}
       </div>
     );
   }

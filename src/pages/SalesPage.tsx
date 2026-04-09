@@ -361,7 +361,7 @@ export default function SalesPage() {
   }, [vendedores]);
 
   return (
-    <div className={isVertical ? 'h-[calc(100vh-3.5rem-3rem)] flex flex-col gap-2 overflow-hidden' : 'space-y-6'}>
+    <div className={isVertical ? 'flex flex-col gap-2' : 'space-y-6'}>
       {/* Birthday banner */}
       {aniversariantes.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
