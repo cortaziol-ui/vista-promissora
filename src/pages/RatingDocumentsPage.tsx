@@ -7,6 +7,7 @@ const config = {
   pathPrefix: 'rating',
   defaultSubfolder: 'Documentos Rating',
   breadcrumbRoot: 'Rating',
+  driveLink: 'https://drive.google.com/drive/u/2/folders/1mzu3pD6hG9ZejrFCAWdcMEwPtKZwBVTp',
 };
 
 export default function RatingDocumentsPage() {
