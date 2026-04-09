@@ -10,11 +10,30 @@ interface KpiCardProps {
   colorClass: string;
   subtitle?: string;
   delay?: number;
-  size?: 'default' | 'large';
+  size?: 'default' | 'large' | 'compact';
 }
 
 export function KpiCard({ title, value, change, icon, glowClass, colorClass, subtitle, delay = 0, size = 'default' }: KpiCardProps) {
   const isLarge = size === 'large';
+  const isCompact = size === 'compact';
+
+  if (isCompact) {
+    return (
+      <div
+        className={`glass-card px-3 py-2 hover-lift ${glowClass} animate-in`}
+        style={{ animationDelay: `${delay}ms` }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <div className={`w-7 h-7 rounded-md flex items-center justify-center ${colorClass} bg-opacity-15 shrink-0`}>
+            {icon}
+          </div>
+          <p className="text-[11px] text-muted-foreground truncate leading-tight">{title}</p>
+        </div>
+        <p className="text-xl font-bold text-foreground tracking-tight leading-none">{value}</p>
+        {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{subtitle}</p>}
+      </div>
+    );
+  }
 
   return (
     <div
