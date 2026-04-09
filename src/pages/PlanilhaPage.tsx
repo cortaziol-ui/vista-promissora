@@ -284,6 +284,7 @@ export default function PlanilhaPage() {
                 <th className="text-left py-3 px-3">CPF</th>
                 <th className="text-left py-3 px-3">Telefone</th>
                 <th className="text-left py-3 px-3">Serviço</th>
+                <th className="text-left py-3 px-3">Link</th>
                 <th className="text-left py-3 px-3">Vendedor</th>
                 <th className="text-right py-3 px-3">Entrada</th>
                 <th className="text-center py-3 px-3">1ª Parcela</th>
@@ -313,6 +314,15 @@ export default function PlanilhaPage() {
                   <td className="py-3 px-3 text-muted-foreground font-mono text-xs">{c.cpf}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.telefone}</td>
                   <td className="py-3 px-3"><Badge variant="outline" className="text-xs">{c.servico}</Badge></td>
+                  <td className="py-3 px-3">
+                    {c.link ? (
+                      <a href={c.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline truncate block max-w-[120px]">
+                        Abrir
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="py-3 px-3 font-medium text-foreground">{c.vendedor}</td>
                   <td className="py-3 px-3 text-right text-foreground">{fmtCurrency(c.entrada)}</td>
                   <td className="py-3 px-3 text-center">
