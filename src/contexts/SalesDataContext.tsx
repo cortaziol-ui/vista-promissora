@@ -20,6 +20,7 @@ export interface Cliente {
   entrada: number;
   parcela1: Parcela;
   parcela2: Parcela;
+  parcela3?: Parcela;
   situacao: string;
   valorTotal: number;
   link?: string;
@@ -88,6 +89,11 @@ function mapRowToCliente(row: any): Cliente {
       status: row.parcela2_status as Parcela['status'],
       dataPagamento: row.parcela2_data_pagamento || undefined,
     },
+    parcela3: row.parcela3_valor != null && Number(row.parcela3_valor) > 0 ? {
+      valor: Number(row.parcela3_valor),
+      status: (row.parcela3_status || 'AGUARDANDO') as Parcela['status'],
+      dataPagamento: row.parcela3_data_pagamento || undefined,
+    } : undefined,
     situacao: row.situacao,
     valorTotal: Number(row.valor_total),
     link: row.link || undefined,
@@ -114,6 +120,11 @@ function mapClienteToRow(c: Partial<Cliente>) {
     row.parcela2_valor = c.parcela2.valor;
     row.parcela2_status = c.parcela2.status;
     row.parcela2_data_pagamento = c.parcela2.dataPagamento || null;
+  }
+  if (c.parcela3 !== undefined) {
+    row.parcela3_valor = c.parcela3 ? c.parcela3.valor : 0;
+    row.parcela3_status = c.parcela3 ? c.parcela3.status : 'AGUARDANDO';
+    row.parcela3_data_pagamento = c.parcela3 ? (c.parcela3.dataPagamento || null) : null;
   }
   if (c.situacao !== undefined) row.situacao = c.situacao;
   if (c.valorTotal !== undefined) row.valor_total = c.valorTotal;

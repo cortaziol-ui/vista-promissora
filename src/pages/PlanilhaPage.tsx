@@ -172,8 +172,11 @@ export default function PlanilhaPage() {
   const openEdit = (c: Cliente) => { setEditingId(c.id); setForm({ ...c }); setModalOpen(true); };
 
   const handleSave = () => {
-    const valorTotal = form.entrada + form.parcela1.valor + form.parcela2.valor;
-    const data = { ...form, valorTotal };
+    const p3 = form.parcela3?.valor || 0;
+    const valorTotal = form.entrada + form.parcela1.valor + form.parcela2.valor + p3;
+    // Clear parcela3 if not a double sale
+    const parcela3 = form.servico === 'LIMPA NOME + RATING' ? form.parcela3 : undefined;
+    const data = { ...form, parcela3, valorTotal };
     if (editingId !== null) {
       updateCliente(editingId, data);
     } else {
@@ -187,8 +190,8 @@ export default function PlanilhaPage() {
   };
 
   const exportCSV = () => {
-    const headers = ['ID', 'Data', 'Nome', 'CPF', 'Email', 'Telefone', 'Serviço', 'Vendedor', 'Entrada', 'Parcela 1', 'Status P1', 'Parcela 2', 'Status P2', 'Situação', 'Valor Total'];
-    const rows = filtered.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.situacao, c.valorTotal].join(','));
+    const headers = ['ID', 'Data', 'Nome', 'CPF', 'Email', 'Telefone', 'Serviço', 'Vendedor', 'Entrada', 'Parcela 1', 'Status P1', 'Parcela 2', 'Status P2', 'Parcela 3', 'Status P3', 'Situação', 'Valor Total'];
+    const rows = filtered.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.parcela3?.valor || 0, c.parcela3?.status || '', c.situacao, c.valorTotal].join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -285,6 +288,7 @@ export default function PlanilhaPage() {
                 <th className="text-right py-3 px-3">Entrada</th>
                 <th className="text-center py-3 px-3">1ª Parcela</th>
                 <th className="text-center py-3 px-3">2ª Parcela</th>
+                <th className="text-center py-3 px-3">3ª Parcela</th>
                 <th className="text-left py-3 px-3 min-w-[180px]">Situação</th>
                 <th className="text-right py-3 px-3">Total</th>
                 <th className="text-center py-3 px-3">Ações</th>
@@ -316,6 +320,13 @@ export default function PlanilhaPage() {
                   </td>
                   <td className="py-3 px-3 text-center">
                     <span className="text-xs">{parcelaIcon(c.parcela2.status)} {fmtCurrency(c.parcela2.valor)}</span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    {c.parcela3 ? (
+                      <span className="text-xs">{parcelaIcon(c.parcela3.status)} {fmtCurrency(c.parcela3.valor)}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-3">
                     <Badge className={`text-[10px] border ${situacaoColors[c.situacao] || 'bg-muted/20 text-muted-foreground'}`}>
@@ -557,6 +568,51 @@ export default function PlanilhaPage() {
                     )}
                   </div>
                 </div>
+                {form.servico === 'LIMPA NOME + RATING' && (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="ativar-p3"
+                        checked={!!form.parcela3}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setForm(f => ({ ...f, parcela3: { valor: 250, status: 'AGUARDANDO' } }));
+                          } else {
+                            setForm(f => ({ ...f, parcela3: undefined }));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                      />
+                      <Label htmlFor="ativar-p3" className="cursor-pointer">Ativar 3ª Parcela</Label>
+                    </div>
+                    {form.parcela3 && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>3ª Parcela (R$)</Label>
+                          <Input type="number" value={form.parcela3.valor} onChange={e => setForm(f => ({ ...f, parcela3: { ...f.parcela3!, valor: Number(e.target.value) } }))} />
+                          <Select value={form.parcela3.status} onValueChange={v => {
+                            const today = new Date().toLocaleDateString('pt-BR');
+                            setForm(f => ({ ...f, parcela3: { ...f.parcela3!, status: v as any, dataPagamento: v === 'PAGO' ? (f.parcela3?.dataPagamento || today) : undefined } }));
+                          }}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                              <SelectItem value="PAGO">Pago</SelectItem>
+                              <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {form.parcela3.status === 'PAGO' && (
+                            <div>
+                              <Label className="text-xs">Data Pagamento</Label>
+                              <Input value={form.parcela3.dataPagamento || ''} onChange={e => setForm(f => ({ ...f, parcela3: { ...f.parcela3!, dataPagamento: e.target.value } }))} placeholder="DD/MM/YYYY" className="text-xs h-8" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </form>
