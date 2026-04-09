@@ -15,7 +15,7 @@ export interface Cliente {
   nascimento: string;
   email: string;
   telefone: string;
-  servico: 'LIMPA NOME' | 'RATING' | 'OUTROS';
+  servico: 'LIMPA NOME' | 'RATING' | 'LIMPA NOME + RATING' | 'OUTROS';
   vendedor: string;
   entrada: number;
   parcela1: Parcela;

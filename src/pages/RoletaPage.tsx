@@ -7,7 +7,7 @@ import { useRoletaSpins } from '@/hooks/useRoletaSpins';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Gift, Zap, Target, Crown, History, Trophy } from 'lucide-react';
+import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper } from 'lucide-react';
 
 interface PrizeOption {
   label: string;
@@ -51,7 +51,15 @@ const PRIZES_META_MENSAL_100: PrizeOption[] = [
   { label: 'Pix de R$ 200', peso: 5, color: '#FFD700' },
 ];
 
+const PRIZES_POR_VENDA: PrizeOption[] = [
+  { label: 'Salva de palmas da equipe', peso: 20, color: '#4CAF50' },
+  { label: 'Puxar a buzina das vendas', peso: 25, color: '#FF5722' },
+  { label: 'Soquinho em toda a equipe', peso: 15, color: '#00BCD4' },
+  { label: 'Puxar grito de guerra', peso: 40, color: '#9C27B0' },
+];
+
 const PRIZE_MAP: Record<string, PrizeOption[]> = {
+  por_venda: PRIZES_POR_VENDA,
   volume_diario: PRIZES_VOLUME_DIARIO,
   meta_semanal_100: PRIZES_META_SEMANAL,
   meta_mensal_70: PRIZES_META_MENSAL_70,
@@ -68,6 +76,14 @@ interface MotiveConfig {
 }
 
 const MOTIVES: MotiveConfig[] = [
+  {
+    id: 'por_venda',
+    titulo: 'Por Venda',
+    descricao: '1 giro por venda realizada',
+    icon: <PartyPopper className="w-5 h-5" />,
+    color: '#FF5722',
+    bgColor: 'rgba(255, 87, 34, 0.15)',
+  },
   {
     id: 'volume_diario',
     titulo: 'Volume Diário',
@@ -117,7 +133,7 @@ export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller, isManager } = useAuth();
-  const { spins, loading: spinsLoading, saveSpin, checkRateLimit } = useRoletaSpins();
+  const { spins, loading: spinsLoading, saveSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
 
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
@@ -276,6 +292,22 @@ export default function RoletaPage() {
     }
   }, [loading, spinsLoading, drawWheel, wheelAngle, currentPrizes]);
 
+  // Count today's sales for a vendor (LIMPA NOME + RATING = 2)
+  const getTodaySalesCount = useCallback((vendedorNome: string) => {
+    const today = new Date().toLocaleDateString('pt-BR');
+    return clientes
+      .filter(c => c.vendedor === vendedorNome && c.data === today)
+      .reduce((s, c) => s + (c.servico === 'LIMPA NOME + RATING' ? 2 : 1), 0);
+  }, [clientes]);
+
+  // Available spins for "por_venda"
+  const availableSpins = useMemo(() => {
+    if (!selectedVendedor) return 0;
+    const todaySales = getTodaySalesCount(selectedVendedor);
+    const usedSpins = getSpinsUsedToday(selectedVendedor);
+    return Math.max(0, todaySales - usedSpins);
+  }, [selectedVendedor, getTodaySalesCount, getSpinsUsedToday]);
+
   const validateSpin = useCallback(async (): Promise<string | null> => {
     if (!selectedVendedor) return 'Selecione um vendedor';
     if (!selectedMotivo) return 'Selecione um motivo';
@@ -283,18 +315,20 @@ export default function RoletaPage() {
     const vendedor = vendedores.find(v => v.nome === selectedVendedor);
     if (!vendedor) return 'Vendedor não encontrado';
 
-    const { allowed, hoursRemaining } = await checkRateLimit(selectedVendedor, selectedMotivo);
-    if (!allowed) {
-      return `Próxima girada disponível em ${Math.ceil(hoursRemaining)}h`;
-    }
-
     const today = new Date().toLocaleDateString('pt-BR');
     const vendorClientes = clientes.filter(c => c.vendedor === selectedVendedor);
-    const todayClientes = vendorClientes.filter(c => c.data === today);
+    const todaySales = getTodaySalesCount(selectedVendedor);
     const stat = vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
 
-    if (selectedMotivo === 'volume_diario' && todayClientes.length < 3) {
-      return `Você tem ${todayClientes.length} vendas hoje. Precisa de 3 para girar. 💪`;
+    if (selectedMotivo === 'por_venda') {
+      if (availableSpins <= 0) {
+        return `Nenhum giro disponível. Faça uma venda para liberar! 💪`;
+      }
+      return null;
+    }
+
+    if (selectedMotivo === 'volume_diario' && todaySales < 3) {
+      return `Você tem ${todaySales} venda${todaySales !== 1 ? 's' : ''} hoje. Precisa de 3 para girar. 💪`;
     }
 
     if (selectedMotivo === 'meta_semanal_100') {
@@ -320,7 +354,7 @@ export default function RoletaPage() {
     }
 
     return null;
-  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats, checkRateLimit]);
+  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats, availableSpins, getTodaySalesCount]);
 
   const handleSpin = useCallback(async () => {
     const error = await validateSpin();
@@ -442,6 +476,14 @@ export default function RoletaPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedMotivo === 'por_venda' && selectedVendedor && (
+              <div className={`p-3 rounded-lg text-sm font-medium ${availableSpins > 0 ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'}`}>
+                {availableSpins > 0
+                  ? `🎰 ${availableSpins} giro${availableSpins !== 1 ? 's' : ''} disponíve${availableSpins !== 1 ? 'is' : 'l'}!`
+                  : 'Nenhum giro disponível. Faça uma venda para liberar!'}
+              </div>
+            )}
 
             {validationError && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">

@@ -20,12 +20,7 @@ const LOCAL_KEY_LIMITS = 'roleta_limites_v2';
 const MIGRATION_FLAG = 'roleta_migrated_to_supabase';
 const RECOVERY_FLAG = 'roleta_recovery_20260407';
 
-const COOLDOWN_HOURS: Record<string, number> = {
-  volume_diario: 24,
-  meta_semanal_100: 168,
-  meta_mensal_70: 168,
-  meta_mensal_100: 168,
-};
+// No cooldown limits — spins are unlimited once conditions are met
 
 // --- localStorage helpers (fallback) ---
 
@@ -290,47 +285,21 @@ export function useRoletaSpins() {
     [user, spins],
   );
 
-  // --- Check rate limit via Supabase ---
+  // --- Check rate limit (disabled — always allowed) ---
   const checkRateLimit = useCallback(
-    async (vendedor: string, motivo: string): Promise<{ allowed: boolean; hoursRemaining: number }> => {
-      const cooldown = COOLDOWN_HOURS[motivo] ?? 24;
-
-      try {
-        const { data, error } = await (supabase.from as any)('roleta_spins')
-          .select('created_at')
-          .eq('vendedor', vendedor)
-          .eq('motivo', motivo)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-          return { allowed: true, hoursRemaining: 0 };
-        }
-
-        const lastSpinTime = new Date(data[0].created_at).getTime();
-        const elapsed = (Date.now() - lastSpinTime) / (1000 * 60 * 60);
-
-        if (elapsed >= cooldown) {
-          return { allowed: true, hoursRemaining: 0 };
-        }
-        return { allowed: false, hoursRemaining: cooldown - elapsed };
-      } catch (err) {
-        console.error('[useRoletaSpins] checkRateLimit Supabase error, falling back to localStorage:', err);
-
-        // Fallback to localStorage
-        const limits = loadLocalLimits();
-        const key = `${vendedor}_${motivo}`;
-        const last = limits[key];
-        if (!last) return { allowed: true, hoursRemaining: 0 };
-
-        const elapsed = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60);
-        if (elapsed >= cooldown) return { allowed: true, hoursRemaining: 0 };
-        return { allowed: false, hoursRemaining: cooldown - elapsed };
-      }
+    async (_vendedor: string, _motivo: string): Promise<{ allowed: boolean; hoursRemaining: number }> => {
+      return { allowed: true, hoursRemaining: 0 };
     },
     [],
+  );
+
+  // --- Count spins used today for "por_venda" motive ---
+  const getSpinsUsedToday = useCallback(
+    (vendedor: string): number => {
+      const today = new Date().toLocaleDateString('pt-BR');
+      return spins.filter(s => s.vendedor === vendedor && s.motivo === 'por_venda' && s.data === today).length;
+    },
+    [spins],
   );
 
   return {
@@ -338,6 +307,7 @@ export function useRoletaSpins() {
     loading,
     saveSpin,
     checkRateLimit,
+    getSpinsUsedToday,
     refresh: fetchSpins,
   };
 }

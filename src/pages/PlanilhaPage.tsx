@@ -472,11 +472,12 @@ export default function PlanilhaPage() {
                   <SelectContent>
                     <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
                     <SelectItem value="RATING">Rating</SelectItem>
+                    <SelectItem value="LIMPA NOME + RATING">Limpa Nome + Rating (Dupla)</SelectItem>
                     <SelectItem value="OUTROS">Outros</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {form.servico === 'RATING' && (
+              {(form.servico === 'RATING' || form.servico === 'LIMPA NOME + RATING') && (
                 <div className="space-y-2">
                   <Label>Link Diagnóstico</Label>
                   <Input value={form.link || ''} onChange={e => updateFormField('link', e.target.value)} placeholder="https://..." autoComplete="off" />
