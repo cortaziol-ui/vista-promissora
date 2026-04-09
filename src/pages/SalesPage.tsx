@@ -476,7 +476,7 @@ export default function SalesPage() {
       </div>
 
       {/* Seller Detail Table */}
-      <div className={`glass-card ${isVertical ? 'p-2.5' : 'p-5'} ${isVertical ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+      <div className={`glass-card ${isVertical ? 'p-2.5' : 'p-5'}`}>
         <div className={`flex items-center justify-between ${isVertical ? 'mb-1.5' : 'mb-4'}`}>
           <h3 className={`${isVertical ? 'text-xs' : 'text-sm'} font-semibold text-foreground`}>Performance por Vendedor</h3>
           <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
@@ -496,7 +496,7 @@ export default function SalesPage() {
         </div>
 
         {tableView === 'geral' ? (
-          <div className={`overflow-x-auto ${isVertical ? 'flex-1 min-h-0 overflow-y-auto' : ''}`}>
+          <div className="overflow-x-auto">
             <table className={`w-full ${isVertical ? 'text-xs' : 'text-sm'}`}>
               <thead>
                 <tr className="text-muted-foreground border-b border-border/50">
