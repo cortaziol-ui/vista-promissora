@@ -20,6 +20,7 @@ import SettingsPage from "./pages/SettingsPage";
 import RoletaPage from "./pages/RoletaPage";
 import FichaRatingPage from "./pages/FichaRatingPage";
 import FichasRespostasPage from "./pages/FichasRespostasPage";
+import DocumentosPage from "./pages/DocumentosPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -120,6 +121,7 @@ function AppRoutes() {
       <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><SalesPage /></ProtectedRoute>} />
       <Route path="/roleta" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'financeiro']}><RoletaPage /></ProtectedRoute>} />
       <Route path="/fichas" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><FichasRespostasPage /></ProtectedRoute>} />
+      <Route path="/documentos" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><DocumentosPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
       {/* Rota pública — formulário de ficha rating */}

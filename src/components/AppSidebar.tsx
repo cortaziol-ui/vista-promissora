@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,7 @@ const allNavItems: NavItem[] = [
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
   { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller', 'financeiro'] },
   { title: 'Fichas Rating', url: '/fichas', icon: FileText, roles: ['admin', 'manager', 'financeiro'] },
+  { title: 'Documentos', url: '/documentos', icon: FolderOpen, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
 ];
 
 const adminItems: NavItem[] = [
