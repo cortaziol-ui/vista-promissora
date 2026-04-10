@@ -497,7 +497,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                           onClick={() => openFolder(folder.name)}
                         >
                           <Folder className="w-5 h-5 text-muted-foreground shrink-0" />
-                          <span className="text-sm text-white font-medium flex-1 select-none break-words leading-snug">
+                          <span className="text-sm text-white font-medium flex-1 select-none break-words leading-snug uppercase">
                             {folder.name}
                           </span>
                           <DropdownMenu>
