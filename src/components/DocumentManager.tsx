@@ -57,6 +57,8 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
+  const [renameFileTarget, setRenameFileTarget] = useState<string | null>(null);
+  const [renameFileName, setRenameFileName] = useState('');
 
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -164,16 +166,41 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
   const handleDeleteFolder = async (name: string) => {
     const folderPath = fullPath ? `${fullPath}/${name}` : name;
-    // List all files recursively in the folder
-    const { data: folderItems } = await supabase.storage.from(config.bucket).list(folderPath);
-    if (folderItems && folderItems.length > 0) {
-      const paths = folderItems.map(i => `${folderPath}/${i.name}`);
-      await supabase.storage.from(config.bucket).remove(paths);
+
+    // Recursively collect all file paths inside the folder
+    const collectAll = async (prefix: string): Promise<string[]> => {
+      const { data } = await supabase.storage.from(config.bucket).list(prefix);
+      if (!data || data.length === 0) return [];
+      const paths: string[] = [];
+      for (const item of data) {
+        const itemPath = `${prefix}/${item.name}`;
+        if (!item.id) {
+          // subfolder — recurse
+          paths.push(...await collectAll(itemPath));
+        } else {
+          paths.push(itemPath);
+        }
+      }
+      return paths;
+    };
+
+    try {
+      const allPaths = await collectAll(folderPath);
+      // Also include the placeholder at root of folder
+      allPaths.push(`${folderPath}/${PLACEHOLDER}`);
+
+      if (allPaths.length > 0) {
+        const { error } = await supabase.storage.from(config.bucket).remove(allPaths);
+        if (error) {
+          toast.error(`Erro ao excluir pasta: ${error.message}`);
+          return;
+        }
+      }
+      toast.success(`Pasta "${name}" excluída`);
+      fetchItems();
+    } catch (err: any) {
+      toast.error(`Erro ao excluir pasta: ${err.message || 'erro desconhecido'}`);
     }
-    // Also remove placeholder
-    await supabase.storage.from(config.bucket).remove([`${folderPath}/${PLACEHOLDER}`]);
-    toast.success(`Pasta "${name}" excluída`);
-    fetchItems();
   };
 
   /* ── Rename folder ── */
@@ -216,6 +243,36 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     setCreating(false);
     setRenameTarget(null);
     setRenameName('');
+    fetchItems();
+  };
+
+  /* ── Rename file ── */
+  const handleRenameFile = async () => {
+    if (!renameFileTarget || !renameFileName.trim() || renameFileName.trim() === renameFileTarget) {
+      setRenameFileTarget(null);
+      return;
+    }
+    const newName = renameFileName.trim();
+    const oldPath = fullPath ? `${fullPath}/${renameFileTarget}` : renameFileTarget;
+    const newPath = fullPath ? `${fullPath}/${newName}` : newName;
+
+    setCreating(true);
+    const { data: fileData } = await supabase.storage.from(config.bucket).download(oldPath);
+    if (fileData) {
+      const { error: uploadErr } = await supabase.storage.from(config.bucket).upload(newPath, fileData, { upsert: true });
+      if (uploadErr) {
+        toast.error(`Erro ao renomear: ${uploadErr.message}`);
+        setCreating(false);
+        return;
+      }
+      await supabase.storage.from(config.bucket).remove([oldPath]);
+      toast.success(`Arquivo renomeado para "${newName}"`);
+    } else {
+      toast.error('Erro ao baixar arquivo para renomear');
+    }
+    setCreating(false);
+    setRenameFileTarget(null);
+    setRenameFileName('');
     fetchItems();
   };
 
@@ -463,6 +520,9 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownload(file.name)} title="Download">
                               <Download className="w-3.5 h-3.5" />
                             </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenameFileTarget(file.name); setRenameFileName(file.name); }} title="Renomear">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => handleDeleteFile(file.name)} title="Excluir">
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -517,6 +577,29 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameTarget(null)}>Cancelar</Button>
             <Button onClick={handleRenameFolder} disabled={!renameName.trim() || creating}>
+              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Pencil className="w-4 h-4 mr-1" />}
+              Renomear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename file dialog */}
+      <Dialog open={!!renameFileTarget} onOpenChange={open => !open && setRenameFileTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renomear Arquivo</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Novo nome do arquivo"
+            value={renameFileName}
+            onChange={e => setRenameFileName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRenameFile()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameFileTarget(null)}>Cancelar</Button>
+            <Button onClick={handleRenameFile} disabled={!renameFileName.trim() || creating}>
               {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Pencil className="w-4 h-4 mr-1" />}
               Renomear
             </Button>

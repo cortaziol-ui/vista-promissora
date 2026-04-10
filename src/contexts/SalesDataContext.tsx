@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface Parcela {
   valor: number;
@@ -311,25 +312,42 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from('clientes').insert(row as any).select().single();
     if (data && !error) {
       setClientes(prev => [...prev, mapRowToCliente(data)]);
+    } else if (error) {
+      toast.error('Erro ao adicionar cliente: ' + error.message);
     }
   }, []);
 
   const updateCliente = useCallback(async (id: number, partial: Partial<Cliente>) => {
+    const backup = clientes;
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...partial } : c));
     const row = mapClienteToRow(partial);
-    await supabase.from('clientes').update(row).eq('id', id);
-  }, []);
+    const { error } = await supabase.from('clientes').update(row).eq('id', id);
+    if (error) {
+      setClientes(backup);
+      toast.error('Erro ao atualizar cliente: ' + error.message);
+    }
+  }, [clientes]);
 
   const bulkUpdateClientes = useCallback(async (ids: number[], partial: Partial<Cliente>) => {
+    const backup = clientes;
     setClientes(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...partial } : c));
     const row = mapClienteToRow(partial);
-    await supabase.from('clientes').update(row).in('id', ids);
-  }, []);
+    const { error } = await supabase.from('clientes').update(row).in('id', ids);
+    if (error) {
+      setClientes(backup);
+      toast.error('Erro ao atualizar clientes: ' + error.message);
+    }
+  }, [clientes]);
 
   const deleteCliente = useCallback(async (id: number) => {
+    const backup = clientes;
     setClientes(prev => prev.filter(c => c.id !== id));
-    await supabase.from('clientes').delete().eq('id', id);
-  }, []);
+    const { error } = await supabase.from('clientes').delete().eq('id', id);
+    if (error) {
+      setClientes(backup);
+      toast.error('Erro ao excluir cliente: ' + error.message);
+    }
+  }, [clientes]);
 
   return (
     <SalesDataContext.Provider value={{

@@ -250,6 +250,7 @@ export default function PlanilhaPage() {
             <SelectItem value="all">Todos Serviços</SelectItem>
             <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
             <SelectItem value="RATING">Rating</SelectItem>
+            <SelectItem value="LIMPA NOME + RATING">Limpa Nome + Rating</SelectItem>
             <SelectItem value="OUTROS">Outros</SelectItem>
           </SelectContent>
         </Select>
