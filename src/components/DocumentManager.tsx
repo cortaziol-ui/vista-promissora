@@ -62,6 +62,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBeforeSystem = config.driveLink
@@ -154,6 +155,36 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     fetchItems();
+  };
+
+  /* ── Drag & drop upload ── */
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (path.length === 0) return; // only allow upload inside a client folder
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    let ok = 0;
+    for (const file of files) {
+      const filePath = fullPath ? `${fullPath}/${file.name}` : file.name;
+      const { error } = await supabase.storage.from(config.bucket).upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+      if (error) toast.error(`Erro: ${file.name} — ${error.message}`);
+      else ok++;
+    }
+    if (ok > 0) toast.success(`${ok} arquivo(s) enviado(s)`);
+    setUploading(false);
+    fetchItems();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragging(false);
   };
 
   /* ── Delete ── */
@@ -430,7 +461,12 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
           </div>
 
           {/* Content */}
-          <div className="glass-card p-5">
+          <div
+            className={`glass-card p-5 transition-colors ${dragging && path.length > 0 ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -453,7 +489,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                     {filteredFiles.length > 0 && (
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-3 font-medium">Pastas</p>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                       {filteredFolders.map(folder => (
                         <div
                           key={folder.name}
@@ -461,7 +497,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                           onClick={() => openFolder(folder.name)}
                         >
                           <Folder className="w-5 h-5 text-muted-foreground shrink-0" />
-                          <span className="text-sm text-foreground truncate flex-1 select-none">
+                          <span className="text-sm text-white font-medium flex-1 select-none break-words leading-snug">
                             {folder.name}
                           </span>
                           <DropdownMenu>
