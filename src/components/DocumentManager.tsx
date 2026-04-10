@@ -246,28 +246,28 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
     setCreating(true);
 
-    // List all files inside the old folder
-    const { data: folderItems } = await supabase.storage.from(config.bucket).list(oldBase);
-    const allFiles = folderItems || [];
-
-    // Copy each file to the new path, then delete the old
-    for (const item of allFiles) {
-      const oldPath = `${oldBase}/${item.name}`;
-      const newPath = `${newBase}/${item.name}`;
-
-      if (!item.id) {
-        // It's a subfolder — list its contents too
-        const { data: subItems } = await supabase.storage.from(config.bucket).list(oldPath);
-        for (const sub of subItems || []) {
-          const { data: fileData } = await supabase.storage.from(config.bucket).download(`${oldPath}/${sub.name}`);
-          if (fileData) await supabase.storage.from(config.bucket).upload(`${newPath}/${sub.name}`, fileData, { upsert: true });
-          await supabase.storage.from(config.bucket).remove([`${oldPath}/${sub.name}`]);
+    // Recursively collect all file paths
+    const collectAll = async (prefix: string): Promise<string[]> => {
+      const { data } = await supabase.storage.from(config.bucket).list(prefix);
+      if (!data || data.length === 0) return [];
+      const paths: string[] = [];
+      for (const item of data) {
+        const itemPath = `${prefix}/${item.name}`;
+        if (!item.id) {
+          paths.push(...await collectAll(itemPath));
+        } else {
+          paths.push(itemPath);
         }
-      } else {
-        const { data: fileData } = await supabase.storage.from(config.bucket).download(oldPath);
-        if (fileData) await supabase.storage.from(config.bucket).upload(newPath, fileData, { upsert: true });
-        await supabase.storage.from(config.bucket).remove([oldPath]);
       }
+      return paths;
+    };
+
+    const allPaths = await collectAll(oldBase);
+
+    // Move each file using server-side move (no download/upload)
+    for (const oldPath of allPaths) {
+      const newPath = oldBase ? oldPath.replace(oldBase, newBase) : oldPath;
+      await supabase.storage.from(config.bucket).move(oldPath, newPath);
     }
 
     toast.success(`Pasta renomeada para "${newName}"`);
@@ -288,18 +288,11 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     const newPath = fullPath ? `${fullPath}/${newName}` : newName;
 
     setCreating(true);
-    const { data: fileData } = await supabase.storage.from(config.bucket).download(oldPath);
-    if (fileData) {
-      const { error: uploadErr } = await supabase.storage.from(config.bucket).upload(newPath, fileData, { upsert: true });
-      if (uploadErr) {
-        toast.error(`Erro ao renomear: ${uploadErr.message}`);
-        setCreating(false);
-        return;
-      }
-      await supabase.storage.from(config.bucket).remove([oldPath]);
-      toast.success(`Arquivo renomeado para "${newName}"`);
+    const { error } = await supabase.storage.from(config.bucket).move(oldPath, newPath);
+    if (error) {
+      toast.error(`Erro ao renomear: ${error.message}`);
     } else {
-      toast.error('Erro ao baixar arquivo para renomear');
+      toast.success(`Arquivo renomeado para "${newName}"`);
     }
     setCreating(false);
     setRenameFileTarget(null);
