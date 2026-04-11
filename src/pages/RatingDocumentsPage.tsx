@@ -5,7 +5,7 @@ const config = {
   pageSubtitle: 'Gerenciamento de documentos de Rating por cliente',
   bucket: 'documentos',
   pathPrefix: 'rating',
-  defaultSubfolder: 'Documentos Rating',
+  defaultSubfolder: 'Documentos Pessoais',
   breadcrumbRoot: 'Rating',
   driveLink: 'https://drive.google.com/drive/u/2/folders/1mzu3pD6hG9ZejrFCAWdcMEwPtKZwBVTp',
 };
