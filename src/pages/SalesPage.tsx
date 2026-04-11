@@ -108,7 +108,11 @@ export default function SalesPage() {
 
   // Local computed values based on vendedor filter
   const localFaturamento = useMemo(() => localClientes.reduce((s, c) => s + (c.entrada || 0), 0), [localClientes]);
-  const localTotalVendas = localClientes.length;
+  // LIMPA NOME + RATING counts as 2 sales (same rule as useMonthlyData)
+  const localTotalVendas = useMemo(
+    () => localClientes.reduce((s, c) => s + (c.servico === 'LIMPA NOME + RATING' ? 2 : 1), 0),
+    [localClientes],
+  );
   const localTicketMedio = localTotalVendas > 0 ? localFaturamento / localTotalVendas : 0;
   const localPctMeta = filterVendedor === 'all'
     ? pctMeta
