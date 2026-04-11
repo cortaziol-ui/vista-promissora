@@ -113,24 +113,39 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     setCreating(true);
     const basePath = path.length > 0 ? `${fullPath}/${name}` : (config.pathPrefix ? `${config.pathPrefix}/${name}` : name);
 
-    // Create folder placeholder
-    const placeholder = new Blob([''], { type: 'text/plain' });
-    await supabase.storage.from(config.bucket).upload(`${basePath}/${PLACEHOLDER}`, placeholder, { upsert: true });
+    try {
+      const placeholder = new Blob([''], { type: 'text/plain' });
 
-    // If at root level, also create default subfolder
-    if (path.length === 0) {
-      await supabase.storage.from(config.bucket).upload(
-        `${basePath}/${config.defaultSubfolder}/${PLACEHOLDER}`,
-        placeholder,
-        { upsert: true },
-      );
+      const { error: e1 } = await supabase.storage
+        .from(config.bucket)
+        .upload(`${basePath}/${PLACEHOLDER}`, placeholder, { upsert: true });
+      if (e1) throw e1;
+
+      // If at root level, also create default subfolder
+      if (path.length === 0) {
+        const { error: e2 } = await supabase.storage
+          .from(config.bucket)
+          .upload(
+            `${basePath}/${config.defaultSubfolder}/${PLACEHOLDER}`,
+            placeholder,
+            { upsert: true },
+          );
+        if (e2) {
+          console.error('[DocumentManager] default subfolder upload failed', e2);
+          toast.error(`Pasta criada, mas falhou ao criar "${config.defaultSubfolder}": ${e2.message}`);
+        }
+      }
+
+      toast.success(`Pasta "${name}" criada`);
+      setNewFolderOpen(false);
+      setNewFolderName('');
+      fetchItems();
+    } catch (err: any) {
+      console.error('[DocumentManager] create folder failed', err);
+      toast.error(`Erro ao criar pasta: ${err?.message || 'erro desconhecido'}`);
+    } finally {
+      setCreating(false);
     }
-
-    toast.success(`Pasta "${name}" criada`);
-    setCreating(false);
-    setNewFolderOpen(false);
-    setNewFolderName('');
-    fetchItems();
   };
 
   /* ── Upload files ── */
