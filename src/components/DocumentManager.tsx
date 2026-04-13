@@ -17,6 +17,14 @@ import { toast } from 'sonner';
 
 const PLACEHOLDER = '.emptyFolderPlaceholder';
 
+/** Sanitize a name so it only contains ASCII-safe characters for Supabase Storage keys */
+const sanitizeName = (raw: string): string =>
+  raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9 ._\-()]/g, '')
+    .trim();
+
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
@@ -107,7 +115,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
   /* ── Create new client folder ── */
   const handleCreateFolder = async () => {
-    const name = newFolderName.trim();
+    const name = sanitizeName(newFolderName);
     if (!name) return;
 
     setCreating(true);
@@ -126,7 +134,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
         const { error: e2 } = await supabase.storage
           .from(config.bucket)
           .upload(
-            `${basePath}/${config.defaultSubfolder}/${PLACEHOLDER}`,
+            `${basePath}/${sanitizeName(config.defaultSubfolder)}/${PLACEHOLDER}`,
             placeholder,
             { upsert: true },
           );
@@ -157,7 +165,8 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     let ok = 0;
 
     for (const file of Array.from(files)) {
-      const filePath = fullPath ? `${fullPath}/${file.name}` : file.name;
+      const safeName = sanitizeName(file.name);
+      const filePath = fullPath ? `${fullPath}/${safeName}` : safeName;
       const { error } = await supabase.storage.from(config.bucket).upload(filePath, file, {
         cacheControl: '3600',
         upsert: true,
@@ -183,7 +192,8 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     setUploading(true);
     let ok = 0;
     for (const file of files) {
-      const filePath = fullPath ? `${fullPath}/${file.name}` : file.name;
+      const safeName = sanitizeName(file.name);
+      const filePath = fullPath ? `${fullPath}/${safeName}` : safeName;
       const { error } = await supabase.storage.from(config.bucket).upload(filePath, file, {
         cacheControl: '3600',
         upsert: true,
@@ -255,7 +265,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
       setRenameTarget(null);
       return;
     }
-    const newName = renameName.trim();
+    const newName = sanitizeName(renameName);
     const oldBase = fullPath ? `${fullPath}/${renameTarget}` : renameTarget;
     const newBase = fullPath ? `${fullPath}/${newName}` : newName;
 
@@ -298,7 +308,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
       setRenameFileTarget(null);
       return;
     }
-    const newName = renameFileName.trim();
+    const newName = sanitizeName(renameFileName);
     const oldPath = fullPath ? `${fullPath}/${renameFileTarget}` : renameFileTarget;
     const newPath = fullPath ? `${fullPath}/${newName}` : newName;
 
