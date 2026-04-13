@@ -17,10 +17,13 @@ import { toast } from 'sonner';
 
 const PLACEHOLDER = '.emptyFolderPlaceholder';
 
-/** Remove only characters that Supabase Storage actually rejects (control chars, slashes) */
+/** Normalize to ASCII-safe name for Supabase Storage (keeps legibility) */
 const sanitizeName = (raw: string): string =>
   raw
-    .replace(/[\x00-\x1f\x7f\\]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w .\-()]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
 const MONTHS = [
