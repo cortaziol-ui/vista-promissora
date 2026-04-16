@@ -8,6 +8,7 @@ import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/l
 import { useAccountContext } from '@/contexts/AccountContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
@@ -41,6 +42,7 @@ interface CampaignData {
 }
 
 export default function MarketingPage() {
+  const { activeAccountId } = useTenant();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -59,9 +61,10 @@ export default function MarketingPage() {
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
   useEffect(() => {
-    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+    if (!activeAccountId) return;
+    supabase.from('app_settings').select('value').eq('account_id', activeAccountId).eq('key', 'meta_access_token').maybeSingle()
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => {
     if (!accessToken || !activeAccount?.ad_account_id) {

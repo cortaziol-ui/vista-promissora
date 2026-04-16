@@ -5,6 +5,7 @@ import { useSalesData, type Cliente } from '@/contexts/SalesDataContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DollarSign, TrendingUp, TrendingDown, Percent, AlertTriangle, Plus, Pencil, Trash2, CalendarDays, Check } from 'lucide-react';
@@ -65,6 +66,7 @@ function subMonths(ym: string, n: number): string {
 }
 
 export default function FinancialPage() {
+  const { activeAccountId } = useTenant();
   const { clientes } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const { filteredClientes } = useMonthlyData(selectedMonth);
@@ -93,15 +95,16 @@ export default function FinancialPage() {
 
   // Fetch custos
   const fetchCustos = useCallback(async () => {
+    if (!activeAccountId) return;
     try {
-      const { data } = await (supabase.from as any)('custos_mensais').select('*').order('created_at');
+      const { data } = await (supabase.from as any)('custos_mensais').select('*').eq('account_id', activeAccountId).order('created_at');
       if (data) setCustos(data as Custo[]);
     } catch (e) {
       console.error('[FinancialPage] Error fetching custos:', e);
     } finally {
       setCustosLoading(false);
     }
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => { fetchCustos(); }, [fetchCustos]);
 
@@ -120,6 +123,7 @@ export default function FinancialPage() {
     const inserts = prevFixedCosts.map(c => ({
       nome: c.nome, tipo: 'fixo', valor: c.valor,
       mes_referencia: selectedMonth, categoria: c.categoria, pago: false,
+      account_id: activeAccountId,
     }));
     (supabase.from as any)('custos_mensais').insert(inserts).then(() => fetchCustos());
   }, [custos, custosLoading, selectedMonth, fetchCustos]);
@@ -279,6 +283,7 @@ export default function FinancialPage() {
       await (supabase.from as any)('custos_mensais').insert({
         nome: custoForm.nome, tipo: custoForm.tipo, valor: custoForm.valor,
         mes_referencia: selectedMonth, categoria: custoForm.categoria,
+        account_id: activeAccountId,
       });
       toast({ title: 'Custo adicionado' });
     }

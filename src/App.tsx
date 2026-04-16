@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { TenantProvider } from "@/contexts/TenantContext";
 import { SalesDataProvider } from "@/contexts/SalesDataContext";
 import { AccountProvider } from "@/contexts/AccountContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -22,6 +23,7 @@ import FichaRatingPage from "./pages/FichaRatingPage";
 import FichasRespostasPage from "./pages/FichasRespostasPage";
 import DocumentosPage from "./pages/DocumentosPage";
 import RatingDocumentsPage from "./pages/RatingDocumentsPage";
+import PainelControlePage from "./pages/PainelControlePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -114,6 +116,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to={defaultRoute} replace /> : <LoginPage />} />
 
       <Route path="/" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><OverviewPage /></ProtectedRoute>} />
+      <Route path="/painel" element={<ProtectedRoute roles={['admin']}><PainelControlePage /></ProtectedRoute>} />
       <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><MarketingPage /></ProtectedRoute>} />
       <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><SatisfactionPage /></ProtectedRoute>} />
       <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><PlanilhaPage /></ProtectedRoute>} />
@@ -142,13 +145,15 @@ const App = () => (
         <Toaster />
         <Sonner />
         <AuthProvider>
-          <AccountProvider>
-            <SalesDataProvider>
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </SalesDataProvider>
-          </AccountProvider>
+          <TenantProvider>
+            <AccountProvider>
+              <SalesDataProvider>
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </SalesDataProvider>
+            </AccountProvider>
+          </TenantProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

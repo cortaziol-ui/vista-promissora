@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import type { MetaCampaign } from '@/lib/metaAdsApi';
 import { matchAllCampaigns, type VendorAlias, type CampaignLink } from '@/lib/campaignMatcher';
 
@@ -10,16 +11,18 @@ interface UseCampaignLinksParams {
 }
 
 export function useCampaignLinks({ campaigns, vendedores, month }: UseCampaignLinksParams) {
+  const { activeAccountId } = useTenant();
   const [aliases, setAliases] = useState<VendorAlias[]>([]);
   const [existingLinks, setExistingLinks] = useState<CampaignLink[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    if (!activeAccountId) return;
     setLoading(true);
     try {
       const [aliasRes, linkRes] = await Promise.all([
-        (supabase.from as any)('vendor_aliases').select('*'),
-        (supabase.from as any)('campaign_vendor_links').select('*').eq('month', month),
+        (supabase.from as any)('vendor_aliases').select('*').eq('account_id', activeAccountId),
+        (supabase.from as any)('campaign_vendor_links').select('*').eq('account_id', activeAccountId).eq('month', month),
       ]);
       if (aliasRes.data) setAliases(aliasRes.data as VendorAlias[]);
       if (linkRes.data) {
@@ -36,7 +39,7 @@ export function useCampaignLinks({ campaigns, vendedores, month }: UseCampaignLi
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [month, activeAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -47,6 +50,7 @@ export function useCampaignLinks({ campaigns, vendedores, month }: UseCampaignLi
   const saveLink = useCallback(async (
     campaignId: string, campaignName: string, vendedorId: number | null, vendedorNome: string | null
   ) => {
+    if (!activeAccountId) return;
     await (supabase.from as any)('campaign_vendor_links').upsert({
       campaign_id: campaignId,
       campaign_name: campaignName,
@@ -54,12 +58,14 @@ export function useCampaignLinks({ campaigns, vendedores, month }: UseCampaignLi
       vendedor_nome: vendedorNome,
       is_manual_override: true,
       month,
+      account_id: activeAccountId,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'campaign_id,month' });
+    }, { onConflict: 'account_id,campaign_id,month' });
     await fetchData();
-  }, [month, fetchData]);
+  }, [month, activeAccountId, fetchData]);
 
   const saveBulkLinks = useCallback(async (linksToSave: CampaignLink[]) => {
+    if (!activeAccountId) return;
     const rows = linksToSave.map(l => ({
       campaign_id: l.campaign_id,
       campaign_name: l.campaign_name,
@@ -67,11 +73,12 @@ export function useCampaignLinks({ campaigns, vendedores, month }: UseCampaignLi
       vendedor_nome: l.vendedor_nome,
       is_manual_override: l.is_manual_override,
       month,
+      account_id: activeAccountId,
       updated_at: new Date().toISOString(),
     }));
-    await (supabase.from as any)('campaign_vendor_links').upsert(rows, { onConflict: 'campaign_id,month' });
+    await (supabase.from as any)('campaign_vendor_links').upsert(rows, { onConflict: 'account_id,campaign_id,month' });
     await fetchData();
-  }, [month, fetchData]);
+  }, [month, activeAccountId, fetchData]);
 
   return { links, aliases, loading, saveLink, saveBulkLinks, refreshLinks: fetchData };
 }

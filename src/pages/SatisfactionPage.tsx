@@ -4,6 +4,7 @@ import { KpiCard } from '@/components/KpiCard';
 import { SmilePlus, Smile, Meh, Frown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface NPSEntry {
   id: string;
@@ -13,6 +14,7 @@ interface NPSEntry {
 }
 
 export default function SatisfactionPage() {
+  const { activeAccountId } = useTenant();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -20,12 +22,13 @@ export default function SatisfactionPage() {
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
   useEffect(() => {
+    if (!activeAccountId) return;
     const fetchNps = async () => {
-      const { data } = await supabase.from('nps_entries').select('*');
+      const { data } = await supabase.from('nps_entries').select('*').eq('account_id', activeAccountId);
       if (data) setNpsEntries(data);
     };
     fetchNps();
-  }, []);
+  }, [activeAccountId]);
 
   const monthEntries = useMemo(() => {
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;

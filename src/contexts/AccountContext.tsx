@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface MetaAccount {
   id: string;
@@ -31,14 +32,21 @@ const AccountContext = createContext<AccountContextValue>({
 });
 
 export function AccountProvider({ children }: { children: React.ReactNode }) {
+  const { activeAccountId } = useTenant();
   const [accounts, setAccounts] = useState<MetaAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    if (!activeAccountId) {
+      setAccounts([]);
+      setLoading(false);
+      return;
+    }
     try {
       const { data } = await supabase
         .from('meta_accounts')
         .select('*')
+        .eq('account_id', activeAccountId)
         .order('created_at', { ascending: true });
       setAccounts((data as MetaAccount[]) ?? []);
     } catch (e) {
@@ -46,7 +54,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -54,33 +62,34 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   const switchAccount = useCallback(async (id: string) => {
     setAccounts(prev => prev.map(a => ({ ...a, is_active: a.id === id })));
-    await supabase.from('meta_accounts').update({ is_active: false }).neq('id', id);
+    await supabase.from('meta_accounts').update({ is_active: false }).eq('account_id', activeAccountId!).neq('id', id);
     await supabase.from('meta_accounts').update({ is_active: true }).eq('id', id);
     const account = accounts.find(a => a.id === id);
-    if (account) {
+    if (account && activeAccountId) {
       await supabase.from('app_settings').upsert(
-        [{ key: 'meta_ad_account_id', value: account.ad_account_id }],
-        { onConflict: 'key' }
+        [{ key: 'meta_ad_account_id', value: account.ad_account_id, account_id: activeAccountId } as any],
+        { onConflict: 'account_id,key' }
       );
     }
-  }, [accounts]);
+  }, [accounts, activeAccountId]);
 
   const addAccount = useCallback(async (name: string, adAccountId: string) => {
+    if (!activeAccountId) throw new Error('No active tenant');
     const isFirst = accounts.length === 0;
     const { data, error } = await supabase
       .from('meta_accounts')
-      .insert({ name, access_token: '', ad_account_id: adAccountId, is_active: isFirst })
+      .insert({ name, access_token: '', ad_account_id: adAccountId, is_active: isFirst, account_id: activeAccountId } as any)
       .select().single();
     if (error) throw new Error(error.message);
     if (isFirst) {
       await supabase.from('app_settings').upsert(
-        [{ key: 'meta_ad_account_id', value: adAccountId }],
-        { onConflict: 'key' }
+        [{ key: 'meta_ad_account_id', value: adAccountId, account_id: activeAccountId } as any],
+        { onConflict: 'account_id,key' }
       );
     }
     await load();
     return data as MetaAccount;
-  }, [accounts.length, load]);
+  }, [accounts.length, load, activeAccountId]);
 
   const updateAccountName = useCallback(async (id: string, name: string) => {
     await supabase.from('meta_accounts').update({ name }).eq('id', id);

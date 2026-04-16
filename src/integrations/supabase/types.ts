@@ -14,32 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          logo_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          logo_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          logo_url?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
+          account_id: string
           key: string
           updated_at: string | null
           value: string
         }
         Insert: {
+          account_id: string
           key: string
           updated_at?: string | null
           value: string
         }
         Update: {
+          account_id?: string
           key?: string
           updated_at?: string | null
           value?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clientes: {
         Row: {
+          account_id: string
           cpf: string | null
           created_at: string
           data: string
           email: string | null
           entrada: number
           id: number
+          link: string | null
           nascimento: string | null
           nome: string
           parcela1_data_pagamento: string | null
@@ -48,6 +85,9 @@ export type Database = {
           parcela2_data_pagamento: string | null
           parcela2_status: string
           parcela2_valor: number
+          parcela3_data_pagamento: string | null
+          parcela3_status: string
+          parcela3_valor: number
           servico: string
           situacao: string
           telefone: string | null
@@ -55,12 +95,14 @@ export type Database = {
           vendedor: string
         }
         Insert: {
+          account_id: string
           cpf?: string | null
           created_at?: string
           data: string
           email?: string | null
           entrada?: number
           id?: number
+          link?: string | null
           nascimento?: string | null
           nome: string
           parcela1_data_pagamento?: string | null
@@ -69,6 +111,9 @@ export type Database = {
           parcela2_data_pagamento?: string | null
           parcela2_status?: string
           parcela2_valor?: number
+          parcela3_data_pagamento?: string | null
+          parcela3_status?: string
+          parcela3_valor?: number
           servico?: string
           situacao?: string
           telefone?: string | null
@@ -76,12 +121,14 @@ export type Database = {
           vendedor: string
         }
         Update: {
+          account_id?: string
           cpf?: string | null
           created_at?: string
           data?: string
           email?: string | null
           entrada?: number
           id?: number
+          link?: string | null
           nascimento?: string | null
           nome?: string
           parcela1_data_pagamento?: string | null
@@ -90,16 +137,28 @@ export type Database = {
           parcela2_data_pagamento?: string | null
           parcela2_status?: string
           parcela2_valor?: number
+          parcela3_data_pagamento?: string | null
+          parcela3_status?: string
+          parcela3_valor?: number
           servico?: string
           situacao?: string
           telefone?: string | null
           valor_total?: number
           vendedor?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_settings: {
         Row: {
+          account_id: string
           created_at: string
           id: string
           key: string
@@ -107,6 +166,7 @@ export type Database = {
           value: Json
         }
         Insert: {
+          account_id: string
           created_at?: string
           id?: string
           key: string
@@ -114,17 +174,27 @@ export type Database = {
           value?: Json
         }
         Update: {
+          account_id?: string
           created_at?: string
           id?: string
           key?: string
           updated_at?: string
           value?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meta_accounts: {
         Row: {
           access_token: string
+          account_id: string
           ad_account_id: string
           created_at: string
           id: string
@@ -133,6 +203,7 @@ export type Database = {
         }
         Insert: {
           access_token?: string
+          account_id: string
           ad_account_id: string
           created_at?: string
           id?: string
@@ -141,16 +212,26 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          account_id?: string
           ad_account_id?: string
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meta_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nps_entries: {
         Row: {
+          account_id: string
           comment: string | null
           created_at: string
           date: string
@@ -158,6 +239,7 @@ export type Database = {
           score: number
         }
         Insert: {
+          account_id: string
           comment?: string | null
           created_at?: string
           date?: string
@@ -165,13 +247,57 @@ export type Database = {
           score: number
         }
         Update: {
+          account_id?: string
           comment?: string | null
           created_at?: string
           date?: string
           id?: string
           score?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nps_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_accounts: {
+        Row: {
+          id: string
+          user_id: string
+          account_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          is_default: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          account_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          is_default?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          account_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          is_default?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -193,6 +319,7 @@ export type Database = {
       }
       vendedores: {
         Row: {
+          account_id: string
           avatar: string
           cargo: string
           created_at: string
@@ -202,6 +329,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          account_id: string
           avatar?: string
           cargo?: string
           created_at?: string
@@ -211,6 +339,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          account_id?: string
           avatar?: string
           cargo?: string
           created_at?: string
@@ -219,7 +348,15 @@ export type Database = {
           nome?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -235,7 +372,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "seller"
+      app_role: "admin" | "manager" | "seller" | "administrativo" | "financeiro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -363,7 +500,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "seller"],
+      app_role: ["admin", "manager", "seller", "administrativo", "financeiro"],
     },
   },
 } as const

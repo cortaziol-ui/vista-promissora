@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { fetchCampaignInsights, type MetaInsights } from '@/lib/metaAdsApi';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -37,6 +38,7 @@ export default function OverviewPage() {
   const availableMonths = useAvailableMonths(clientes);
   const { isSeller } = useAuth();
   const { activeAccount } = useAccountContext();
+  const { activeAccountId } = useTenant();
 
   // Meta Ads state
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -45,9 +47,10 @@ export default function OverviewPage() {
 
   // Load Meta token
   useEffect(() => {
-    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+    if (!activeAccountId) return;
+    supabase.from('app_settings').select('value').eq('account_id', activeAccountId).eq('key', 'meta_access_token').maybeSingle()
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => {
     if (!accessToken || !activeAccount?.ad_account_id) {

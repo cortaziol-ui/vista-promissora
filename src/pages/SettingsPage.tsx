@@ -8,6 +8,7 @@ import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { matchAllCampaigns } from '@/lib/campaignMatcher';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound } from 'lucide-react';
@@ -36,6 +37,7 @@ const MESES = [
 ];
 
 export default function SettingsPage() {
+  const { activeAccountId } = useTenant();
   const { isAdmin, isManager } = useAuth();
   const {
     vendedores,
@@ -122,7 +124,8 @@ export default function SettingsPage() {
   const [tiers, setTiers] = useState<Tier[]>([]);
 
   const fetchTiers = useCallback(async () => {
-    const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+    if (!activeAccountId) return;
+    const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
     if (data && data.length > 0) {
       setTiers(data as Tier[]);
       return;
@@ -130,7 +133,7 @@ export default function SettingsPage() {
     // No tiers for this month — copy from previous month
     const prevDate = new Date(year, Number(selectedMonth) - 2, 1);
     const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-    const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('month', prevYM).is('vendedor_id', null).order('sort_order');
+    const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', prevYM).is('vendedor_id', null).order('sort_order');
     if (prevData && prevData.length > 0) {
       const inserts = prevData.map((t: any) => ({
         month: monthYM,
@@ -139,15 +142,16 @@ export default function SettingsPage() {
         pct_meta: t.pct_meta,
         premiacao: t.premiacao,
         sort_order: t.sort_order,
+        account_id: activeAccountId,
       }));
       await (supabase.from as any)('commission_tiers').insert(inserts);
       // Re-fetch after insert
-      const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+      const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
       if (newData) setTiers(newData as Tier[]);
     } else {
       setTiers([]);
     }
-  }, [monthYM, year, selectedMonth]);
+  }, [monthYM, year, selectedMonth, activeAccountId]);
 
   useEffect(() => { fetchTiers(); }, [fetchTiers]);
 
@@ -163,9 +167,10 @@ export default function SettingsPage() {
 
   // Load access token
   useEffect(() => {
-    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+    if (!activeAccountId) return;
+    supabase.from('app_settings').select('value').eq('account_id', activeAccountId).eq('key', 'meta_access_token').maybeSingle()
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
-  }, []);
+  }, [activeAccountId]);
 
   // Load campaigns when month/token/account changes
   const loadCampaigns = useCallback(async () => {

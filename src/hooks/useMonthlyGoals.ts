@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface MonthlyGoals {
   metaEmpresaVendas: number;
@@ -15,6 +16,7 @@ interface MonthlyGoals {
 }
 
 export function useMonthlyGoals(month: string): MonthlyGoals {
+  const { activeAccountId } = useTenant();
   const {
     metaEmpresaVendas: globalMetaEmpresa,
     metaComercialVendas: globalMetaComercial,
@@ -38,11 +40,13 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
       // Fetch company goals for this month
       const { data: companyGoals } = await (supabase.from as any)('monthly_goals')
         .select('*')
+        .eq('account_id', activeAccountId)
         .eq('month', month);
 
       // Fetch vendor goals for this month
       const { data: vGoals } = await (supabase.from as any)('vendor_monthly_goals')
         .select('*')
+        .eq('account_id', activeAccountId)
         .eq('month', month);
 
       if (cancelled) return;
@@ -78,35 +82,39 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
 
     fetch();
     return () => { cancelled = true; };
-  }, [month, globalMetaEmpresa, globalMetaComercial, globalMetaMensal, vendedores]);
+  }, [month, activeAccountId, globalMetaEmpresa, globalMetaComercial, globalMetaMensal, vendedores]);
 
   const setMetaEmpresaVendas = useCallback(async (value: number) => {
+    if (!activeAccountId) return;
     setMetaEmpresaState(value);
     await (supabase.from as any)('monthly_goals')
-      .upsert({ month, key: 'meta_empresa_vendas', value }, { onConflict: 'month,key' });
-  }, [month]);
+      .upsert({ month, key: 'meta_empresa_vendas', value, account_id: activeAccountId }, { onConflict: 'account_id,month,key' });
+  }, [month, activeAccountId]);
 
   const setMetaComercialVendas = useCallback(async (value: number) => {
+    if (!activeAccountId) return;
     setMetaComercialState(value);
     await (supabase.from as any)('monthly_goals')
-      .upsert({ month, key: 'meta_comercial_vendas', value }, { onConflict: 'month,key' });
-  }, [month]);
+      .upsert({ month, key: 'meta_comercial_vendas', value, account_id: activeAccountId }, { onConflict: 'account_id,month,key' });
+  }, [month, activeAccountId]);
 
   const setMetaMensalGlobalFn = useCallback(async (value: number) => {
+    if (!activeAccountId) return;
     setMetaMensalState(value);
     await (supabase.from as any)('monthly_goals')
-      .upsert({ month, key: 'meta_mensal', value }, { onConflict: 'month,key' });
-  }, [month]);
+      .upsert({ month, key: 'meta_mensal', value, account_id: activeAccountId }, { onConflict: 'account_id,month,key' });
+  }, [month, activeAccountId]);
 
   const setVendorGoal = useCallback(async (vendedorId: number, value: number) => {
+    if (!activeAccountId) return;
     setVendorGoals(prev => {
       const next = new Map(prev);
       next.set(vendedorId, value);
       return next;
     });
     await (supabase.from as any)('vendor_monthly_goals')
-      .upsert({ month, vendedor_id: vendedorId, meta: value }, { onConflict: 'month,vendedor_id' });
-  }, [month]);
+      .upsert({ month, vendedor_id: vendedorId, meta: value, account_id: activeAccountId }, { onConflict: 'account_id,month,vendedor_id' });
+  }, [month, activeAccountId]);
 
   return {
     metaEmpresaVendas,

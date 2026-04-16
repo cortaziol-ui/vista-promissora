@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { toast } from '@/components/ui/sonner';
 
 export interface RoletaSpinRecord {
@@ -87,15 +88,18 @@ function parseLocalDateTime(data: string, hora: string): string {
 
 export function useRoletaSpins() {
   const { user } = useAuth();
+  const { activeAccountId } = useTenant();
   const [spins, setSpins] = useState<RoletaSpinRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const migratedRef = useRef(false);
 
   // --- Fetch spins from Supabase ---
   const fetchSpins = useCallback(async () => {
+    if (!activeAccountId) return [];
     try {
       const { data, error } = await (supabase.from as any)('roleta_spins')
         .select('*')
+        .eq('account_id', activeAccountId)
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -113,7 +117,7 @@ export function useRoletaSpins() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeAccountId]);
 
   // --- Migrate localStorage data to Supabase (once) ---
   const migrateLocalStorage = useCallback(async (userId: string) => {
@@ -248,6 +252,7 @@ export function useRoletaSpins() {
             hora: record.hora,
             status: record.status,
             created_by: user.id,
+            account_id: activeAccountId,
           })
           .select()
           .single();

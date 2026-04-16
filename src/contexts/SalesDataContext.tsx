@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { toast } from 'sonner';
 
 export interface Parcela {
@@ -136,6 +137,7 @@ function mapClienteToRow(c: Partial<Cliente>) {
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
+  const { activeAccountId, loading: tenantLoading } = useTenant();
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(450000);
@@ -143,24 +145,31 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [metaComercialVendas, setMetaComercialVendasState] = useState<number>(30);
   const [loading, setLoading] = useState(true);
 
-  // Helper to fetch all clientes
+  // Helper to fetch all clientes for the active account
   const fetchClientes = useCallback(async () => {
-    const { data } = await supabase.from('clientes').select('*').order('id');
+    if (!activeAccountId) return;
+    const { data } = await supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id');
     if (data) {
       setClientes(data.map(mapRowToCliente));
     }
-  }, []);
+  }, [activeAccountId]);
 
-  // Fetch initial data
+  // Fetch initial data — re-runs when activeAccountId changes
   useEffect(() => {
+    if (tenantLoading || !activeAccountId) {
+      if (!tenantLoading && !activeAccountId) setLoading(false);
+      return;
+    }
+
     const fetchAll = async () => {
+      setLoading(true);
       try {
         const [vendRes, cliRes, settRes, metaEmpRes, metaComRes] = await Promise.all([
-          supabase.from('vendedores').select('*').order('id'),
-          supabase.from('clientes').select('*').order('id'),
-          supabase.from('company_settings').select('*').eq('key', 'meta_mensal').maybeSingle(),
-          supabase.from('company_settings').select('*').eq('key', 'meta_empresa_vendas').maybeSingle(),
-          supabase.from('company_settings').select('*').eq('key', 'meta_comercial_vendas').maybeSingle(),
+          supabase.from('vendedores').select('*').eq('account_id', activeAccountId).order('id'),
+          supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id'),
+          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_mensal').maybeSingle(),
+          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_empresa_vendas').maybeSingle(),
+          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_comercial_vendas').maybeSingle(),
         ]);
 
         if (vendRes.data) {
@@ -181,14 +190,20 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
         if (settRes.data) {
           setMetaMensalGlobalState(Number(settRes.data.value) || 450000);
+        } else {
+          setMetaMensalGlobalState(450000);
         }
 
         if (metaEmpRes.data) {
           setMetaEmpresaVendasState(Number(metaEmpRes.data.value) || 30);
+        } else {
+          setMetaEmpresaVendasState(30);
         }
 
         if (metaComRes.data) {
           setMetaComercialVendasState(Number(metaComRes.data.value) || 30);
+        } else {
+          setMetaComercialVendasState(30);
         }
       } catch (e) {
         console.error("[SalesDataProvider] Error fetching data:", e);
@@ -198,25 +213,27 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     };
 
     fetchAll();
-  }, []);
+  }, [activeAccountId, tenantLoading]);
 
-  // Supabase realtime subscription for clientes
+  // Supabase realtime subscription for clientes (filtered by account)
   useEffect(() => {
+    if (!activeAccountId) return;
+
     const channel = supabase
-      .channel('clientes-realtime')
+      .channel(`clientes-realtime-${activeAccountId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'clientes' },
+        { event: 'INSERT', schema: 'public', table: 'clientes', filter: `account_id=eq.${activeAccountId}` },
         () => { fetchClientes(); }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'clientes' },
+        { event: 'UPDATE', schema: 'public', table: 'clientes', filter: `account_id=eq.${activeAccountId}` },
         () => { fetchClientes(); }
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'clientes' },
+        { event: 'DELETE', schema: 'public', table: 'clientes', filter: `account_id=eq.${activeAccountId}` },
         () => { fetchClientes(); }
       )
       .subscribe((status) => {
@@ -228,36 +245,42 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchClientes]);
+  }, [fetchClientes, activeAccountId]);
 
   const setMetaMensalGlobal = useCallback(async (v: number) => {
+    if (!activeAccountId) return;
     setMetaMensalGlobalState(v);
     await supabase
       .from('company_settings')
       .update({ value: v as any })
+      .eq('account_id', activeAccountId)
       .eq('key', 'meta_mensal');
-  }, []);
+  }, [activeAccountId]);
 
   const setMetaEmpresaVendas = useCallback(async (v: number) => {
+    if (!activeAccountId) return;
     setMetaEmpresaVendasState(v);
     await supabase
       .from('company_settings')
-      .upsert({ key: 'meta_empresa_vendas', value: v as any } as any, { onConflict: 'key' });
-  }, []);
+      .upsert({ key: 'meta_empresa_vendas', value: v as any, account_id: activeAccountId } as any, { onConflict: 'account_id,key' });
+  }, [activeAccountId]);
 
   const setMetaComercialVendas = useCallback(async (v: number) => {
+    if (!activeAccountId) return;
     setMetaComercialVendasState(v);
     await supabase
       .from('company_settings')
-      .upsert({ key: 'meta_comercial_vendas', value: v as any } as any, { onConflict: 'key' });
-  }, []);
+      .upsert({ key: 'meta_comercial_vendas', value: v as any, account_id: activeAccountId } as any, { onConflict: 'account_id,key' });
+  }, [activeAccountId]);
 
   const addVendedor = useCallback(async (v: Omit<Vendedor, 'id'>): Promise<Vendedor | null> => {
+    if (!activeAccountId) return null;
     const { data, error } = await supabase.from('vendedores').insert({
       nome: v.nome,
       cargo: v.cargo,
       meta: v.meta,
       avatar: v.avatar,
+      account_id: activeAccountId,
       ...(v.aniversario ? { aniversario: v.aniversario } : {}),
       ...(v.foto ? { foto: v.foto } : {}),
     } as any).select().single();
@@ -268,7 +291,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       return newV;
     }
     return null;
-  }, []);
+  }, [activeAccountId]);
 
   const deleteVendedor = useCallback(async (id: number): Promise<boolean> => {
     const vendedor = vendedores.find(v => v.id === id);
@@ -294,6 +317,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addCliente = useCallback(async (c: Omit<Cliente, 'id'>) => {
+    if (!activeAccountId) return;
     const row = mapClienteToRow(c as Partial<Cliente>);
     row.data = c.data;
     row.nome = c.nome;
@@ -308,6 +332,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     row.parcela2_data_pagamento = c.parcela2.dataPagamento || null;
     row.situacao = c.situacao;
     row.valor_total = c.valorTotal;
+    row.account_id = activeAccountId;
 
     const { data, error } = await supabase.from('clientes').insert(row as any).select().single();
     if (data && !error) {
@@ -315,7 +340,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     } else if (error) {
       toast.error('Erro ao adicionar cliente: ' + error.message);
     }
-  }, []);
+  }, [activeAccountId]);
 
   const updateCliente = useCallback(async (id: number, partial: Partial<Cliente>) => {
     const backup = clientes;

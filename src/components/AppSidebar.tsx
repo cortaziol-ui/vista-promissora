@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen, ChevronRight,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen, ChevronRight, Building2, ChevronDown, LayoutDashboard,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
@@ -40,6 +41,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { user, logout } = useAuth();
+  const { accounts, activeAccount, isMultiTenant, switchAccount } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -51,6 +53,8 @@ export function AppSidebar() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('app-theme') as 'dark' | 'light') || 'dark';
   });
+
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -67,12 +71,84 @@ export function AppSidebar() {
     navigate('/login');
   };
 
+  const handleSwitchAccount = (accountId: string) => {
+    switchAccount(accountId);
+    setAccountMenuOpen(false);
+    // Stay on current page — data will reload via TenantContext
+  };
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="p-4 flex justify-center">
           <img src="/logo-outcom.png" alt="out.com" className={collapsed ? "w-8 shrink-0 rounded-lg" : "w-28 shrink-0 rounded-xl"} />
         </div>
+
+        {/* Account Switcher — only visible for multi-tenant users */}
+        {isMultiTenant && !collapsed && (
+          <div className="px-3 mb-2">
+            <div className="relative">
+              <button
+                onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+                className="w-full flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/50 px-3 py-2 text-left hover:bg-secondary transition-colors"
+              >
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Subconta</p>
+                  <p className="text-sm font-medium truncate">{activeAccount?.name || 'Selecionar'}</p>
+                </div>
+                <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${accountMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {accountMenuOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-popover shadow-lg z-50">
+                  {/* Painel de Controle link */}
+                  {userRole === 'admin' && (
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        navigate('/painel');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors rounded-t-lg border-b border-border/50"
+                    >
+                      <LayoutDashboard className="h-3.5 w-3.5 text-primary" />
+                      <span className="font-medium text-primary">Painel de Controle</span>
+                    </button>
+                  )}
+                  {accounts.map((account) => (
+                    <button
+                      key={account.id}
+                      onClick={() => handleSwitchAccount(account.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors last:rounded-b-lg ${
+                        account.id === activeAccount?.id ? 'bg-accent/50 font-medium' : ''
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${account.id === activeAccount?.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                      <span className="truncate">{account.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Painel de Controle — visible for admins with multi-tenant even when collapsed */}
+        {isMultiTenant && collapsed && userRole === 'admin' && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/painel" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                      <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>

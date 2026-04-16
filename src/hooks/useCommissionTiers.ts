@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface CommissionTier {
   id: number;
@@ -38,6 +39,7 @@ export function useCommissionTiers({
   vendas,
   meta,
 }: UseCommissionTiersParams): UseCommissionTiersResult {
+  const { activeAccountId } = useTenant();
   const [rawTiers, setRawTiers] = useState<CommissionTier[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,6 +47,7 @@ export function useCommissionTiers({
     let cancelled = false;
 
     async function fetchTiers() {
+      if (!activeAccountId) return;
       setLoading(true);
 
       try {
@@ -53,6 +56,7 @@ export function useCommissionTiers({
           const { data: specific } = await supabase
             .from('commission_tiers')
             .select('*')
+            .eq('account_id', activeAccountId)
             .eq('month', month)
             .eq('vendedor_id', vendedorId)
             .order('sort_order', { ascending: true });
@@ -68,6 +72,7 @@ export function useCommissionTiers({
         const { data: global } = await supabase
           .from('commission_tiers')
           .select('*')
+          .eq('account_id', activeAccountId)
           .eq('month', month)
           .is('vendedor_id', null)
           .order('sort_order', { ascending: true });
@@ -88,7 +93,7 @@ export function useCommissionTiers({
 
     fetchTiers();
     return () => { cancelled = true; };
-  }, [vendedorId, month]);
+  }, [vendedorId, month, activeAccountId]);
 
   const enriched = useMemo(() => {
     return rawTiers.map((tier) => {

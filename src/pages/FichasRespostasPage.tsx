@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function FichasRespostasPage() {
+  const { activeAccountId } = useTenant();
   const [fichas, setFichas] = useState<FichaRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -81,13 +83,15 @@ export default function FichasRespostasPage() {
 
   useEffect(() => {
     fetchFichas();
-  }, []);
+  }, [activeAccountId]);
 
   const fetchFichas = async () => {
+    if (!activeAccountId) return;
     setLoading(true);
     const { data } = await supabase
       .from('fichas_rating' as any)
       .select('*')
+      .eq('account_id', activeAccountId)
       .order('created_at', { ascending: false });
     if (data) setFichas(data as any);
     setLoading(false);

@@ -1,11 +1,16 @@
 import { useState, useCallback, forwardRef } from 'react';
 import { useForm } from 'react-hook-form';
+import { useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { fichaRatingSchema, type FichaRatingData } from '@/lib/fichaRatingSchema';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
 
+// Default account ID for backward compatibility (Outcom Principal)
+const DEFAULT_ACCOUNT_ID = 'a0000000-0000-0000-0000-000000000001';
+
 export default function FichaRatingPage() {
+  const [searchParams] = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,9 +63,12 @@ export default function FichaRatingPage() {
 
   const onSubmit = async (data: FichaRatingData) => {
     setSubmitting(true);
+    // account_id from URL param or default to Outcom Principal
+    const accountId = searchParams.get('account') || DEFAULT_ACCOUNT_ID;
     try {
       const { error } = await supabase.from('fichas_rating' as any).insert({
         slug: 'geral',
+        account_id: accountId,
         ...data,
       } as any);
 

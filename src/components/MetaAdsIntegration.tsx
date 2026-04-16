@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
@@ -22,7 +23,7 @@ import { testConnection, testAdAccount, fetchCampaignInsights } from "@/lib/meta
 
 // ─── Token Section ────────────────────────────────────────────────────────────
 
-function TokenSection() {
+function TokenSection({ activeAccountId }: { activeAccountId: string | null }) {
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,23 +31,26 @@ function TokenSection() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!activeAccountId) return;
     supabase
       .from("app_settings")
       .select("value")
+      .eq("account_id", activeAccountId)
       .eq("key", "meta_access_token")
       .maybeSingle()
       .then(({ data }) => {
         if (data?.value) setToken(data.value);
       });
-  }, []);
+  }, [activeAccountId]);
 
   async function handleSave() {
+    if (!activeAccountId) return;
     setSaving(true);
     setStatus("idle");
     try {
       const { error } = await supabase
         .from("app_settings")
-        .upsert({ key: "meta_access_token", value: token }, { onConflict: "key" });
+        .upsert({ key: "meta_access_token", value: token, account_id: activeAccountId } as any, { onConflict: "account_id,key" });
       if (error) throw new Error(error.message);
       setStatus("success");
       setMessage("Token salvo com sucesso.");
@@ -121,7 +125,7 @@ function TokenSection() {
 
 // ─── Sync Section ─────────────────────────────────────────────────────────────
 
-function SyncSection() {
+function SyncSection({ activeAccountId }: { activeAccountId: string | null }) {
   const { accounts } = useAccountContext();
   const [syncing, setSyncing] = useState(false);
   const [results, setResults] = useState<{ name: string; ok: boolean; msg: string }[]>([]);
@@ -133,6 +137,7 @@ function SyncSection() {
     const { data: tokenData } = await supabase
       .from("app_settings")
       .select("value")
+      .eq("account_id", activeAccountId!)
       .eq("key", "meta_access_token")
       .maybeSingle();
     const accessToken = tokenData?.value;
@@ -212,7 +217,7 @@ function SyncSection() {
 
 // ─── Add Account Form ─────────────────────────────────────────────────────────
 
-function AddAccountForm({ onAdded }: { onAdded: () => void }) {
+function AddAccountForm({ onAdded, activeAccountId }: { onAdded: () => void; activeAccountId: string | null }) {
   const { addAccount } = useAccountContext();
   const [accountId, setAccountId] = useState("");
   const [name, setName] = useState("");
@@ -231,6 +236,7 @@ function AddAccountForm({ onAdded }: { onAdded: () => void }) {
       const { data: tokenData } = await supabase
         .from("app_settings")
         .select("value")
+        .eq("account_id", activeAccountId!)
         .eq("key", "meta_access_token")
         .maybeSingle();
       const accessToken = tokenData?.value;
@@ -472,15 +478,16 @@ function AccountRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MetaAdsIntegration() {
+  const { activeAccountId } = useTenant();
   const { accounts, loading, switchAccount, deleteAccount, updateAccountName, reload } = useAccountContext();
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">Integração Meta Ads</h2>
 
-      <TokenSection />
+      <TokenSection activeAccountId={activeAccountId} />
 
-      <SyncSection />
+      <SyncSection activeAccountId={activeAccountId} />
 
       <div className="glass-card p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -509,7 +516,7 @@ export default function MetaAdsIntegration() {
         )}
       </div>
 
-      <AddAccountForm onAdded={reload} />
+      <AddAccountForm onAdded={reload} activeAccountId={activeAccountId} />
     </div>
   );
 }

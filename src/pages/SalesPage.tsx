@@ -10,6 +10,7 @@ import { getCurrentMonth, monthLabel, countWeekdays } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { getLeadsByVendor } from '@/lib/vendorLeads';
@@ -21,6 +22,7 @@ const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
 
 export default function SalesPage() {
+  const { activeAccountId } = useTenant();
   const { clientes, vendedores } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const {
@@ -51,9 +53,10 @@ export default function SalesPage() {
 
   // Load Meta token
   useEffect(() => {
-    supabase.from('app_settings').select('value').eq('key', 'meta_access_token').maybeSingle()
+    if (!activeAccountId) return;
+    supabase.from('app_settings').select('value').eq('account_id', activeAccountId).eq('key', 'meta_access_token').maybeSingle()
       .then(({ data }) => { if (data?.value) setAccessToken(data.value); });
-  }, []);
+  }, [activeAccountId]);
 
   // Fetch campaigns for selected month
   useEffect(() => {
