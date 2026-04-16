@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { TenantProvider } from "@/contexts/TenantContext";
+import { TenantProvider, useTenant } from "@/contexts/TenantContext";
 import { SalesDataProvider } from "@/contexts/SalesDataContext";
 import { AccountProvider } from "@/contexts/AccountContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -100,8 +100,9 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const { isMultiTenant } = useTenant();
   const hasOverview = user && ['admin', 'manager', 'financeiro'].includes(user.role);
-  const defaultRoute = hasOverview ? '/' : '/vendas';
+  const defaultRoute = (isMultiTenant && user?.role === 'admin') ? '/painel' : (hasOverview ? '/' : '/vendas');
 
   if (loading) {
     return (

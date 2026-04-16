@@ -44,7 +44,7 @@ CREATE POLICY "Admins can manage user_accounts"
 
 -- 3. Seed two accounts
 INSERT INTO public.accounts (id, name, slug) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Outcom Principal', 'outcom1'),
+  ('a0000000-0000-0000-0000-000000000001', 'Outcom 1', 'outcom1'),
   ('a0000000-0000-0000-0000-000000000002', 'Outcom 2', 'outcom2');
 
 -- 4. Map ALL existing users to account 1 (outcom1)
