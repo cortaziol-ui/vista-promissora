@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import { Search, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Eye, Loader2, Trash2, ArrowRightLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface FichaRating {
   id: string;
@@ -66,6 +67,7 @@ const ITEMS_PER_PAGE = 15;
 
 const statusColors: Record<string, string> = {
   pendente: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  enviada: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   aprovado: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   rejeitado: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
@@ -89,6 +91,32 @@ export default function FichasRespostasPage() {
       .order('created_at', { ascending: false });
     if (data) setFichas(data as any);
     setLoading(false);
+  };
+
+  const toggleStatus = async (ficha: FichaRating) => {
+    const newStatus = ficha.status === 'pendente' ? 'enviada' : 'pendente';
+    const { error } = await supabase
+      .from('fichas_rating' as any)
+      .update({ status: newStatus } as any)
+      .eq('id', ficha.id);
+    if (error) toast.error('Erro ao atualizar status');
+    else {
+      setFichas(prev => prev.map(f => f.id === ficha.id ? { ...f, status: newStatus } : f));
+      toast.success(`Status alterado para "${newStatus}"`);
+    }
+  };
+
+  const deleteFicha = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta ficha?')) return;
+    const { error } = await supabase
+      .from('fichas_rating' as any)
+      .delete()
+      .eq('id', id);
+    if (error) toast.error('Erro ao excluir ficha');
+    else {
+      setFichas(prev => prev.filter(f => f.id !== id));
+      toast.success('Ficha excluída');
+    }
   };
 
   const filtered = fichas.filter(f => {
@@ -169,10 +197,18 @@ export default function FichasRespostasPage() {
                           {f.status}
                         </Badge>
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelected(f)}>
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelected(f)} title="Visualizar">
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleStatus(f)} title="Alterar status">
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => deleteFicha(f.id)} title="Excluir">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
