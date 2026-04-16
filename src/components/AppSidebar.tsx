@@ -41,7 +41,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { user, logout } = useAuth();
-  const { accounts, activeAccount, isMultiTenant, switchAccount } = useTenant();
+  const { accounts, activeAccount, isMultiTenant, isOverviewMode, switchAccount, enterOverviewMode } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -94,8 +94,8 @@ export function AppSidebar() {
               >
                 <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Subconta</p>
-                  <p className="text-sm font-medium truncate">{activeAccount?.name || 'Selecionar'}</p>
+                  <p className="text-xs text-muted-foreground">{isOverviewMode ? 'Modo' : 'Subconta'}</p>
+                  <p className="text-sm font-medium truncate">{isOverviewMode ? 'Painel de Controle' : (activeAccount?.name || 'Selecionar')}</p>
                 </div>
                 <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${accountMenuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -107,6 +107,7 @@ export function AppSidebar() {
                     <button
                       onClick={() => {
                         setAccountMenuOpen(false);
+                        enterOverviewMode();
                         navigate('/painel');
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors rounded-t-lg border-b border-border/50"
@@ -154,52 +155,66 @@ export function AppSidebar() {
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+              {isOverviewMode ? (
+                /* Overview mode: só Visão Geral apontando para /painel */
+                <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end={item.url === '/'} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
+                    <NavLink to="/painel" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                      <Home className="mr-2 h-4 w-4 shrink-0" />
+                      {!collapsed && <span>Visão Geral</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-
-              {/* Documentos — submenu colapsável */}
-              {['admin', 'manager', 'administrativo', 'financeiro'].includes(userRole) && (
-                <Collapsible defaultOpen={location.pathname.startsWith('/documentos')} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Documentos" className="hover:bg-sidebar-accent/50">
-                        <FolderOpen className="mr-2 h-4 w-4 shrink-0" />
-                        {!collapsed && (
-                          <>
-                            <span className="flex-1">Documentos</span>
-                            <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                          </>
-                        )}
+              ) : (
+                <>
+                  {visibleNavItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <NavLink to={item.url} end={item.url === '/'} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                          <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
                       </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <NavLink to="/documentos/rating" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
-                              Rating
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <NavLink to="/documentos" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
-                              Limpa Nome
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
+                    </SidebarMenuItem>
+                  ))}
+
+                  {/* Documentos — submenu colapsável */}
+                  {['admin', 'manager', 'administrativo', 'financeiro'].includes(userRole) && (
+                    <Collapsible defaultOpen={location.pathname.startsWith('/documentos')} className="group/collapsible">
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton tooltip="Documentos" className="hover:bg-sidebar-accent/50">
+                            <FolderOpen className="mr-2 h-4 w-4 shrink-0" />
+                            {!collapsed && (
+                              <>
+                                <span className="flex-1">Documentos</span>
+                                <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                              </>
+                            )}
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton asChild>
+                                <NavLink to="/documentos/rating" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                                  Rating
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton asChild>
+                                <NavLink to="/documentos" end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-primary font-medium">
+                                  Limpa Nome
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  )}
+                </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
