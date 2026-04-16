@@ -41,11 +41,12 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { user, logout } = useAuth();
-  const { accounts, activeAccount, isMultiTenant, isOverviewMode, switchAccount, enterOverviewMode } = useTenant();
+  const { accounts, activeAccount, isMultiTenant, switchAccount, enterOverviewMode } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
 
   const userRole = user?.role || 'seller';
+  const isOnPainel = location.pathname === '/painel';
 
   const visibleNavItems = allNavItems.filter(item => item.roles.includes(userRole));
   const visibleAdminItems = adminItems.filter(item => item.roles.includes(userRole));
@@ -74,7 +75,10 @@ export function AppSidebar() {
   const handleSwitchAccount = (accountId: string) => {
     switchAccount(accountId);
     setAccountMenuOpen(false);
-    // Stay on current page — data will reload via TenantContext
+    // Se está no painel de controle, navegar para visão geral da subconta
+    if (location.pathname === '/painel') {
+      navigate('/');
+    }
   };
 
   return (
@@ -94,8 +98,8 @@ export function AppSidebar() {
               >
                 <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">{isOverviewMode ? 'Modo' : 'Subconta'}</p>
-                  <p className="text-sm font-medium truncate">{isOverviewMode ? 'Painel de Controle' : (activeAccount?.name || 'Selecionar')}</p>
+                  <p className="text-xs text-muted-foreground">{isOnPainel ? 'Modo' : 'Subconta'}</p>
+                  <p className="text-sm font-medium truncate">{isOnPainel ? 'Painel de Controle' : (activeAccount?.name || 'Selecionar')}</p>
                 </div>
                 <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${accountMenuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -155,7 +159,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {isOverviewMode ? (
+              {isOnPainel ? (
                 /* Overview mode: só Visão Geral apontando para /painel */
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
