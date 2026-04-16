@@ -133,6 +133,7 @@ function AppRoutes() {
 
       {/* Rota pública — formulário de ficha rating */}
       <Route path="/ficha-rating" element={<FichaRatingPage />} />
+      <Route path="/ficha-rating/:slug" element={<FichaRatingPage />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

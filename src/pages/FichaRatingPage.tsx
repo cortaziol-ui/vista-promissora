@@ -1,15 +1,20 @@
 import { useState, useCallback, forwardRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { fichaRatingSchema, type FichaRatingData } from '@/lib/fichaRatingSchema';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
 
-// Default account ID for backward compatibility (Outcom Principal)
+// Slug → account_id mapping
+const SLUG_TO_ACCOUNT: Record<string, string> = {
+  outcom1: 'a0000000-0000-0000-0000-000000000001',
+  outcom2: 'a0000000-0000-0000-0000-000000000002',
+};
 const DEFAULT_ACCOUNT_ID = 'a0000000-0000-0000-0000-000000000001';
 
 export default function FichaRatingPage() {
+  const { slug } = useParams<{ slug?: string }>();
   const [searchParams] = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -63,8 +68,8 @@ export default function FichaRatingPage() {
 
   const onSubmit = async (data: FichaRatingData) => {
     setSubmitting(true);
-    // account_id from URL param or default to Outcom Principal
-    const accountId = searchParams.get('account') || DEFAULT_ACCOUNT_ID;
+    // Resolve account_id: slug param > query param > default
+    const accountId = (slug && SLUG_TO_ACCOUNT[slug]) || searchParams.get('account') || DEFAULT_ACCOUNT_ID;
     try {
       const { error } = await supabase.from('fichas_rating' as any).insert({
         slug: 'geral',
