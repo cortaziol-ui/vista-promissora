@@ -369,7 +369,29 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     row.valor_total = c.valorTotal;
     row.account_id = activeAccountId;
 
-    const { data, error } = await supabase.from('clientes').insert(row as any).select().single();
+    const attemptInsert = async (r: Record<string, any>) => {
+      return await supabase.from('clientes').insert(r as any).select().single();
+    };
+
+    let { data, error } = await attemptInsert(row);
+
+    // If schema cache error on new optional columns, retry without them
+    if (error && /column.*schema cache/i.test(error.message)) {
+      const safeRow = { ...row };
+      const optionalCols = [
+        'parcela1_data_prevista', 'parcela2_data_prevista', 'parcela3_data_prevista',
+        'referencia1_nome', 'referencia1_telefone', 'referencia1_grau',
+        'referencia2_nome', 'referencia2_telefone', 'referencia2_grau',
+      ];
+      optionalCols.forEach(c => delete safeRow[c]);
+      const retry = await attemptInsert(safeRow);
+      data = retry.data;
+      error = retry.error;
+      if (!error) {
+        console.warn('[SalesDataContext] addCliente: colunas novas não aplicadas no banco. Rodar migration pendente.');
+      }
+    }
+
     if (data && !error) {
       setClientes(prev => [...prev, mapRowToCliente(data)]);
     } else if (error) {
@@ -377,11 +399,27 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     }
   }, [activeAccountId]);
 
+  const stripOptionalCols = (r: Record<string, any>) => {
+    const safe = { ...r };
+    const optional = [
+      'parcela1_data_prevista', 'parcela2_data_prevista', 'parcela3_data_prevista',
+      'referencia1_nome', 'referencia1_telefone', 'referencia1_grau',
+      'referencia2_nome', 'referencia2_telefone', 'referencia2_grau',
+    ];
+    optional.forEach(c => delete safe[c]);
+    return safe;
+  };
+
   const updateCliente = useCallback(async (id: number, partial: Partial<Cliente>) => {
     const backup = clientes;
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...partial } : c));
     const row = mapClienteToRow(partial);
-    const { error } = await supabase.from('clientes').update(row).eq('id', id);
+    let { error } = await supabase.from('clientes').update(row).eq('id', id);
+    if (error && /column.*schema cache/i.test(error.message)) {
+      const retry = await supabase.from('clientes').update(stripOptionalCols(row)).eq('id', id);
+      error = retry.error;
+      if (!error) console.warn('[SalesDataContext] updateCliente: colunas novas não aplicadas. Rodar migration.');
+    }
     if (error) {
       setClientes(backup);
       toast.error('Erro ao atualizar cliente: ' + error.message);
@@ -392,7 +430,12 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     const backup = clientes;
     setClientes(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...partial } : c));
     const row = mapClienteToRow(partial);
-    const { error } = await supabase.from('clientes').update(row).in('id', ids);
+    let { error } = await supabase.from('clientes').update(row).in('id', ids);
+    if (error && /column.*schema cache/i.test(error.message)) {
+      const retry = await supabase.from('clientes').update(stripOptionalCols(row)).in('id', ids);
+      error = retry.error;
+      if (!error) console.warn('[SalesDataContext] bulkUpdateClientes: colunas novas não aplicadas. Rodar migration.');
+    }
     if (error) {
       setClientes(backup);
       toast.error('Erro ao atualizar clientes: ' + error.message);

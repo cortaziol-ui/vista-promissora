@@ -30,7 +30,9 @@ export function useMonthlyData(month: string): MonthlyData {
   const filteredClientes = useMemo(() => {
     return clientes.filter(c => {
       const m = parseMonthFromData(c.data);
-      return m === month;
+      if (m !== month) return false;
+      if (c.situacao === 'CANCELAMENTO') return false;
+      return true;
     });
   }, [clientes, month]);
 

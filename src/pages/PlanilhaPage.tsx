@@ -29,6 +29,7 @@ const situacaoColors: Record<string, string> = {
   'SERVIÇO RATING FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'SERVIÇO FINALIZADO': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'CANCELADO': 'bg-red-500/20 text-red-400 border-red-500/30',
+  'CANCELAMENTO': 'bg-red-500/20 text-red-400 border-red-500/30',
   'RESERVA - LIMPA NOME': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   'RESERVA - RATING': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 };
@@ -402,6 +403,7 @@ export default function PlanilhaPage() {
                 <SelectItem value="RATING ATUALIZADO ENTREGUE">Rating Atualizado Entregue</SelectItem>
                 <SelectItem value="RESERVA - LIMPA NOME">Reserva - Limpa Nome</SelectItem>
                 <SelectItem value="RESERVA - RATING">Reserva - Rating</SelectItem>
+                <SelectItem value="CANCELAMENTO">Cancelamento</SelectItem>
               </SelectContent>
             </Select>
             <Select value={bulkP1Status} onValueChange={setBulkP1Status}>
@@ -533,6 +535,7 @@ export default function PlanilhaPage() {
                     <SelectItem value="RATING ATUALIZADO ENTREGUE">Rating Atualizado Entregue</SelectItem>
                     <SelectItem value="RESERVA - LIMPA NOME">Reserva - Limpa Nome</SelectItem>
                     <SelectItem value="RESERVA - RATING">Reserva - Rating</SelectItem>
+                    <SelectItem value="CANCELAMENTO">Cancelamento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
