@@ -553,6 +553,15 @@ export default function PlanilhaPage() {
                         <SelectItem value="CANCELADO">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
+                    <div>
+                      <Label className="text-xs">Data Prevista de Pagamento</Label>
+                      <Input value={form.parcela1.dataPrevista || ''} onChange={e => {
+                        let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                        if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                        else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                        setForm(f => ({ ...f, parcela1: { ...f.parcela1, dataPrevista: v } }));
+                      }} placeholder="DD/MM/YYYY" maxLength={10} className="text-xs h-8" />
+                    </div>
                     {form.parcela1.status === 'PAGO' && (
                       <div>
                         <Label className="text-xs">Data Pagamento</Label>
@@ -574,6 +583,15 @@ export default function PlanilhaPage() {
                         <SelectItem value="CANCELADO">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
+                    <div>
+                      <Label className="text-xs">Data Prevista de Pagamento</Label>
+                      <Input value={form.parcela2.dataPrevista || ''} onChange={e => {
+                        let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                        if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                        else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                        setForm(f => ({ ...f, parcela2: { ...f.parcela2, dataPrevista: v } }));
+                      }} placeholder="DD/MM/YYYY" maxLength={10} className="text-xs h-8" />
+                    </div>
                     {form.parcela2.status === 'PAGO' && (
                       <div>
                         <Label className="text-xs">Data Pagamento</Label>
@@ -616,6 +634,15 @@ export default function PlanilhaPage() {
                               <SelectItem value="CANCELADO">Cancelado</SelectItem>
                             </SelectContent>
                           </Select>
+                          <div>
+                            <Label className="text-xs">Data Prevista de Pagamento</Label>
+                            <Input value={form.parcela3.dataPrevista || ''} onChange={e => {
+                              let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                              else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                              setForm(f => ({ ...f, parcela3: { ...f.parcela3!, dataPrevista: v } }));
+                            }} placeholder="DD/MM/YYYY" maxLength={10} className="text-xs h-8" />
+                          </div>
                           {form.parcela3.status === 'PAGO' && (
                             <div>
                               <Label className="text-xs">Data Pagamento</Label>
@@ -627,6 +654,80 @@ export default function PlanilhaPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Referências Pessoais */}
+              <div className="col-span-full border-t border-border/30 pt-4">
+                <p className="text-sm font-medium text-foreground mb-3">Referências Pessoais</p>
+                <div className="space-y-4">
+                  {/* Referência 1 */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">1ª Referência Pessoal</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Nome</Label>
+                        <Input
+                          value={form.referencia1?.nome || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia1: { nome: e.target.value, telefone: f.referencia1?.telefone || '', grau: f.referencia1?.grau || '' } }))}
+                          placeholder="Ex: Caio"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Telefone</Label>
+                        <Input
+                          value={form.referencia1?.telefone || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia1: { nome: f.referencia1?.nome || '', telefone: e.target.value, grau: f.referencia1?.grau || '' } }))}
+                          placeholder="(00) 00000-0000"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Grau de Parentesco</Label>
+                        <Input
+                          value={form.referencia1?.grau || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia1: { nome: f.referencia1?.nome || '', telefone: f.referencia1?.telefone || '', grau: e.target.value } }))}
+                          placeholder="Ex: Amigo"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Referência 2 */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">2ª Referência Pessoal</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Nome</Label>
+                        <Input
+                          value={form.referencia2?.nome || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia2: { nome: e.target.value, telefone: f.referencia2?.telefone || '', grau: f.referencia2?.grau || '' } }))}
+                          placeholder="Ex: Maria"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Telefone</Label>
+                        <Input
+                          value={form.referencia2?.telefone || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia2: { nome: f.referencia2?.nome || '', telefone: e.target.value, grau: f.referencia2?.grau || '' } }))}
+                          placeholder="(00) 00000-0000"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Grau de Parentesco</Label>
+                        <Input
+                          value={form.referencia2?.grau || ''}
+                          onChange={e => setForm(f => ({ ...f, referencia2: { nome: f.referencia2?.nome || '', telefone: f.referencia2?.telefone || '', grau: e.target.value } }))}
+                          placeholder="Ex: Irmã"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </form>

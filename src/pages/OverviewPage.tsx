@@ -87,6 +87,24 @@ export default function OverviewPage() {
     vendedorStats.map(s => ({ name: s.vendedor.nome, value: s.vendas })),
   [vendedorStats]);
 
+  // Cobranças previstas para hoje
+  const cobrancasHoje = useMemo(() => {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const result: { clienteNome: string; clienteTelefone: string; parcela: string; valor: number }[] = [];
+    for (const c of clientes) {
+      if (c.parcela1?.status === 'AGUARDANDO' && c.parcela1?.dataPrevista === hoje) {
+        result.push({ clienteNome: c.nome, clienteTelefone: c.telefone, parcela: '1ª Parcela', valor: c.parcela1.valor });
+      }
+      if (c.parcela2?.status === 'AGUARDANDO' && c.parcela2?.dataPrevista === hoje) {
+        result.push({ clienteNome: c.nome, clienteTelefone: c.telefone, parcela: '2ª Parcela', valor: c.parcela2.valor });
+      }
+      if (c.parcela3?.status === 'AGUARDANDO' && c.parcela3?.dataPrevista === hoje) {
+        result.push({ clienteNome: c.nome, clienteTelefone: c.telefone, parcela: '3ª Parcela', valor: c.parcela3.valor });
+      }
+    }
+    return result;
+  }, [clientes]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -106,6 +124,34 @@ export default function OverviewPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Alerta de cobranças previstas para hoje */}
+      {cobrancasHoje.length > 0 && !isSeller && (
+        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground mb-1">
+                {cobrancasHoje.length === 1 ? '1 parcela para cobrar hoje' : `${cobrancasHoje.length} parcelas para cobrar hoje`}
+              </p>
+              <p className="text-sm text-muted-foreground mb-3">
+                Total: <span className="font-medium text-foreground">{fmtFull(cobrancasHoje.reduce((s, c) => s + c.valor, 0))}</span>
+              </p>
+              <div className="space-y-1.5">
+                {cobrancasHoje.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm bg-background/50 rounded-md px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{c.clienteNome}</p>
+                      <p className="text-xs text-muted-foreground">{c.parcela} · {c.clienteTelefone || 'Sem telefone'}</p>
+                    </div>
+                    <span className="font-semibold text-foreground shrink-0 ml-3">{fmtFull(c.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isSeller ? 'xl:grid-cols-4' : 'xl:grid-cols-6'} gap-4`}>
         <KpiCard title="Meta Mensal" value={`${metaEmpresaVendas} vendas`} icon={<Target className="w-5 h-5 text-kpi-goal" />} glowClass="kpi-glow-goal" colorClass="bg-kpi-goal/15" delay={0} />

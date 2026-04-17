@@ -7,6 +7,13 @@ export interface Parcela {
   valor: number;
   status: 'PAGO' | 'AGUARDANDO' | 'CANCELADO';
   dataPagamento?: string;
+  dataPrevista?: string;
+}
+
+export interface Referencia {
+  nome: string;
+  telefone: string;
+  grau: string;
 }
 
 export interface Cliente {
@@ -26,6 +33,8 @@ export interface Cliente {
   situacao: string;
   valorTotal: number;
   link?: string;
+  referencia1?: Referencia;
+  referencia2?: Referencia;
 }
 
 export interface Vendedor {
@@ -85,20 +94,33 @@ function mapRowToCliente(row: any): Cliente {
       valor: Number(row.parcela1_valor),
       status: row.parcela1_status as Parcela['status'],
       dataPagamento: row.parcela1_data_pagamento || undefined,
+      dataPrevista: row.parcela1_data_prevista || undefined,
     },
     parcela2: {
       valor: Number(row.parcela2_valor),
       status: row.parcela2_status as Parcela['status'],
       dataPagamento: row.parcela2_data_pagamento || undefined,
+      dataPrevista: row.parcela2_data_prevista || undefined,
     },
     parcela3: row.parcela3_valor != null && Number(row.parcela3_valor) > 0 ? {
       valor: Number(row.parcela3_valor),
       status: (row.parcela3_status || 'AGUARDANDO') as Parcela['status'],
       dataPagamento: row.parcela3_data_pagamento || undefined,
+      dataPrevista: row.parcela3_data_prevista || undefined,
     } : undefined,
     situacao: row.situacao,
     valorTotal: Number(row.valor_total),
     link: row.link || undefined,
+    referencia1: (row.referencia1_nome || row.referencia1_telefone || row.referencia1_grau) ? {
+      nome: row.referencia1_nome || '',
+      telefone: row.referencia1_telefone || '',
+      grau: row.referencia1_grau || '',
+    } : undefined,
+    referencia2: (row.referencia2_nome || row.referencia2_telefone || row.referencia2_grau) ? {
+      nome: row.referencia2_nome || '',
+      telefone: row.referencia2_telefone || '',
+      grau: row.referencia2_grau || '',
+    } : undefined,
   };
 }
 
@@ -117,20 +139,33 @@ function mapClienteToRow(c: Partial<Cliente>) {
     row.parcela1_valor = c.parcela1.valor;
     row.parcela1_status = c.parcela1.status;
     row.parcela1_data_pagamento = c.parcela1.dataPagamento || null;
+    row.parcela1_data_prevista = c.parcela1.dataPrevista || null;
   }
   if (c.parcela2 !== undefined) {
     row.parcela2_valor = c.parcela2.valor;
     row.parcela2_status = c.parcela2.status;
     row.parcela2_data_pagamento = c.parcela2.dataPagamento || null;
+    row.parcela2_data_prevista = c.parcela2.dataPrevista || null;
   }
   if (c.parcela3 !== undefined) {
     row.parcela3_valor = c.parcela3 ? c.parcela3.valor : 0;
     row.parcela3_status = c.parcela3 ? c.parcela3.status : 'AGUARDANDO';
     row.parcela3_data_pagamento = c.parcela3 ? (c.parcela3.dataPagamento || null) : null;
+    row.parcela3_data_prevista = c.parcela3 ? (c.parcela3.dataPrevista || null) : null;
   }
   if (c.situacao !== undefined) row.situacao = c.situacao;
   if (c.valorTotal !== undefined) row.valor_total = c.valorTotal;
   if (c.link !== undefined) row.link = c.link || null;
+  if (c.referencia1 !== undefined) {
+    row.referencia1_nome = c.referencia1?.nome || null;
+    row.referencia1_telefone = c.referencia1?.telefone || null;
+    row.referencia1_grau = c.referencia1?.grau || null;
+  }
+  if (c.referencia2 !== undefined) {
+    row.referencia2_nome = c.referencia2?.nome || null;
+    row.referencia2_telefone = c.referencia2?.telefone || null;
+    row.referencia2_grau = c.referencia2?.grau || null;
+  }
   return row;
 }
 
