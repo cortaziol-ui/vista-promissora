@@ -185,6 +185,9 @@ export default function PlanilhaPage() {
       updateCliente(editingId, data);
     } else {
       addCliente(data);
+      // Jump to last page so the new client is visible
+      const newTotalPages = Math.max(1, Math.ceil((filtered.length + 1) / ITEMS_PER_PAGE));
+      setPage(newTotalPages - 1);
     }
     setModalOpen(false);
   };
