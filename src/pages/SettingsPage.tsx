@@ -224,14 +224,23 @@ export default function SettingsPage() {
       setEditingPasswordEmail(null);
       return;
     }
-    const { error } = await (supabase.rpc as any)('change_user_password', {
-      target_user_id: userId,
-      new_password: passwordDraft,
+    const { data, error } = await supabase.functions.invoke('change-user-password', {
+      body: { target_user_id: userId, new_password: passwordDraft },
     });
-    if (error) {
-      toast({ title: 'Erro', description: 'Falha ao alterar senha.', variant: 'destructive' });
+    if (error || (data as any)?.error) {
+      const msg = (data as any)?.error || error?.message || 'Falha ao alterar senha.';
+      toast({ title: 'Erro', description: msg, variant: 'destructive' });
+    } else if ((data as any)?.warning) {
+      toast({
+        title: 'Senha alterada (atenção)',
+        description: (data as any).warning,
+        variant: 'destructive',
+      });
     } else {
-      toast({ title: 'Senha alterada', description: `Senha de ${label} atualizada com sucesso.` });
+      toast({
+        title: 'Senha alterada',
+        description: `Senha de ${label} atualizada. O usuário será desconectado de todos os dispositivos.`,
+      });
     }
     setEditingPasswordEmail(null);
     setPasswordDraft('');
