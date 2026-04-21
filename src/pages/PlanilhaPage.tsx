@@ -185,9 +185,10 @@ export default function PlanilhaPage() {
       updateCliente(editingId, data);
     } else {
       addCliente(data);
-      // Jump to last page so the new client is visible
-      const newTotalPages = Math.max(1, Math.ceil((filtered.length + 1) / ITEMS_PER_PAGE));
-      setPage(newTotalPages - 1);
+      // Jump to last page so the newly added client is visible
+      const newTotal = filtered.length + 1;
+      const lastPage = Math.max(0, Math.ceil(newTotal / ITEMS_PER_PAGE) - 1);
+      setPage(lastPage);
     }
     setModalOpen(false);
   };
@@ -468,7 +469,12 @@ export default function PlanilhaPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
                 <Label>Data</Label>
-                <Input value={form.data} onChange={e => updateFormField('data', e.target.value)} placeholder="DD/MM/YYYY" autoComplete="off" />
+                <Input value={form.data} onChange={e => {
+                  let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                  if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                  else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                  updateFormField('data', v);
+                }} placeholder="DD/MM/YYYY" maxLength={10} autoComplete="off" />
               </div>
               <div className="space-y-2">
                 <Label>Nome Completo</Label>
