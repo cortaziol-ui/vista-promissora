@@ -83,15 +83,32 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     ? (path.length > 0 ? `${config.pathPrefix}/${path.join('/')}` : config.pathPrefix)
     : path.join('/');
 
+  /* ── Helper: list all items at a prefix, paginated (Supabase default limit is 100) ── */
+  const listAllPaginated = useCallback(async (prefix: string): Promise<StorageItem[]> => {
+    const PAGE_SIZE = 1000;
+    let all: StorageItem[] = [];
+    let offset = 0;
+    while (true) {
+      const { data } = await supabase.storage.from(config.bucket).list(prefix, {
+        sortBy: { column: 'name', order: 'asc' },
+        limit: PAGE_SIZE,
+        offset,
+      });
+      if (!data || data.length === 0) break;
+      all = all.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+    return all;
+  }, [config.bucket]);
+
   /* ── Fetch items at current path ── */
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.storage.from(config.bucket).list(fullPath || '', {
-      sortBy: { column: 'name', order: 'asc' },
-    });
-    setItems((data || []).filter(i => i.name !== PLACEHOLDER));
+    const all = await listAllPaginated(fullPath || '');
+    setItems(all.filter(i => i.name !== PLACEHOLDER));
     setLoading(false);
-  }, [fullPath, config.bucket]);
+  }, [fullPath, listAllPaginated]);
 
   useEffect(() => {
     if (!isBeforeSystem) fetchItems();
@@ -224,12 +241,12 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const handleDeleteFolder = async (name: string) => {
     const folderPath = fullPath ? `${fullPath}/${name}` : name;
 
-    // Recursively collect all file paths inside the folder
+    // Recursively collect all file paths inside the folder (paginated)
     const collectAll = async (prefix: string): Promise<string[]> => {
-      const { data } = await supabase.storage.from(config.bucket).list(prefix);
-      if (!data || data.length === 0) return [];
+      const items = await listAllPaginated(prefix);
+      if (items.length === 0) return [];
       const paths: string[] = [];
-      for (const item of data) {
+      for (const item of items) {
         const itemPath = `${prefix}/${item.name}`;
         if (!item.id) {
           // subfolder — recurse
@@ -272,12 +289,12 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
     setCreating(true);
 
-    // Recursively collect all file paths
+    // Recursively collect all file paths (paginated)
     const collectAll = async (prefix: string): Promise<string[]> => {
-      const { data } = await supabase.storage.from(config.bucket).list(prefix);
-      if (!data || data.length === 0) return [];
+      const items = await listAllPaginated(prefix);
+      if (items.length === 0) return [];
       const paths: string[] = [];
-      for (const item of data) {
+      for (const item of items) {
         const itemPath = `${prefix}/${item.name}`;
         if (!item.id) {
           paths.push(...await collectAll(itemPath));
