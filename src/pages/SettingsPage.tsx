@@ -80,13 +80,21 @@ export default function SettingsPage() {
   const [editingPasswordEmail, setEditingPasswordEmail] = useState<string | null>(null);
   const [passwordDraft, setPasswordDraft] = useState('');
 
-  // Fetch user_ids by matching emails via user_roles + vendedores
+  // Fetch user_ids by matching roles, filtering by the active tenant account
   useEffect(() => {
     async function fetchAccountIds() {
-      const { data } = await (supabase.from as any)('user_roles').select('user_id, role');
-      if (!data) return;
-      // We need to match user_ids to emails. Since we can't query auth.users from frontend,
-      // we store the mapping when we find matching roles.
+      if (!activeAccountId) return;
+
+      // 1. Get all user_ids linked to the active account via user_accounts
+      const { data: userAccData } = await (supabase.from as any)('user_accounts')
+        .select('user_id, role')
+        .eq('account_id', activeAccountId);
+      if (!userAccData || userAccData.length === 0) {
+        setAccountUserIds(new Map());
+        return;
+      }
+
+      // 2. Build map role -> email for this tenant's accounts
       const map = new Map<string, string>();
       const roleToEmail: Record<string, string> = {
         admin: 'caio@outcom.com',
@@ -95,9 +103,9 @@ export default function SettingsPage() {
         administrativo: 'adm@outcom.com',
         financeiro: 'financeiro@outcom.com',
       };
-      // Group by role - take first user_id for each role
+      // Only map user_ids that belong to THIS account
       const seen = new Set<string>();
-      for (const row of data) {
+      for (const row of userAccData) {
         const email = roleToEmail[row.role];
         if (email && !seen.has(row.role)) {
           map.set(email, row.user_id);
@@ -107,7 +115,7 @@ export default function SettingsPage() {
       setAccountUserIds(map);
     }
     fetchAccountIds();
-  }, []);
+  }, [activeAccountId]);
 
   // Sync drafts when month-specific goals load
   useEffect(() => {
