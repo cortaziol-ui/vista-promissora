@@ -247,7 +247,7 @@ export default function SettingsPage() {
     } else {
       toast({
         title: 'Senha alterada',
-        description: `Senha de ${label} atualizada. O usuário será desconectado de todos os dispositivos.`,
+        description: `Senha de ${label} atualizada com sucesso.`,
       });
     }
     setEditingPasswordEmail(null);

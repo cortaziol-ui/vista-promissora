@@ -47,23 +47,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Revoke all active sessions globally
-    const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(
-      target_user_id,
-      "global"
-    );
-
-    if (signOutError) {
-      console.error("[change-user-password] signOut failed (password still changed):", signOutError);
-      // Password was updated but sessions weren't revoked — return partial success
-      return new Response(
-        JSON.stringify({
-          success: true,
-          warning: "Senha alterada, mas falha ao desconectar sessões ativas: " + signOutError.message,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Do not revoke active sessions — per user request, keep them logged in.
 
     return new Response(
       JSON.stringify({ success: true }),

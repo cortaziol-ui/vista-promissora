@@ -38,14 +38,25 @@ const parcelaIcon = (s: string) => s === 'PAGO' ? '✅' : s === 'CANCELADO' ? '�
 
 const ITEMS_PER_PAGE = 20;
 
+// Add N days to a DD/MM/YYYY string, returning a DD/MM/YYYY string
+function addDaysBR(dateBR: string, days: number): string {
+  const parts = dateBR.split('/');
+  if (parts.length !== 3) return '';
+  const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  if (isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString('pt-BR');
+}
+
 function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
+  const today = new Date().toLocaleDateString('pt-BR');
   return {
-    data: new Date().toLocaleDateString('pt-BR'),
+    data: today,
     nome: '', cpf: '', nascimento: '', email: '', telefone: '',
     servico: 'LIMPA NOME', vendedor: '', entrada: 179,
-    parcela1: { valor: 250, status: 'AGUARDANDO' },
-    parcela2: { valor: 250, status: 'AGUARDANDO' },
-    situacao: 'ENVIADO - AGUARDANDO LIMPAR',
+    parcela1: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 30) },
+    parcela2: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 60) },
+    situacao: 'À ENVIAR',
     valorTotal: 679,
   };
 }
@@ -473,7 +484,19 @@ export default function PlanilhaPage() {
                   let v = e.target.value.replace(/\D/g, '').slice(0, 8);
                   if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
                   else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
-                  updateFormField('data', v);
+                  // Only auto-recalculate parcela previstas for new clients (not editing)
+                  if (editingId === null && v.length === 10) {
+                    const p1Prev = addDaysBR(v, 30);
+                    const p2Prev = addDaysBR(v, 60);
+                    setForm(prev => ({
+                      ...prev,
+                      data: v,
+                      parcela1: { ...prev.parcela1, dataPrevista: p1Prev },
+                      parcela2: { ...prev.parcela2, dataPrevista: p2Prev },
+                    }));
+                  } else {
+                    updateFormField('data', v);
+                  }
                 }} placeholder="DD/MM/YYYY" maxLength={10} autoComplete="off" />
               </div>
               <div className="space-y-2">
