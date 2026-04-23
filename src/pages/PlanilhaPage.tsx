@@ -20,6 +20,9 @@ import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Cale
 import { toast } from 'sonner';
 import KanbanPosVenda from '@/components/KanbanPosVenda';
 
+// Feature flag: kanban is hidden while we polish it. Set to true to re-enable.
+const KANBAN_ENABLED = false;
+
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 const situacaoColors: Record<string, string> = {
@@ -134,7 +137,7 @@ export default function PlanilhaPage() {
     return (localStorage.getItem('planilhaViewMode') as 'tabela' | 'kanban') || 'tabela';
   });
   // Force tabela view for non-admins (kanban is admin-only while we polish it)
-  const effectiveViewMode: 'tabela' | 'kanban' = isAdmin ? viewMode : 'tabela';
+  const effectiveViewMode: 'tabela' | 'kanban' = (KANBAN_ENABLED && isAdmin) ? viewMode : 'tabela';
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -355,7 +358,7 @@ export default function PlanilhaPage() {
             </Button>
           </div>
           {/* View toggle: Tabela / Kanban (admin-only while feature is in polish) */}
-          {isAdmin && (
+          {KANBAN_ENABLED && isAdmin && (
             <div className="flex items-center bg-secondary rounded-lg border border-border/50 p-0.5">
               <Button
                 variant={viewMode === 'tabela' ? 'default' : 'ghost'}
