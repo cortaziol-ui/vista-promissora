@@ -53,15 +53,6 @@ function addDaysBR(dateBR: string, days: number): string {
   return d.toLocaleDateString('pt-BR');
 }
 
-// Parse DD/MM/YYYY → Date (or null if invalid)
-function parseBR(d: string): Date | null {
-  if (!d) return null;
-  const parts = d.split('/');
-  if (parts.length !== 3) return null;
-  const dt = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-  return isNaN(dt.getTime()) ? null : dt;
-}
-
 // Titles of the 6 follow-up contacts (order matters; n = index+1)
 const CONTATO_TITULOS = [
   'Boas-vindas',
@@ -93,21 +84,6 @@ function ensureContatos(existing: Contato[] | undefined, dataCliente: string): C
     const found = existing.find(e => e.n === def.n);
     return found ? { ...def, ...found, titulo: def.titulo } : def;
   });
-}
-
-// Returns { total, feitos, atrasados } for a cliente's contatos
-function contatosStatus(contatos: Contato[] | undefined): { total: number; feitos: number; atrasados: number } {
-  if (!contatos || contatos.length === 0) return { total: 0, feitos: 0, atrasados: 0 };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let feitos = 0;
-  let atrasados = 0;
-  for (const c of contatos) {
-    if (c.status === 'feito' || c.status === 'cancelado') { if (c.status === 'feito') feitos++; continue; }
-    const d = parseBR(c.data);
-    if (d && d.getTime() <= today.getTime()) atrasados++;
-  }
-  return { total: contatos.length, feitos, atrasados };
 }
 
 function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
@@ -488,44 +464,7 @@ export default function PlanilhaPage() {
                   )}
                   <td className="py-3 px-3 text-muted-foreground">{c.id}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.data}</td>
-                  <td className="py-3 px-3 font-medium text-foreground">
-                    <div className="flex items-center gap-2">
-                      <span>{c.nome}</span>
-                      {(() => {
-                        const s = contatosStatus(c.contatos);
-                        if (s.total === 0) return null;
-                        if (s.atrasados > 0) {
-                          return (
-                            <Badge
-                              className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0 h-5"
-                              title={`${s.atrasados} contato(s) atrasado(s)`}
-                            >
-                              ⚠ {s.atrasados}
-                            </Badge>
-                          );
-                        }
-                        if (s.feitos === s.total) {
-                          return (
-                            <Badge
-                              className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 h-5"
-                              title="Todos os contatos concluídos"
-                            >
-                              ✓ {s.feitos}/{s.total}
-                            </Badge>
-                          );
-                        }
-                        return (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] px-1.5 py-0 h-5 text-muted-foreground"
-                            title={`${s.feitos} de ${s.total} contatos concluídos`}
-                          >
-                            {s.feitos}/{s.total}
-                          </Badge>
-                        );
-                      })()}
-                    </div>
-                  </td>
+                  <td className="py-3 px-3 font-medium text-foreground">{c.nome}</td>
                   <td className="py-3 px-3 text-muted-foreground font-mono text-xs">{c.cpf}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.telefone}</td>
                   <td className="py-3 px-3"><Badge variant="outline" className="text-xs">{c.servico}</Badge></td>
