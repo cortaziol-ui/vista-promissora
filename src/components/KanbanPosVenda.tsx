@@ -1,19 +1,18 @@
-import { useMemo, useState } from 'react';
-import { Cliente, Contato } from '@/contexts/SalesDataContext';
+import { useMemo } from 'react';
+import { Cliente } from '@/contexts/SalesDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Check, Clock, AlertCircle, Pencil } from 'lucide-react';
+import { MessageCircle, Check, Pencil } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 const FASES = [
   { n: 1, titulo: 'Boas-vindas', gatilho: '+1 dia' },
@@ -120,10 +119,16 @@ function ClienteCard({
   onMarkFeito: () => void;
   column: number;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(cliente.id),
     data: { cliente, column },
   });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 50 : 'auto',
+    position: isDragging ? 'relative' : undefined,
+  };
 
   const contatoAtual = cliente.contatos?.find(c => c.n === column);
   const dataAtual = contatoAtual?.data;
@@ -159,7 +164,8 @@ function ClienteCard({
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-lg bg-card border border-border/50 p-3 cursor-grab active:cursor-grabbing hover:border-primary/50 hover:bg-card/80 transition-all ${isDragging ? 'opacity-40' : 'opacity-100'}`}
+      style={style}
+      className={`rounded-lg bg-card border ${isDragging ? 'border-primary shadow-2xl' : 'border-border/50'} p-3 cursor-grab active:cursor-grabbing hover:border-primary/50 hover:bg-card/80 transition-colors`}
       {...attributes}
       {...listeners}
     >
@@ -271,8 +277,6 @@ function Coluna({
 
 /* ─── Main Kanban ─── */
 export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente, onMarkContatoFeito }: KanbanProps) {
-  const [activeCliente, setActiveCliente] = useState<Cliente | null>(null);
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
@@ -287,13 +291,7 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
     return grouped;
   }, [clientes]);
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const cliente = event.active.data.current?.cliente as Cliente;
-    if (cliente) setActiveCliente(cliente);
-  };
-
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveCliente(null);
     const { active, over } = event;
     if (!over) return;
     const overId = String(over.id);
@@ -307,7 +305,7 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
   };
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-3">
         {FASES.map(fase => (
           <Coluna
@@ -319,16 +317,6 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
           />
         ))}
       </div>
-      <DragOverlay>
-        {activeCliente && (
-          <div className="rounded-lg bg-card border border-primary/70 p-3 shadow-xl w-[260px]">
-            <p className="text-sm font-semibold text-foreground leading-tight">
-              {activeCliente.nome.split(' ').slice(0, 2).join(' ')}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">👤 {activeCliente.vendedor}</p>
-          </div>
-        )}
-      </DragOverlay>
     </DndContext>
   );
 }

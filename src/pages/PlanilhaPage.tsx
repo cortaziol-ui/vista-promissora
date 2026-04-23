@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,6 +122,7 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
 }
 
 export default function PlanilhaPage() {
+  const { isAdmin } = useAuth();
   const { clientes, vendedores, addCliente, updateCliente, bulkUpdateClientes, deleteCliente } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
@@ -131,6 +133,8 @@ export default function PlanilhaPage() {
   const [viewMode, setViewMode] = useState<'tabela' | 'kanban'>(() => {
     return (localStorage.getItem('planilhaViewMode') as 'tabela' | 'kanban') || 'tabela';
   });
+  // Force tabela view for non-admins (kanban is admin-only while we polish it)
+  const effectiveViewMode: 'tabela' | 'kanban' = isAdmin ? viewMode : 'tabela';
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -350,27 +354,29 @@ export default function PlanilhaPage() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          {/* View toggle: Tabela / Kanban */}
-          <div className="flex items-center bg-secondary rounded-lg border border-border/50 p-0.5">
-            <Button
-              variant={viewMode === 'tabela' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => { setViewMode('tabela'); localStorage.setItem('planilhaViewMode', 'tabela'); }}
-              className="h-7 px-3 gap-1"
-              title="Visão tabela"
-            >
-              <TableIcon className="w-3.5 h-3.5" /> Tabela
-            </Button>
-            <Button
-              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => { setViewMode('kanban'); localStorage.setItem('planilhaViewMode', 'kanban'); }}
-              className="h-7 px-3 gap-1"
-              title="Kanban pós-venda"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" /> Kanban
-            </Button>
-          </div>
+          {/* View toggle: Tabela / Kanban (admin-only while feature is in polish) */}
+          {isAdmin && (
+            <div className="flex items-center bg-secondary rounded-lg border border-border/50 p-0.5">
+              <Button
+                variant={viewMode === 'tabela' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => { setViewMode('tabela'); localStorage.setItem('planilhaViewMode', 'tabela'); }}
+                className="h-7 px-3 gap-1"
+                title="Visão tabela"
+              >
+                <TableIcon className="w-3.5 h-3.5" /> Tabela
+              </Button>
+              <Button
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => { setViewMode('kanban'); localStorage.setItem('planilhaViewMode', 'kanban'); }}
+                className="h-7 px-3 gap-1"
+                title="Kanban pós-venda"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" /> Kanban
+              </Button>
+            </div>
+          )}
           <Button variant={bulkMode ? 'destructive' : 'outline'} onClick={toggleBulkMode} className="gap-2">
             {bulkMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
             {bulkMode ? 'Cancelar' : 'Editar em Massa'}
@@ -413,7 +419,7 @@ export default function PlanilhaPage() {
       </div>
 
       {/* Kanban view */}
-      {viewMode === 'kanban' && (
+      {effectiveViewMode === 'kanban' && (
         <div className="glass-card p-4">
           <KanbanPosVenda
             clientes={filtered}
@@ -425,7 +431,7 @@ export default function PlanilhaPage() {
       )}
 
       {/* Table view */}
-      {viewMode === 'tabela' && (
+      {effectiveViewMode === 'tabela' && (
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
