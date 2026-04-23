@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Cliente } from '@/contexts/SalesDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Check, Pencil, MessageSquareText } from 'lucide-react';
+import { MessageCircle, Check, Pencil, Settings } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -20,6 +20,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const FASES = [
   { n: 1, titulo: 'Boas-vindas', gatilho: '+1 dia' },
@@ -303,9 +305,9 @@ function Coluna({
               variant="ghost"
               className="h-6 w-6 p-0 shrink-0 hover:bg-primary/20 hover:text-primary"
               onClick={() => onEditTemplate(fase.n)}
-              title="Editar mensagem padrão do WhatsApp"
+              title="Editar título e mensagem da fase"
             >
-              <MessageSquareText className="w-3.5 h-3.5" />
+              <Settings className="w-3.5 h-3.5" />
             </Button>
           </div>
           <Badge variant="secondary" className="text-xs shrink-0">{clientes.length}</Badge>
@@ -338,14 +340,18 @@ function Coluna({
 export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente, onMarkContatoFeito }: KanbanProps) {
   const { activeAccountId } = useTenant();
   const [templates, setTemplates] = useState<Record<number, string>>(MENSAGENS_DEFAULT);
+  // Custom titles per phase (empty = fall back to FASES default)
+  const [customTitles, setCustomTitles] = useState<Record<number, string>>({});
   const [editingPhaseN, setEditingPhaseN] = useState<number | null>(null);
   const [draftMessage, setDraftMessage] = useState('');
+  const [draftTitle, setDraftTitle] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  // Load saved templates from Supabase app_settings (key: kanban_msg_1 .. kanban_msg_6)
+  // Load saved templates + custom titles from Supabase app_settings
+  // Keys: kanban_msg_1..6 (message), kanban_title_1..6 (title)
   useEffect(() => {
     if (!activeAccountId) return;
     let cancelled = false;
@@ -354,42 +360,80 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
         .from('app_settings')
         .select('key, value')
         .eq('account_id', activeAccountId)
-        .like('key', 'kanban_msg_%');
+        .or('key.like.kanban_msg_%,key.like.kanban_title_%');
       if (cancelled || !data) return;
-      const loaded: Record<number, string> = { ...MENSAGENS_DEFAULT };
+      const loadedMsg: Record<number, string> = { ...MENSAGENS_DEFAULT };
+      const loadedTitle: Record<number, string> = {};
       for (const row of data) {
-        const m = String(row.key).match(/^kanban_msg_(\d)$/);
-        if (m) loaded[Number(m[1])] = String(row.value ?? '');
+        const mMsg = String(row.key).match(/^kanban_msg_(\d)$/);
+        if (mMsg) { loadedMsg[Number(mMsg[1])] = String(row.value ?? ''); continue; }
+        const mTitle = String(row.key).match(/^kanban_title_(\d)$/);
+        if (mTitle) { loadedTitle[Number(mTitle[1])] = String(row.value ?? ''); }
       }
-      setTemplates(loaded);
+      setTemplates(loadedMsg);
+      setCustomTitles(loadedTitle);
     })();
     return () => { cancelled = true; };
   }, [activeAccountId]);
 
+  // Build FASES with effective titles (custom overrides default)
+  const fasesEffective = useMemo(() =>
+    FASES.map(f => ({ ...f, titulo: customTitles[f.n] && customTitles[f.n].trim() ? customTitles[f.n] : f.titulo })),
+    [customTitles]
+  );
+
   const openEditTemplate = (n: number) => {
     setEditingPhaseN(n);
     setDraftMessage(templates[n] ?? MENSAGENS_DEFAULT[n] ?? '');
+    setDraftTitle(customTitles[n] ?? FASES.find(f => f.n === n)?.titulo ?? '');
   };
 
   const saveTemplate = useCallback(async () => {
     if (editingPhaseN == null || !activeAccountId) return;
     const n = editingPhaseN;
-    const value = draftMessage;
-    const { error } = await supabase
+    const msg = draftMessage;
+    const title = draftTitle.trim();
+
+    // Save message
+    const { error: msgErr } = await supabase
       .from('app_settings')
       .upsert(
-        { account_id: activeAccountId, key: `kanban_msg_${n}`, value } as any,
+        { account_id: activeAccountId, key: `kanban_msg_${n}`, value: msg } as any,
         { onConflict: 'account_id,key' }
       );
-    if (error) {
-      toast.error('Erro ao salvar mensagem: ' + error.message);
-      return;
+    if (msgErr) { toast.error('Erro ao salvar mensagem: ' + msgErr.message); return; }
+
+    // Save title (or delete if reset to default)
+    const defaultTitle = FASES.find(f => f.n === n)?.titulo ?? '';
+    if (title && title !== defaultTitle) {
+      const { error: titleErr } = await supabase
+        .from('app_settings')
+        .upsert(
+          { account_id: activeAccountId, key: `kanban_title_${n}`, value: title } as any,
+          { onConflict: 'account_id,key' }
+        );
+      if (titleErr) { toast.error('Erro ao salvar título: ' + titleErr.message); return; }
+      setCustomTitles(prev => ({ ...prev, [n]: title }));
+    } else {
+      // Title equals default or is empty — remove custom row to fall back
+      await supabase
+        .from('app_settings')
+        .delete()
+        .eq('account_id', activeAccountId)
+        .eq('key', `kanban_title_${n}`);
+      setCustomTitles(prev => {
+        const next = { ...prev };
+        delete next[n];
+        return next;
+      });
     }
-    setTemplates(prev => ({ ...prev, [n]: value }));
-    toast.success(`Mensagem da fase ${n} salva`);
+
+    setTemplates(prev => ({ ...prev, [n]: msg }));
+    toast.success(`Fase ${n} atualizada`);
     setEditingPhaseN(null);
     setDraftMessage('');
-  }, [editingPhaseN, draftMessage, activeAccountId]);
+    setDraftTitle('');
+  }, [editingPhaseN, draftMessage, draftTitle, activeAccountId]);
 
   const insertPlaceholder = (ph: string) => {
     setDraftMessage(prev => prev + ph);
@@ -420,12 +464,12 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
     }
   };
 
-  const editingFase = editingPhaseN ? FASES.find(f => f.n === editingPhaseN) : null;
+  const defaultTitleForEditing = editingPhaseN ? FASES.find(f => f.n === editingPhaseN)?.titulo : '';
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-3">
-        {FASES.map(fase => (
+        {fasesEffective.map(fase => (
           <Coluna
             key={fase.n}
             fase={fase}
@@ -438,46 +482,69 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
         ))}
       </div>
 
-      {/* Edit template dialog */}
-      <Dialog open={editingPhaseN !== null} onOpenChange={open => { if (!open) { setEditingPhaseN(null); setDraftMessage(''); } }}>
+      {/* Edit phase dialog (title + message) */}
+      <Dialog open={editingPhaseN !== null} onOpenChange={open => { if (!open) { setEditingPhaseN(null); setDraftMessage(''); setDraftTitle(''); } }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Mensagem da fase {editingPhaseN} — {editingFase?.titulo}</DialogTitle>
+            <DialogTitle>Configurar fase {editingPhaseN}</DialogTitle>
             <DialogDescription>
-              Esta é a mensagem que aparecerá pré-preenchida ao clicar no botão WhatsApp dos cards desta coluna. Use os placeholders abaixo para inserir o nome do cliente ou vendedor.
+              Edite o título da coluna e a mensagem padrão do WhatsApp. Use os placeholders para inserir dados dinâmicos do cliente.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{primeiro_nome}}')} className="text-xs">+ Primeiro nome</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{nome_completo}}')} className="text-xs">+ Nome completo</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{vendedor}}')} className="text-xs">+ Vendedor</Button>
+          <div className="space-y-4 py-2">
+            {/* Phase title */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Título da fase</Label>
+              <Input
+                value={draftTitle}
+                onChange={e => setDraftTitle(e.target.value)}
+                placeholder={defaultTitleForEditing}
+                className="text-sm"
+              />
+              {draftTitle.trim() && draftTitle.trim() !== defaultTitleForEditing && (
+                <button
+                  type="button"
+                  onClick={() => setDraftTitle(defaultTitleForEditing || '')}
+                  className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                >
+                  Restaurar título padrão ({defaultTitleForEditing})
+                </button>
+              )}
             </div>
 
-            <Textarea
-              value={draftMessage}
-              onChange={e => setDraftMessage(e.target.value)}
-              placeholder="Digite a mensagem..."
-              className="min-h-[160px] text-sm"
-              autoFocus
-            />
+            {/* Message template */}
+            <div className="space-y-2 pt-2 border-t border-border/30">
+              <Label className="text-xs">Mensagem do WhatsApp</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{primeiro_nome}}')} className="text-xs">+ Primeiro nome</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{nome_completo}}')} className="text-xs">+ Nome completo</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{vendedor}}')} className="text-xs">+ Vendedor</Button>
+              </div>
 
-            <div className="rounded-md bg-secondary/50 border border-border/30 p-2">
-              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Pré-visualização (exemplo: João Silva / Bianca)</p>
-              <p className="text-xs text-foreground whitespace-pre-wrap">
-                {draftMessage
-                  .replace(/\{\{primeiro_nome\}\}/g, 'João')
-                  .replace(/\{\{nome_completo\}\}/g, 'João Silva')
-                  .replace(/\{\{vendedor\}\}/g, 'Bianca')
-                  || <span className="text-muted-foreground/60">(mensagem vazia)</span>}
-              </p>
+              <Textarea
+                value={draftMessage}
+                onChange={e => setDraftMessage(e.target.value)}
+                placeholder="Digite a mensagem..."
+                className="min-h-[140px] text-sm"
+              />
+
+              <div className="rounded-md bg-secondary/50 border border-border/30 p-2">
+                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Pré-visualização (exemplo: João Silva / Bianca)</p>
+                <p className="text-xs text-foreground whitespace-pre-wrap">
+                  {draftMessage
+                    .replace(/\{\{primeiro_nome\}\}/g, 'João')
+                    .replace(/\{\{nome_completo\}\}/g, 'João Silva')
+                    .replace(/\{\{vendedor\}\}/g, 'Bianca')
+                    || <span className="text-muted-foreground/60">(mensagem vazia)</span>}
+                </p>
+              </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setEditingPhaseN(null); setDraftMessage(''); }}>Cancelar</Button>
-            <Button onClick={saveTemplate}>Salvar mensagem</Button>
+            <Button variant="outline" onClick={() => { setEditingPhaseN(null); setDraftMessage(''); setDraftTitle(''); }}>Cancelar</Button>
+            <Button onClick={saveTemplate}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -101,7 +100,6 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
 }
 
 export default function PlanilhaPage() {
-  const { isAdmin } = useAuth();
   const { clientes, vendedores, addCliente, updateCliente, bulkUpdateClientes, deleteCliente } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
@@ -113,7 +111,7 @@ export default function PlanilhaPage() {
     return (localStorage.getItem('planilhaViewMode') as 'tabela' | 'kanban') || 'tabela';
   });
   // Force tabela view for non-admins (kanban is admin-only while we polish it)
-  const effectiveViewMode: 'tabela' | 'kanban' = (KANBAN_ENABLED && isAdmin) ? viewMode : 'tabela';
+  const effectiveViewMode: 'tabela' | 'kanban' = KANBAN_ENABLED ? viewMode : 'tabela';
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -338,8 +336,8 @@ export default function PlanilhaPage() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          {/* View toggle: Tabela / Kanban (admin-only while feature is in polish) */}
-          {KANBAN_ENABLED && isAdmin && (
+          {/* View toggle: Tabela / Kanban — visible to everyone with Planilha access */}
+          {KANBAN_ENABLED && (
             <div className="flex items-center bg-secondary rounded-lg border border-border/50 p-0.5">
               <Button
                 variant={viewMode === 'tabela' ? 'default' : 'ghost'}
