@@ -15,8 +15,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X } from 'lucide-react';
+import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import KanbanPosVenda from '@/components/KanbanPosVenda';
 
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -127,6 +128,9 @@ export default function PlanilhaPage() {
   const [filterServico, setFilterServico] = useState('all');
   const [filterSituacao, setFilterSituacao] = useState('all');
   const [page, setPage] = useState(0);
+  const [viewMode, setViewMode] = useState<'tabela' | 'kanban'>(() => {
+    return (localStorage.getItem('planilhaViewMode') as 'tabela' | 'kanban') || 'tabela';
+  });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -250,6 +254,47 @@ export default function PlanilhaPage() {
     setModalOpen(true);
   };
 
+  // Move cliente to specific kanban column (manual override via drag-and-drop)
+  const handleMoveCliente = (clienteId: number, newCol: number) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return;
+    const contatos = ensureContatos(cliente.contatos, cliente.data);
+    // Store override in first contato's obs field using a marker
+    const overrideMarker = `__col__=${newCol}`;
+    const updated = contatos.map((c, i) => {
+      if (i === 0) {
+        // Strip any previous override and add new
+        const cleanObs = (c.obs || '').replace(/__col__=\d/g, '').trim();
+        return { ...c, obs: cleanObs ? `${cleanObs} ${overrideMarker}` : overrideMarker };
+      }
+      return c;
+    });
+    updateCliente(clienteId, { contatos: updated });
+  };
+
+  // Mark current contato as "feito"
+  const handleMarkContatoFeito = (cliente: Cliente, contatoN: number) => {
+    const contatos = ensureContatos(cliente.contatos, cliente.data);
+    const updated = contatos.map(c => {
+      if (c.n === contatoN) return { ...c, status: 'feito' as const };
+      return c;
+    });
+    // Auto-fill dates 5 and 6 when contato 3 is marked feito (like in the modal)
+    if (contatoN === 3) {
+      const c3 = updated.find(c => c.n === 3);
+      if (c3?.data) {
+        const c5Data = addDaysBR(c3.data, 15);
+        const c6Data = addDaysBR(c3.data, 30);
+        for (let i = 0; i < updated.length; i++) {
+          if (updated[i].n === 5 && !updated[i].data) updated[i] = { ...updated[i], data: c5Data };
+          if (updated[i].n === 6 && !updated[i].data) updated[i] = { ...updated[i], data: c6Data };
+        }
+      }
+    }
+    updateCliente(cliente.id, { contatos: updated });
+    toast.success(`Contato ${contatoN} marcado como feito`);
+  };
+
   const handleSave = () => {
     const p3 = form.parcela3?.valor || 0;
     const valorTotal = form.entrada + form.parcela1.valor + form.parcela2.valor + p3;
@@ -305,6 +350,27 @@ export default function PlanilhaPage() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
+          {/* View toggle: Tabela / Kanban */}
+          <div className="flex items-center bg-secondary rounded-lg border border-border/50 p-0.5">
+            <Button
+              variant={viewMode === 'tabela' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => { setViewMode('tabela'); localStorage.setItem('planilhaViewMode', 'tabela'); }}
+              className="h-7 px-3 gap-1"
+              title="Visão tabela"
+            >
+              <TableIcon className="w-3.5 h-3.5" /> Tabela
+            </Button>
+            <Button
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => { setViewMode('kanban'); localStorage.setItem('planilhaViewMode', 'kanban'); }}
+              className="h-7 px-3 gap-1"
+              title="Kanban pós-venda"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" /> Kanban
+            </Button>
+          </div>
           <Button variant={bulkMode ? 'destructive' : 'outline'} onClick={toggleBulkMode} className="gap-2">
             {bulkMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
             {bulkMode ? 'Cancelar' : 'Editar em Massa'}
@@ -346,7 +412,20 @@ export default function PlanilhaPage() {
         </Select>
       </div>
 
-      {/* Table */}
+      {/* Kanban view */}
+      {viewMode === 'kanban' && (
+        <div className="glass-card p-4">
+          <KanbanPosVenda
+            clientes={filtered}
+            onEditCliente={openEdit}
+            onMoveCliente={handleMoveCliente}
+            onMarkContatoFeito={handleMarkContatoFeito}
+          />
+        </div>
+      )}
+
+      {/* Table view */}
+      {viewMode === 'tabela' && (
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -488,6 +567,7 @@ export default function PlanilhaPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Bulk Edit Toolbar */}
       {bulkMode && selectedIds.size > 0 && (
