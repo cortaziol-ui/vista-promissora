@@ -16,6 +16,14 @@ export interface Referencia {
   grau: string;
 }
 
+export interface Contato {
+  n: number;
+  titulo: string;
+  data: string;
+  status: 'pendente' | 'feito' | 'cancelado';
+  obs?: string;
+}
+
 export interface Cliente {
   id: number;
   data: string;
@@ -35,6 +43,7 @@ export interface Cliente {
   link?: string;
   referencia1?: Referencia;
   referencia2?: Referencia;
+  contatos?: Contato[];
 }
 
 export interface Vendedor {
@@ -121,6 +130,7 @@ function mapRowToCliente(row: any): Cliente {
       telefone: row.referencia2_telefone || '',
       grau: row.referencia2_grau || '',
     } : undefined,
+    contatos: Array.isArray(row.contatos) ? row.contatos as Contato[] : undefined,
   };
 }
 
@@ -165,6 +175,9 @@ function mapClienteToRow(c: Partial<Cliente>) {
     row.referencia2_nome = c.referencia2?.nome || null;
     row.referencia2_telefone = c.referencia2?.telefone || null;
     row.referencia2_grau = c.referencia2?.grau || null;
+  }
+  if (c.contatos !== undefined) {
+    row.contatos = c.contatos ?? null;
   }
   return row;
 }
@@ -382,6 +395,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
         'parcela1_data_prevista', 'parcela2_data_prevista', 'parcela3_data_prevista',
         'referencia1_nome', 'referencia1_telefone', 'referencia1_grau',
         'referencia2_nome', 'referencia2_telefone', 'referencia2_grau',
+        'contatos',
       ];
       optionalCols.forEach(c => delete safeRow[c]);
       const retry = await attemptInsert(safeRow);
@@ -405,6 +419,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       'parcela1_data_prevista', 'parcela2_data_prevista', 'parcela3_data_prevista',
       'referencia1_nome', 'referencia1_telefone', 'referencia1_grau',
       'referencia2_nome', 'referencia2_telefone', 'referencia2_grau',
+      'contatos',
     ];
     optional.forEach(c => delete safe[c]);
     return safe;

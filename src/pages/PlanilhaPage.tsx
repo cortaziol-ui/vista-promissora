@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useSalesData, Cliente } from '@/contexts/SalesDataContext';
+import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,63 @@ function addDaysBR(dateBR: string, days: number): string {
   return d.toLocaleDateString('pt-BR');
 }
 
+// Parse DD/MM/YYYY → Date (or null if invalid)
+function parseBR(d: string): Date | null {
+  if (!d) return null;
+  const parts = d.split('/');
+  if (parts.length !== 3) return null;
+  const dt = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+// Titles of the 6 follow-up contacts (order matters; n = index+1)
+const CONTATO_TITULOS = [
+  'Boas-vindas',
+  'Acompanhamento / Atualização',
+  'Entrega do serviço + aviso 48h',
+  'Pós-pagamento (envio do PDF)',
+  'Upsell / Agendamento especialista',
+  'Cobrança 2ª parcela',
+];
+
+function buildDefaultContatos(dataCliente: string): Contato[] {
+  const c1 = addDaysBR(dataCliente, 1);
+  const c2 = addDaysBR(dataCliente, 15);
+  return CONTATO_TITULOS.map((titulo, i) => ({
+    n: i + 1,
+    titulo,
+    data: i === 0 ? c1 : i === 1 ? c2 : '',
+    status: 'pendente',
+    obs: '',
+  }));
+}
+
+// Ensure a cliente always has the 6 contatos (fill missing or old records)
+function ensureContatos(existing: Contato[] | undefined, dataCliente: string): Contato[] {
+  const defaults = buildDefaultContatos(dataCliente);
+  if (!existing || existing.length === 0) return defaults;
+  // Merge: preserve existing by n, fill gaps with defaults
+  return defaults.map(def => {
+    const found = existing.find(e => e.n === def.n);
+    return found ? { ...def, ...found, titulo: def.titulo } : def;
+  });
+}
+
+// Returns { total, feitos, atrasados } for a cliente's contatos
+function contatosStatus(contatos: Contato[] | undefined): { total: number; feitos: number; atrasados: number } {
+  if (!contatos || contatos.length === 0) return { total: 0, feitos: 0, atrasados: 0 };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let feitos = 0;
+  let atrasados = 0;
+  for (const c of contatos) {
+    if (c.status === 'feito' || c.status === 'cancelado') { if (c.status === 'feito') feitos++; continue; }
+    const d = parseBR(c.data);
+    if (d && d.getTime() <= today.getTime()) atrasados++;
+  }
+  return { total: contatos.length, feitos, atrasados };
+}
+
 function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
   const today = new Date().toLocaleDateString('pt-BR');
   return {
@@ -58,6 +115,7 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
     parcela2: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 60) },
     situacao: 'À ENVIAR',
     valorTotal: 679,
+    contatos: buildDefaultContatos(today),
   };
 }
 
@@ -184,7 +242,13 @@ export default function PlanilhaPage() {
   const situacoes = useMemo(() => [...new Set(clientes.map(c => c.situacao).filter(s => s && s.trim()))], [clientes]);
 
   const openNew = () => { setEditingId(null); setForm(makeEmptyCliente(selectedMonth)); setModalOpen(true); };
-  const openEdit = (c: Cliente) => { setEditingId(c.id); setForm({ ...c }); setModalOpen(true); };
+  const openEdit = (c: Cliente) => {
+    setEditingId(c.id);
+    // Backfill contatos for legacy records that never had them
+    const withContatos = { ...c, contatos: ensureContatos(c.contatos, c.data) };
+    setForm(withContatos);
+    setModalOpen(true);
+  };
 
   const handleSave = () => {
     const p3 = form.parcela3?.valor || 0;
@@ -330,7 +394,44 @@ export default function PlanilhaPage() {
                   )}
                   <td className="py-3 px-3 text-muted-foreground">{c.id}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.data}</td>
-                  <td className="py-3 px-3 font-medium text-foreground">{c.nome}</td>
+                  <td className="py-3 px-3 font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>{c.nome}</span>
+                      {(() => {
+                        const s = contatosStatus(c.contatos);
+                        if (s.total === 0) return null;
+                        if (s.atrasados > 0) {
+                          return (
+                            <Badge
+                              className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0 h-5"
+                              title={`${s.atrasados} contato(s) atrasado(s)`}
+                            >
+                              ⚠ {s.atrasados}
+                            </Badge>
+                          );
+                        }
+                        if (s.feitos === s.total) {
+                          return (
+                            <Badge
+                              className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 h-5"
+                              title="Todos os contatos concluídos"
+                            >
+                              ✓ {s.feitos}/{s.total}
+                            </Badge>
+                          );
+                        }
+                        return (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-5 text-muted-foreground"
+                            title={`${s.feitos} de ${s.total} contatos concluídos`}
+                          >
+                            {s.feitos}/{s.total}
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                  </td>
                   <td className="py-3 px-3 text-muted-foreground font-mono text-xs">{c.cpf}</td>
                   <td className="py-3 px-3 text-muted-foreground whitespace-nowrap">{c.telefone}</td>
                   <td className="py-3 px-3"><Badge variant="outline" className="text-xs">{c.servico}</Badge></td>
@@ -484,16 +585,27 @@ export default function PlanilhaPage() {
                   let v = e.target.value.replace(/\D/g, '').slice(0, 8);
                   if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
                   else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
-                  // Only auto-recalculate parcela previstas for new clients (not editing)
+                  // Only auto-recalculate parcela previstas + contatos for new clients (not editing)
                   if (editingId === null && v.length === 10) {
                     const p1Prev = addDaysBR(v, 30);
                     const p2Prev = addDaysBR(v, 60);
-                    setForm(prev => ({
-                      ...prev,
-                      data: v,
-                      parcela1: { ...prev.parcela1, dataPrevista: p1Prev },
-                      parcela2: { ...prev.parcela2, dataPrevista: p2Prev },
-                    }));
+                    const c1 = addDaysBR(v, 1);
+                    const c2 = addDaysBR(v, 15);
+                    setForm(prev => {
+                      const currentContatos = prev.contatos ?? buildDefaultContatos(v);
+                      const nextContatos = currentContatos.map(c => {
+                        if (c.n === 1) return { ...c, data: c1 };
+                        if (c.n === 2) return { ...c, data: c2 };
+                        return c;
+                      });
+                      return {
+                        ...prev,
+                        data: v,
+                        parcela1: { ...prev.parcela1, dataPrevista: p1Prev },
+                        parcela2: { ...prev.parcela2, dataPrevista: p2Prev },
+                        contatos: nextContatos,
+                      };
+                    });
                   } else {
                     updateFormField('data', v);
                   }
@@ -762,6 +874,98 @@ export default function PlanilhaPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Contatos de Acompanhamento */}
+              <div className="col-span-full border-t border-border/30 pt-4">
+                <p className="text-sm font-medium text-foreground mb-1">Contatos de Acompanhamento</p>
+                <p className="text-xs text-muted-foreground mb-3">Jornada pós-venda (boas-vindas, acompanhamento, entrega, upsell, cobrança). Datas 1 e 2 calculadas a partir da data do cliente.</p>
+                <div className="space-y-3">
+                  {(form.contatos ?? ensureContatos(form.contatos, form.data)).map((contato) => (
+                    <div key={contato.n} className="p-3 rounded-lg bg-secondary/30 border border-border/30">
+                      <div className="flex items-start gap-3">
+                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-xs font-semibold shrink-0 mt-1">
+                          {contato.n}
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_140px_160px] gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Título</Label>
+                            <p className="text-sm font-medium text-foreground leading-tight mt-1">{contato.titulo}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Data Prevista</Label>
+                            <Input
+                              value={contato.data}
+                              onChange={e => {
+                                let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+                                else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                                setForm(f => {
+                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                                  const next = currentContatos.map(c => c.n === contato.n ? { ...c, data: v } : c);
+                                  return { ...f, contatos: next };
+                                });
+                              }}
+                              placeholder="DD/MM/YYYY"
+                              maxLength={10}
+                              className="text-xs h-8 mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Status</Label>
+                            <Select
+                              value={contato.status}
+                              onValueChange={v => {
+                                setForm(f => {
+                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                                  let next = currentContatos.map(c => c.n === contato.n ? { ...c, status: v as Contato['status'] } : c);
+                                  // When contato 3 (Entrega) is marked as 'feito' and has date, auto-fill contacts 5 and 6
+                                  if (contato.n === 3 && v === 'feito') {
+                                    const c3 = next.find(c => c.n === 3);
+                                    if (c3?.data) {
+                                      const c5Data = addDaysBR(c3.data, 15);
+                                      const c6Data = addDaysBR(c3.data, 30);
+                                      next = next.map(c => {
+                                        if (c.n === 5 && !c.data) return { ...c, data: c5Data };
+                                        if (c.n === 6 && !c.data) return { ...c, data: c6Data };
+                                        return c;
+                                      });
+                                    }
+                                  }
+                                  return { ...f, contatos: next };
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="h-8 mt-1 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendente">Pendente</SelectItem>
+                                <SelectItem value="feito">Feito</SelectItem>
+                                <SelectItem value="cancelado">Cancelado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 pl-10">
+                        <Input
+                          value={contato.obs || ''}
+                          onChange={e => {
+                            setForm(f => {
+                              const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                              const next = currentContatos.map(c => c.n === contato.n ? { ...c, obs: e.target.value } : c);
+                              return { ...f, contatos: next };
+                            });
+                          }}
+                          placeholder="Observação (opcional)"
+                          className="text-xs h-8"
+                          autoComplete="off"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
