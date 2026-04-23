@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Cliente } from '@/contexts/SalesDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Check, Pencil } from 'lucide-react';
+import { MessageCircle, Check, Pencil, MessageSquareText } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -13,6 +13,13 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
+import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 const FASES = [
   { n: 1, titulo: 'Boas-vindas', gatilho: '+1 dia' },
@@ -89,21 +96,50 @@ interface KanbanProps {
   onMarkContatoFeito: (cliente: Cliente, contatoN: number) => void;
 }
 
-function buildWhatsappLink(telefone: string, nome: string, contatoN: number): string {
-  // Normalize phone
-  const digits = telefone.replace(/\D/g, '');
-  const phone = digits.startsWith('55') ? digits : digits.length >= 10 ? '55' + digits : digits;
+/**
+ * Mensagens default (exibidas enquanto não tiver nada salvo no banco).
+ * O admin pode editar via botão na coluna do kanban.
+ * Placeholders: {{primeiro_nome}}, {{nome_completo}}, {{vendedor}}
+ */
+const MENSAGENS_DEFAULT: Record<number, string> = {
+  1: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+  2: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+  3: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+  4: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+  5: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+  6: 'Olá {{primeiro_nome}}! [edite esta mensagem]',
+};
 
-  // Suggested message by phase (Caio pode editar nas configs do WPP dele, mas deixamos um template útil)
-  const messages: Record<number, string> = {
-    1: `Olá ${nome.split(' ')[0]}! Seja muito bem-vindo(a) à Outcom. Começamos seu processo e vou te manter informado em cada etapa. Qualquer dúvida, estou à disposição!`,
-    2: `Olá ${nome.split(' ')[0]}, passando pra te atualizar sobre o andamento do seu processo. Está tudo rodando bem. Qualquer dúvida me avise!`,
-    3: `Olá ${nome.split(' ')[0]}! Seu serviço foi finalizado. Você tem 48h para efetuar o pagamento restante e já te envio o PDF com orientações de boas ações.`,
-    4: `Olá ${nome.split(' ')[0]}! Pagamento confirmado. Segue o PDF com as próximas orientações. Vamos programar a data da 2ª parcela.`,
-    5: `Olá ${nome.split(' ')[0]}! Agora que seu processo está pronto, temos oportunidades financeiras especiais pra você. Posso agendar um papo rápido com nosso especialista?`,
-    6: `Olá ${nome.split(' ')[0]}! Passando só pra te lembrar do vencimento da 2ª parcela. Qualquer coisa me fala!`,
-  };
-  const msg = encodeURIComponent(messages[contatoN] || `Olá ${nome.split(' ')[0]}!`);
+// "JOÃO DA SILVA" → "João da Silva"  (preposições/artigos minúsculos)
+const LOWER_WORDS = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+function toTitleCase(name: string): string {
+  if (!name) return '';
+  return name
+    .toLocaleLowerCase('pt-BR')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w, i) => {
+      if (i > 0 && LOWER_WORDS.has(w)) return w;
+      return w.charAt(0).toLocaleUpperCase('pt-BR') + w.slice(1);
+    })
+    .join(' ');
+}
+
+function renderMessage(template: string, cliente: Cliente): string {
+  const nomeCompleto = toTitleCase(cliente.nome);
+  const primeiroNome = nomeCompleto.split(' ')[0] || nomeCompleto;
+  return template
+    .replace(/\{\{primeiro_nome\}\}/g, primeiroNome)
+    .replace(/\{\{nome_completo\}\}/g, nomeCompleto)
+    .replace(/\{\{vendedor\}\}/g, cliente.vendedor || '');
+}
+
+function buildWhatsappLink(cliente: Cliente, contatoN: number, templates: Record<number, string>): string {
+  const digits = (cliente.telefone || '').replace(/\D/g, '');
+  const phone = digits.startsWith('55') ? digits : digits.length >= 10 ? '55' + digits : digits;
+  const template = templates[contatoN] || MENSAGENS_DEFAULT[contatoN] || '';
+  const rendered = renderMessage(template, cliente);
+  const msg = encodeURIComponent(rendered);
   return `https://wa.me/${phone}?text=${msg}`;
 }
 
@@ -113,11 +149,13 @@ function ClienteCard({
   onEdit,
   onMarkFeito,
   column,
+  templates,
 }: {
   cliente: Cliente;
   onEdit: () => void;
   onMarkFeito: () => void;
   column: number;
+  templates: Record<number, string>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(cliente.id),
@@ -126,8 +164,9 @@ function ClienteCard({
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 50 : 'auto',
+    zIndex: isDragging ? 9999 : undefined,
     position: isDragging ? 'relative' : undefined,
+    boxShadow: isDragging ? '0 20px 40px -10px rgba(0,0,0,0.6)' : undefined,
   };
 
   const contatoAtual = cliente.contatos?.find(c => c.n === column);
@@ -158,8 +197,11 @@ function ClienteCard({
 
   const feitos = cliente.contatos?.filter(c => c.status === 'feito').length || 0;
 
-  const firstName = cliente.nome.split(' ')[0] || cliente.nome;
-  const wppUrl = cliente.telefone ? buildWhatsappLink(cliente.telefone, cliente.nome, column) : null;
+  const nomeFormatado = toTitleCase(cliente.nome);
+  const vendedorFormatado = toTitleCase(cliente.vendedor || '');
+  // Display first + second name in Title Case
+  const nomeExibido = nomeFormatado.split(' ').slice(0, 2).join(' ');
+  const wppUrl = cliente.telefone ? buildWhatsappLink(cliente, column, templates) : null;
 
   return (
     <div
@@ -170,16 +212,16 @@ function ClienteCard({
       {...listeners}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-sm font-semibold text-foreground leading-tight" title={cliente.nome}>
-          {firstName} {cliente.nome.split(' ').slice(1, 2).join(' ')}
+        <p className="text-sm font-semibold text-foreground leading-tight" title={nomeFormatado}>
+          {nomeExibido}
         </p>
         <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0">
           {feitos}/6
         </Badge>
       </div>
 
-      <p className="text-[10px] text-muted-foreground mb-2 truncate" title={cliente.vendedor}>
-        👤 {cliente.vendedor}
+      <p className="text-[10px] text-muted-foreground mb-2 truncate" title={vendedorFormatado}>
+        👤 {vendedorFormatado}
       </p>
 
       {dateLabel && (
@@ -190,10 +232,13 @@ function ClienteCard({
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 w-7 p-0 hover:bg-emerald-500/20 hover:text-emerald-400"
+          className={
+            contatoAtual?.status === 'feito'
+              ? 'h-7 w-7 p-0 bg-emerald-500/20 text-emerald-400 hover:bg-amber-500/20 hover:text-amber-400'
+              : 'h-7 w-7 p-0 hover:bg-emerald-500/20 hover:text-emerald-400'
+          }
           onClick={(e) => { e.stopPropagation(); onMarkFeito(); }}
-          title="Marcar como feito"
-          disabled={contatoAtual?.status === 'feito'}
+          title={contatoAtual?.status === 'feito' ? 'Clique para desmarcar (voltar a pendente)' : 'Marcar como feito'}
         >
           <Check className="w-3.5 h-3.5" />
         </Button>
@@ -229,11 +274,15 @@ function Coluna({
   clientes,
   onEditCliente,
   onMarkFeito,
+  onEditTemplate,
+  templates,
 }: {
   fase: { n: number; titulo: string; gatilho: string };
   clientes: Cliente[];
   onEditCliente: (c: Cliente) => void;
   onMarkFeito: (c: Cliente, n: number) => void;
+  onEditTemplate: (n: number) => void;
+  templates: Record<number, string>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${fase.n}` });
 
@@ -244,17 +293,26 @@ function Coluna({
     >
       <div className="p-3 border-b border-border/30 shrink-0">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0">
               {fase.n}
             </span>
             <p className="text-sm font-semibold text-foreground truncate" title={fase.titulo}>{fase.titulo}</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 shrink-0 hover:bg-primary/20 hover:text-primary"
+              onClick={() => onEditTemplate(fase.n)}
+              title="Editar mensagem padrão do WhatsApp"
+            >
+              <MessageSquareText className="w-3.5 h-3.5" />
+            </Button>
           </div>
           <Badge variant="secondary" className="text-xs shrink-0">{clientes.length}</Badge>
         </div>
         <p className="text-[10px] text-muted-foreground mt-1">Gatilho: {fase.gatilho}</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[200px]">
+      <div className="flex-1 p-2 space-y-2 min-h-[200px]">
         {clientes.length === 0 ? (
           <div className="flex items-center justify-center h-24 text-xs text-muted-foreground/50">
             Sem clientes
@@ -267,6 +325,7 @@ function Coluna({
               column={fase.n}
               onEdit={() => onEditCliente(c)}
               onMarkFeito={() => onMarkFeito(c, fase.n)}
+              templates={templates}
             />
           ))
         )}
@@ -277,14 +336,71 @@ function Coluna({
 
 /* ─── Main Kanban ─── */
 export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente, onMarkContatoFeito }: KanbanProps) {
+  const { activeAccountId } = useTenant();
+  const [templates, setTemplates] = useState<Record<number, string>>(MENSAGENS_DEFAULT);
+  const [editingPhaseN, setEditingPhaseN] = useState<number | null>(null);
+  const [draftMessage, setDraftMessage] = useState('');
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  // Group clientes by column
+  // Load saved templates from Supabase app_settings (key: kanban_msg_1 .. kanban_msg_6)
+  useEffect(() => {
+    if (!activeAccountId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .eq('account_id', activeAccountId)
+        .like('key', 'kanban_msg_%');
+      if (cancelled || !data) return;
+      const loaded: Record<number, string> = { ...MENSAGENS_DEFAULT };
+      for (const row of data) {
+        const m = String(row.key).match(/^kanban_msg_(\d)$/);
+        if (m) loaded[Number(m[1])] = String(row.value ?? '');
+      }
+      setTemplates(loaded);
+    })();
+    return () => { cancelled = true; };
+  }, [activeAccountId]);
+
+  const openEditTemplate = (n: number) => {
+    setEditingPhaseN(n);
+    setDraftMessage(templates[n] ?? MENSAGENS_DEFAULT[n] ?? '');
+  };
+
+  const saveTemplate = useCallback(async () => {
+    if (editingPhaseN == null || !activeAccountId) return;
+    const n = editingPhaseN;
+    const value = draftMessage;
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert(
+        { account_id: activeAccountId, key: `kanban_msg_${n}`, value } as any,
+        { onConflict: 'account_id,key' }
+      );
+    if (error) {
+      toast.error('Erro ao salvar mensagem: ' + error.message);
+      return;
+    }
+    setTemplates(prev => ({ ...prev, [n]: value }));
+    toast.success(`Mensagem da fase ${n} salva`);
+    setEditingPhaseN(null);
+    setDraftMessage('');
+  }, [editingPhaseN, draftMessage, activeAccountId]);
+
+  const insertPlaceholder = (ph: string) => {
+    setDraftMessage(prev => prev + ph);
+  };
+
+  // Group clientes by column, keeping a stable sort by id (oldest first)
+  // to prevent cards from jumping positions when their data changes.
   const columns = useMemo(() => {
     const grouped: Record<number, Cliente[]> = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
-    for (const c of clientes) {
+    const sorted = [...clientes].sort((a, b) => a.id - b.id);
+    for (const c of sorted) {
       const col = getColumnOfCliente(c);
       if (grouped[col]) grouped[col].push(c);
     }
@@ -304,6 +420,8 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
     }
   };
 
+  const editingFase = editingPhaseN ? FASES.find(f => f.n === editingPhaseN) : null;
+
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-3">
@@ -314,9 +432,56 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
             clientes={columns[fase.n] || []}
             onEditCliente={onEditCliente}
             onMarkFeito={onMarkContatoFeito}
+            onEditTemplate={openEditTemplate}
+            templates={templates}
           />
         ))}
       </div>
+
+      {/* Edit template dialog */}
+      <Dialog open={editingPhaseN !== null} onOpenChange={open => { if (!open) { setEditingPhaseN(null); setDraftMessage(''); } }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Mensagem da fase {editingPhaseN} — {editingFase?.titulo}</DialogTitle>
+            <DialogDescription>
+              Esta é a mensagem que aparecerá pré-preenchida ao clicar no botão WhatsApp dos cards desta coluna. Use os placeholders abaixo para inserir o nome do cliente ou vendedor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{primeiro_nome}}')} className="text-xs">+ Primeiro nome</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{nome_completo}}')} className="text-xs">+ Nome completo</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => insertPlaceholder('{{vendedor}}')} className="text-xs">+ Vendedor</Button>
+            </div>
+
+            <Textarea
+              value={draftMessage}
+              onChange={e => setDraftMessage(e.target.value)}
+              placeholder="Digite a mensagem..."
+              className="min-h-[160px] text-sm"
+              autoFocus
+            />
+
+            <div className="rounded-md bg-secondary/50 border border-border/30 p-2">
+              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Pré-visualização (exemplo: João Silva / Bianca)</p>
+              <p className="text-xs text-foreground whitespace-pre-wrap">
+                {draftMessage
+                  .replace(/\{\{primeiro_nome\}\}/g, 'João')
+                  .replace(/\{\{nome_completo\}\}/g, 'João Silva')
+                  .replace(/\{\{vendedor\}\}/g, 'Bianca')
+                  || <span className="text-muted-foreground/60">(mensagem vazia)</span>}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingPhaseN(null); setDraftMessage(''); }}>Cancelar</Button>
+            <Button onClick={saveTemplate}>Salvar mensagem</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </DndContext>
   );
 }

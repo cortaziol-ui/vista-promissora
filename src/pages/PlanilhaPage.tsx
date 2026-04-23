@@ -20,8 +20,8 @@ import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Cale
 import { toast } from 'sonner';
 import KanbanPosVenda from '@/components/KanbanPosVenda';
 
-// Feature flag: kanban is hidden while we polish it. Set to true to re-enable.
-const KANBAN_ENABLED = false;
+// Feature flag: kanban está habilitado. Todo usuário admin vê o toggle.
+const KANBAN_ENABLED = true;
 
 const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -282,12 +282,15 @@ export default function PlanilhaPage() {
   // Mark current contato as "feito"
   const handleMarkContatoFeito = (cliente: Cliente, contatoN: number) => {
     const contatos = ensureContatos(cliente.contatos, cliente.data);
+    const current = contatos.find(c => c.n === contatoN);
+    const wasFeito = current?.status === 'feito';
+    const newStatus: 'feito' | 'pendente' = wasFeito ? 'pendente' : 'feito';
     const updated = contatos.map(c => {
-      if (c.n === contatoN) return { ...c, status: 'feito' as const };
+      if (c.n === contatoN) return { ...c, status: newStatus };
       return c;
     });
     // Auto-fill dates 5 and 6 when contato 3 is marked feito (like in the modal)
-    if (contatoN === 3) {
+    if (contatoN === 3 && newStatus === 'feito') {
       const c3 = updated.find(c => c.n === 3);
       if (c3?.data) {
         const c5Data = addDaysBR(c3.data, 15);
@@ -299,7 +302,9 @@ export default function PlanilhaPage() {
       }
     }
     updateCliente(cliente.id, { contatos: updated });
-    toast.success(`Contato ${contatoN} marcado como feito`);
+    toast.success(newStatus === 'feito'
+      ? `Contato ${contatoN} marcado como feito`
+      : `Contato ${contatoN} desmarcado (voltou a pendente)`);
   };
 
   const handleSave = () => {
@@ -421,9 +426,10 @@ export default function PlanilhaPage() {
         </Select>
       </div>
 
-      {/* Kanban view */}
+      {/* Kanban view — uses plain background (not glass-card) to avoid stacking
+          context from backdrop-blur, which would trap dragged cards behind columns. */}
       {effectiveViewMode === 'kanban' && (
-        <div className="glass-card p-4">
+        <div className="bg-card/80 border border-border/50 rounded-xl p-4">
           <KanbanPosVenda
             clientes={filtered}
             onEditCliente={openEdit}
@@ -666,7 +672,7 @@ export default function PlanilhaPage() {
             <DialogTitle>{editingId !== null ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente abaixo.</DialogDescription>
           </DialogHeader>
-          <form autoComplete="off" className="overflow-y-auto flex-1 pr-1" onSubmit={e => { e.preventDefault(); handleSave(); }}>
+          <form autoComplete="off" className="overflow-y-auto flex-1 pr-1" onSubmit={e => e.preventDefault()}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
                 <Label>Data</Label>
