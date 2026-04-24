@@ -88,8 +88,8 @@ export function AppSidebar() {
           <img src="/logo-outcom.png" alt="out.com" className={collapsed ? "w-8 shrink-0 rounded-lg" : "w-28 shrink-0 rounded-xl"} />
         </div>
 
-        {/* Account Switcher — only visible for multi-tenant users */}
-        {isMultiTenant && !collapsed && (
+        {/* Account Switcher — visible for multi-tenant users with admin, manager, administrativo roles */}
+        {isMultiTenant && !collapsed && ['admin', 'manager', 'administrativo'].includes(userRole) && (
           <div className="px-3 mb-2">
             <div className="relative">
               <button
