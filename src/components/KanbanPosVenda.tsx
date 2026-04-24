@@ -301,7 +301,7 @@ function Coluna({
             <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0">
               {phase.ordem}
             </span>
-            <p className="text-sm font-semibold text-foreground truncate" title={phase.titulo}>{phase.titulo}</p>
+            <p className="text-sm font-semibold text-foreground line-clamp-2" title={phase.titulo}>{phase.titulo}</p>
             <Button
               size="sm"
               variant="ghost"
