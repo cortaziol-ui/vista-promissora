@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Cliente } from '@/contexts/SalesDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Check, Pencil, Settings, Plus, Layers, Trash2 } from 'lucide-react';
+import { MessageCircle, Check, Settings, Plus, Layers, Trash2 } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -201,11 +201,15 @@ function ClienteCard({
   const nomeExibido = nomeFormatado.split(' ').slice(0, 2).join(' ');
   const wppUrl = cliente.telefone ? buildWhatsappLink(cliente, column, templates) : null;
 
+  // PointerSensor com distance: 8 já diferencia click de drag. Quando dispara drag,
+  // o onClick nunca é chamado. Então podemos usar onClick no root pra abrir edição.
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-lg bg-card border ${isDragging ? 'border-primary shadow-2xl' : 'border-border/50'} p-3 cursor-grab active:cursor-grabbing hover:border-primary/50 hover:bg-card/80 transition-colors`}
+      className={`rounded-lg bg-card border ${isDragging ? 'border-primary shadow-2xl' : 'border-border/50'} p-3 cursor-pointer hover:border-primary/50 hover:bg-card/80 transition-colors`}
+      onClick={onEdit}
+      title="Clique para editar, arraste para mover"
       {...attributes}
       {...listeners}
     >
@@ -252,15 +256,6 @@ function ClienteCard({
             <MessageCircle className="w-3.5 h-3.5" />
           </a>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 hover:bg-blue-500/20 hover:text-blue-400 ml-auto"
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          title="Editar cliente"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </Button>
       </div>
     </div>
   );
@@ -524,9 +519,6 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
           <Button variant="outline" size="sm" onClick={() => setManageOpen(true)}>
             <Layers className="w-4 h-4 mr-2" /> Gerenciar fases
           </Button>
-          <Button size="sm" onClick={openNewPhase}>
-            <Plus className="w-4 h-4 mr-2" /> Nova fase
-          </Button>
         </div>
       )}
 
@@ -687,13 +679,15 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Manage phases (reorder) */}
+      {/* Manage phases (reorder / create / edit entrypoint) */}
       <GerenciarFasesDialog
         open={manageOpen}
         onOpenChange={setManageOpen}
         phases={orderedPhases}
         onReorder={reorderPhases}
         onDelete={deletePhase}
+        onEditPhase={(phase) => openEditTemplate(phase)}
+        onCreatePhase={openNewPhase}
       />
     </div>
   );

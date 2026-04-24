@@ -68,19 +68,19 @@ CREATE TRIGGER trg_kanban_phases_updated_at
 -- phase_n mantido: 1..6 para os 6 contatos já existentes em clientes.contatos;
 -- 7 é novo e clientes antigos recebem contato[n=7] via ensureContatos no front.
 INSERT INTO public.kanban_phases (account_id, phase_n, titulo, gatilho, trigger_type, trigger_days, trigger_ref_phase_n, ordem)
-SELECT a.id, 1, 'Boas-vindas',                '+1 dia',                   'apos_venda', 1,    NULL, 1 FROM public.accounts a
+SELECT a.id, 1, 'Boas-vindas',                '+1 dia',                   'apos_venda', 1::int,    NULL::int, 1 FROM public.accounts a
 UNION ALL
-SELECT a.id, 2, 'Acompanhamento',             '+15 dias',                 'apos_venda', 15,   NULL, 2 FROM public.accounts a
+SELECT a.id, 2, 'Acompanhamento',             '+15 dias',                 'apos_venda', 15::int,   NULL::int, 2 FROM public.accounts a
 UNION ALL
-SELECT a.id, 3, 'Entrega do serviço',         'Manual',                   'manual',     NULL, NULL, 3 FROM public.accounts a
+SELECT a.id, 3, 'Entrega do serviço',         'Manual',                   'manual',     NULL::int, NULL::int, 3 FROM public.accounts a
 UNION ALL
-SELECT a.id, 7, 'Cobrança 1ª parcela',        'Manual',                   'manual',     NULL, NULL, 4 FROM public.accounts a
+SELECT a.id, 7, 'Cobrança 1ª parcela',        'Manual',                   'manual',     NULL::int, NULL::int, 4 FROM public.accounts a
 UNION ALL
-SELECT a.id, 4, 'Pós-pagamento',              'Manual',                   'manual',     NULL, NULL, 5 FROM public.accounts a
+SELECT a.id, 4, 'Pós-pagamento',              'Manual',                   'manual',     NULL::int, NULL::int, 5 FROM public.accounts a
 UNION ALL
-SELECT a.id, 5, 'Upsell',                     '+15 dias após entrega',    'apos_fase',  15,   3,    6 FROM public.accounts a
+SELECT a.id, 5, 'Upsell',                     '+15 dias após entrega',    'apos_fase',  15::int,   3::int,    6 FROM public.accounts a
 UNION ALL
-SELECT a.id, 6, 'Cobrança 2ª parcela',        '+30 dias após entrega',    'apos_fase',  30,   3,    7 FROM public.accounts a;
+SELECT a.id, 6, 'Cobrança 2ª parcela',        '+30 dias após entrega',    'apos_fase',  30::int,   3::int,    7 FROM public.accounts a;
 
 -- Habilita realtime pra que os clients recebam mudanças ao vivo
 ALTER PUBLICATION supabase_realtime ADD TABLE public.kanban_phases;
