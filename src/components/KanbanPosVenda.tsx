@@ -137,9 +137,18 @@ function buildWhatsappLink(cliente: Cliente, phaseN: number, templates: Record<n
   const phone = digits.startsWith('55') ? digits : digits.length >= 10 ? '55' + digits : digits;
   const template = templates[phaseN] || DEFAULT_MESSAGE;
   const rendered = renderMessage(template, cliente).normalize('NFC');
-  const msg = encodeURIComponent(rendered);
-  // api.whatsapp.com/send direto (sem redirect via wa.me, que corrompia emojis em
-  // alguns contextos de desktop/WhatsApp Web ao reprocessar a URL)
+  // WhatsApp Web corrompia emojis percent-encoded (%F0%9F%98%8A → U+FFFD) ao fazer
+  // redirect interno pra web.whatsapp.com. Solução: passar emojis literais na URL
+  // e só codificar o que é obrigatório pra URL válida (espaço, quebra de linha e
+  // símbolos reservados que podem confundir o parser). Emojis passam inalterados.
+  const msg = rendered
+    .replace(/%/g, '%25')   // % precisa ser primeiro (escape do próprio escape)
+    .replace(/&/g, '%26')
+    .replace(/#/g, '%23')
+    .replace(/\+/g, '%2B')
+    .replace(/\?/g, '%3F')
+    .replace(/\n/g, '%0A')
+    .replace(/ /g, '%20');
   return `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`;
 }
 
