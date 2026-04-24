@@ -138,7 +138,9 @@ function buildWhatsappLink(cliente: Cliente, phaseN: number, templates: Record<n
   const template = templates[phaseN] || DEFAULT_MESSAGE;
   const rendered = renderMessage(template, cliente).normalize('NFC');
   const msg = encodeURIComponent(rendered);
-  return `https://wa.me/${phone}?text=${msg}`;
+  // api.whatsapp.com/send direto (sem redirect via wa.me, que corrompia emojis em
+  // alguns contextos de desktop/WhatsApp Web ao reprocessar a URL)
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`;
 }
 
 /* ─── Card component ─── */
