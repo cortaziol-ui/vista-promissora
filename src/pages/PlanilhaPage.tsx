@@ -18,6 +18,7 @@ import {
 import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import KanbanPosVenda from '@/components/KanbanPosVenda';
+import { useKanbanPhases, KanbanPhase } from '@/hooks/useKanbanPhases';
 
 // Feature flag: kanban está habilitado. Todo usuário admin vê o toggle.
 const KANBAN_ENABLED = true;
@@ -52,40 +53,78 @@ function addDaysBR(dateBR: string, days: number): string {
   return d.toLocaleDateString('pt-BR');
 }
 
-// Titles of the 6 follow-up contacts (order matters; n = index+1)
-const CONTATO_TITULOS = [
-  'Boas-vindas',
-  'Acompanhamento / Atualização',
-  'Entrega do serviço + aviso 48h',
-  'Pós-pagamento (envio do PDF)',
-  'Upsell / Agendamento especialista',
-  'Cobrança 2ª parcela',
+// Fallback legacy (usado apenas se kanban_phases ainda não carregou)
+const FALLBACK_PHASES: Array<{ n: number; titulo: string; days_apos_venda: number | null }> = [
+  { n: 1, titulo: 'Boas-vindas',                       days_apos_venda: 1 },
+  { n: 2, titulo: 'Acompanhamento / Atualização',      days_apos_venda: 15 },
+  { n: 3, titulo: 'Entrega do serviço + aviso 48h',    days_apos_venda: null },
+  { n: 4, titulo: 'Pós-pagamento (envio do PDF)',      days_apos_venda: null },
+  { n: 5, titulo: 'Upsell / Agendamento especialista', days_apos_venda: null },
+  { n: 6, titulo: 'Cobrança 2ª parcela',               days_apos_venda: null },
 ];
 
-function buildDefaultContatos(dataCliente: string): Contato[] {
-  const c1 = addDaysBR(dataCliente, 1);
-  const c2 = addDaysBR(dataCliente, 15);
-  return CONTATO_TITULOS.map((titulo, i) => ({
-    n: i + 1,
-    titulo,
-    data: i === 0 ? c1 : i === 1 ? c2 : '',
+function computeContatoData(phase: KanbanPhase, dataCliente: string, byPhaseN: Map<number, { data: string }>): string {
+  if (phase.trigger_type === 'apos_venda' && phase.trigger_days != null) {
+    return addDaysBR(dataCliente, phase.trigger_days);
+  }
+  if (phase.trigger_type === 'apos_fase' && phase.trigger_days != null && phase.trigger_ref_phase_n != null) {
+    const ref = byPhaseN.get(phase.trigger_ref_phase_n);
+    if (ref?.data) return addDaysBR(ref.data, phase.trigger_days);
+  }
+  return '';
+}
+
+function buildDefaultContatos(dataCliente: string, phases: KanbanPhase[] | null): Contato[] {
+  if (phases && phases.length > 0) {
+    const ordered = [...phases].sort((a, b) => a.ordem - b.ordem);
+    const byPhaseN = new Map<number, { data: string }>();
+    // Primeira passagem: preenche as datas que dependem só da venda
+    for (const p of ordered) {
+      const data = p.trigger_type === 'apos_venda' && p.trigger_days != null
+        ? addDaysBR(dataCliente, p.trigger_days) : '';
+      byPhaseN.set(p.phase_n, { data });
+    }
+    // Segunda passagem: resolve as "apos_fase" baseadas nas datas já calculadas
+    const contatos: Contato[] = ordered.map(p => ({
+      n: p.phase_n,
+      titulo: p.titulo,
+      data: computeContatoData(p, dataCliente, byPhaseN),
+      status: 'pendente',
+      obs: '',
+    }));
+    // Atualiza o map com as datas finais (pode haver encadeamento)
+    for (const c of contatos) byPhaseN.set(c.n, { data: c.data });
+    return contatos;
+  }
+  // Fallback legacy
+  return FALLBACK_PHASES.map(p => ({
+    n: p.n,
+    titulo: p.titulo,
+    data: p.days_apos_venda != null ? addDaysBR(dataCliente, p.days_apos_venda) : '',
     status: 'pendente',
     obs: '',
   }));
 }
 
-// Ensure a cliente always has the 6 contatos (fill missing or old records)
-function ensureContatos(existing: Contato[] | undefined, dataCliente: string): Contato[] {
-  const defaults = buildDefaultContatos(dataCliente);
+// Ensure a cliente always has contatos matching current phases (backfill legacy records + new phases)
+function ensureContatos(existing: Contato[] | undefined, dataCliente: string, phases: KanbanPhase[] | null): Contato[] {
+  const defaults = buildDefaultContatos(dataCliente, phases);
   if (!existing || existing.length === 0) return defaults;
-  // Merge: preserve existing by n, fill gaps with defaults
-  return defaults.map(def => {
+  // Merge por `n`: preserva data/status/obs do existente, atualiza título pro da fase atual
+  const merged = defaults.map(def => {
     const found = existing.find(e => e.n === def.n);
     return found ? { ...def, ...found, titulo: def.titulo } : def;
   });
+  // Preserva contatos que existem em `existing` mas não estão nas fases atuais
+  // (ex: fase foi soft-deleted mas cliente ainda tem o registro). Mantém no array
+  // pra não perder dado; getColumnOfCliente já trata fase inexistente.
+  for (const e of existing) {
+    if (!merged.some(m => m.n === e.n)) merged.push(e);
+  }
+  return merged;
 }
 
-function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
+function makeEmptyCliente(selectedMonth: string, phases: KanbanPhase[] | null): Omit<Cliente, 'id'> {
   const today = new Date().toLocaleDateString('pt-BR');
   return {
     data: today,
@@ -95,12 +134,13 @@ function makeEmptyCliente(selectedMonth: string): Omit<Cliente, 'id'> {
     parcela2: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 60) },
     situacao: 'À ENVIAR',
     valorTotal: 679,
-    contatos: buildDefaultContatos(today),
+    contatos: buildDefaultContatos(today, phases),
   };
 }
 
 export default function PlanilhaPage() {
   const { clientes, vendedores, addCliente, updateCliente, bulkUpdateClientes, deleteCliente } = useSalesData();
+  const { phases: kanbanPhases } = useKanbanPhases();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
   const [filterVendedor, setFilterVendedor] = useState('all');
@@ -115,7 +155,7 @@ export default function PlanilhaPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState<Omit<Cliente, 'id'>>(makeEmptyCliente(selectedMonth));
+  const [form, setForm] = useState<Omit<Cliente, 'id'>>(() => makeEmptyCliente(selectedMonth, null));
 
   // Bulk edit state
   const [bulkMode, setBulkMode] = useState(false);
@@ -226,11 +266,11 @@ export default function PlanilhaPage() {
 
   const situacoes = useMemo(() => [...new Set(clientes.map(c => c.situacao).filter(s => s && s.trim()))], [clientes]);
 
-  const openNew = () => { setEditingId(null); setForm(makeEmptyCliente(selectedMonth)); setModalOpen(true); };
+  const openNew = () => { setEditingId(null); setForm(makeEmptyCliente(selectedMonth, kanbanPhases)); setModalOpen(true); };
   const openEdit = (c: Cliente) => {
     setEditingId(c.id);
     // Backfill contatos for legacy records that never had them
-    const withContatos = { ...c, contatos: ensureContatos(c.contatos, c.data) };
+    const withContatos = { ...c, contatos: ensureContatos(c.contatos, c.data, kanbanPhases) };
     setForm(withContatos);
     setModalOpen(true);
   };
@@ -239,13 +279,13 @@ export default function PlanilhaPage() {
   const handleMoveCliente = (clienteId: number, newCol: number) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return;
-    const contatos = ensureContatos(cliente.contatos, cliente.data);
-    // Store override in first contato's obs field using a marker
+    const contatos = ensureContatos(cliente.contatos, cliente.data, kanbanPhases);
+    // Store override in first contato's obs field using a marker. phase_n pode ter
+    // 2+ dígitos agora (fases dinâmicas), então usamos \d+ no regex de limpeza.
     const overrideMarker = `__col__=${newCol}`;
     const updated = contatos.map((c, i) => {
       if (i === 0) {
-        // Strip any previous override and add new
-        const cleanObs = (c.obs || '').replace(/__col__=\d/g, '').trim();
+        const cleanObs = (c.obs || '').replace(/__col__=\d+/g, '').trim();
         return { ...c, obs: cleanObs ? `${cleanObs} ${overrideMarker}` : overrideMarker };
       }
       return c;
@@ -255,7 +295,7 @@ export default function PlanilhaPage() {
 
   // Mark current contato as "feito"
   const handleMarkContatoFeito = (cliente: Cliente, contatoN: number) => {
-    const contatos = ensureContatos(cliente.contatos, cliente.data);
+    const contatos = ensureContatos(cliente.contatos, cliente.data, kanbanPhases);
     const current = contatos.find(c => c.n === contatoN);
     const wasFeito = current?.status === 'feito';
     const newStatus: 'feito' | 'pendente' = wasFeito ? 'pendente' : 'feito';
@@ -624,7 +664,7 @@ export default function PlanilhaPage() {
                     const c1 = addDaysBR(v, 1);
                     const c2 = addDaysBR(v, 15);
                     setForm(prev => {
-                      const currentContatos = prev.contatos ?? buildDefaultContatos(v);
+                      const currentContatos = prev.contatos ?? buildDefaultContatos(v, kanbanPhases);
                       const nextContatos = currentContatos.map(c => {
                         if (c.n === 1) return { ...c, data: c1 };
                         if (c.n === 2) return { ...c, data: c2 };
@@ -914,7 +954,7 @@ export default function PlanilhaPage() {
                 <p className="text-sm font-medium text-foreground mb-1">Contatos de Acompanhamento</p>
                 <p className="text-xs text-muted-foreground mb-3">Jornada pós-venda (boas-vindas, acompanhamento, entrega, upsell, cobrança). Datas 1 e 2 calculadas a partir da data do cliente.</p>
                 <div className="space-y-3">
-                  {(form.contatos ?? ensureContatos(form.contatos, form.data)).map((contato) => (
+                  {(form.contatos ?? ensureContatos(form.contatos, form.data, kanbanPhases)).map((contato) => (
                     <div key={contato.n} className="p-3 rounded-lg bg-secondary/30 border border-border/30">
                       <div className="flex items-start gap-3">
                         <div className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-xs font-semibold shrink-0 mt-1">
@@ -934,7 +974,7 @@ export default function PlanilhaPage() {
                                 if (v.length > 4) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
                                 else if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
                                 setForm(f => {
-                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data, kanbanPhases);
                                   const next = currentContatos.map(c => c.n === contato.n ? { ...c, data: v } : c);
                                   return { ...f, contatos: next };
                                 });
@@ -950,7 +990,7 @@ export default function PlanilhaPage() {
                               value={contato.status}
                               onValueChange={v => {
                                 setForm(f => {
-                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                                  const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data, kanbanPhases);
                                   let next = currentContatos.map(c => c.n === contato.n ? { ...c, status: v as Contato['status'] } : c);
                                   // When contato 3 (Entrega) is marked as 'feito' and has date, auto-fill contacts 5 and 6
                                   if (contato.n === 3 && v === 'feito') {
@@ -986,7 +1026,7 @@ export default function PlanilhaPage() {
                           value={contato.obs || ''}
                           onChange={e => {
                             setForm(f => {
-                              const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data);
+                              const currentContatos = f.contatos ?? ensureContatos(f.contatos, f.data, kanbanPhases);
                               const next = currentContatos.map(c => c.n === contato.n ? { ...c, obs: e.target.value } : c);
                               return { ...f, contatos: next };
                             });

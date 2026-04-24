@@ -67,6 +67,59 @@ export type Database = {
           },
         ]
       }
+      kanban_phases: {
+        Row: {
+          id: string
+          account_id: string
+          phase_n: number
+          titulo: string
+          gatilho: string
+          trigger_type: string
+          trigger_days: number | null
+          trigger_ref_phase_n: number | null
+          ordem: number
+          ativo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          phase_n: number
+          titulo: string
+          gatilho?: string
+          trigger_type?: string
+          trigger_days?: number | null
+          trigger_ref_phase_n?: number | null
+          ordem: number
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          phase_n?: number
+          titulo?: string
+          gatilho?: string
+          trigger_type?: string
+          trigger_days?: number | null
+          trigger_ref_phase_n?: number | null
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kanban_phases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           account_id: string
