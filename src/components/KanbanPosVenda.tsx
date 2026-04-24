@@ -421,6 +421,8 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
 
     let phaseN: number;
     if (editingPhase === 'new') {
+      // Criar fase é sempre admin (não-admin nem vê o botão pra abrir este fluxo)
+      if (!isAdmin) { toast.error('Apenas o administrador pode criar fases'); setSaving(false); return; }
       const created = await addPhase({
         titulo: title,
         trigger_type: draftTriggerType,
@@ -430,17 +432,21 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
       if (!created) { toast.error('Erro ao criar fase'); setSaving(false); return; }
       phaseN = created.phase_n;
     } else {
-      const ok = await updatePhase(editingPhase.id, {
-        titulo: title,
-        trigger_type: draftTriggerType,
-        trigger_days,
-        trigger_ref_phase_n,
-      });
-      if (!ok) { toast.error('Erro ao atualizar fase'); setSaving(false); return; }
+      // Editando fase existente: só admin atualiza título/gatilho. Não-admin só
+      // salva mensagem (evita tentar UPDATE em kanban_phases que a RLS bloqueia).
+      if (isAdmin) {
+        const ok = await updatePhase(editingPhase.id, {
+          titulo: title,
+          trigger_type: draftTriggerType,
+          trigger_days,
+          trigger_ref_phase_n,
+        });
+        if (!ok) { toast.error('Erro ao atualizar fase'); setSaving(false); return; }
+      }
       phaseN = editingPhase.phase_n;
     }
 
-    // Save message (app_settings keyed by phase_n)
+    // Save message (app_settings keyed by phase_n) — disponível pra todos os papéis
     const { error: msgErr } = await supabase
       .from('app_settings')
       .upsert(
@@ -450,10 +456,10 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
     if (msgErr) { toast.error('Erro ao salvar mensagem: ' + msgErr.message); setSaving(false); return; }
 
     setTemplates(prev => ({ ...prev, [phaseN]: draftMessage }));
-    toast.success(editingPhase === 'new' ? 'Fase criada' : 'Fase atualizada');
+    toast.success(editingPhase === 'new' ? 'Fase criada' : isAdmin ? 'Fase atualizada' : 'Mensagem atualizada');
     setSaving(false);
     closeDialog();
-  }, [editingPhase, activeAccountId, draftTitle, draftMessage, draftTriggerType, draftTriggerDays, draftTriggerRefN, addPhase, updatePhase]);
+  }, [editingPhase, activeAccountId, isAdmin, draftTitle, draftMessage, draftTriggerType, draftTriggerDays, draftTriggerRefN, addPhase, updatePhase]);
 
   const handleDeletePhase = async () => {
     if (!confirmDeletePhase) return;
@@ -555,19 +561,23 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>
-              Edite o título, mensagem padrão do WhatsApp e (se admin) o gatilho da fase.
+              {isAdmin
+                ? 'Edite o título, mensagem do WhatsApp e gatilho da fase.'
+                : 'Edite a mensagem do WhatsApp desta fase. Título e gatilho só podem ser alterados pelo administrador.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Phase title */}
+            {/* Phase title — editable only for admin */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Título da fase</Label>
+              <Label className="text-xs">Título da fase{!isAdmin && ' (somente leitura)'}</Label>
               <Input
                 value={draftTitle}
-                onChange={e => setDraftTitle(e.target.value)}
+                onChange={e => isAdmin && setDraftTitle(e.target.value)}
                 placeholder="Ex: Cobrança 1ª parcela"
                 className="text-sm"
+                readOnly={!isAdmin}
+                disabled={!isAdmin}
               />
             </div>
 
