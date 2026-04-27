@@ -80,10 +80,12 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const [clienteDataByName, setClienteDataByName] = useState<Record<string, string>>({});
 
   // Normaliza nome pra match: remove acentos, símbolos, espaços extras, lowercase.
-  // Nome de pasta tem padrão "<CLIENTE> - <VENDEDOR>" — corta no primeiro " - "
-  // pra extrair só o nome do cliente.
+  // Nome de pasta tem padrão "<CLIENTE> - <VENDEDOR>" — corta no último "-"
+  // pra extrair só o nome do cliente. Funciona com " - " e com "-".
   const normalizeForMatch = (raw: string): string => {
-    const noSuffix = String(raw || '').split(/\s+-\s+/)[0];
+    let noSuffix = String(raw || '');
+    const lastDash = noSuffix.lastIndexOf('-');
+    if (lastDash > 0) noSuffix = noSuffix.slice(0, lastDash);
     return noSuffix
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
