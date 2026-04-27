@@ -681,7 +681,7 @@ export default function SalesPage() {
                 <h3 className="text-sm font-semibold text-foreground mb-0.5">
                   <span className="mr-1">🎂</span>Aniversariantes
                 </h3>
-                <p className="text-xs text-muted-foreground mb-2">Do mês</p>
+                <p className="text-xs text-muted-foreground mb-2">{['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][new Date().getMonth()]}</p>
                 {aniversariantes.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">Nenhum este mês</p>
                 ) : (
