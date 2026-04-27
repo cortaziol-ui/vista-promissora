@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface CommissionTier {
   id: number;
@@ -39,24 +40,41 @@ export function useCommissionTiers({
   vendas,
   meta,
 }: UseCommissionTiersParams): UseCommissionTiersResult {
-  const { activeAccountId } = useTenant();
+  const { activeAccountId, accounts } = useTenant();
+  const { user } = useAuth();
   const [rawTiers, setRawTiers] = useState<CommissionTier[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
+  const accountIds = accounts.map(a => a.id);
+  const accountIdsKey = accountIds.join(',');
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchTiers() {
-      if (!activeAccountId) return;
+      if (!activeAccountId && !isConsolidatedSeller) return;
       setLoading(true);
 
       try {
+        // In consolidated mode we need to know which account the vendedor belongs to,
+        // so we can pull the right account's tiers (each tenant has its own pricing).
+        let scopedAccountId: string | null = activeAccountId;
+        if (isConsolidatedSeller && vendedorId !== null) {
+          const { data: vendRow } = await supabase
+            .from('vendedores')
+            .select('account_id')
+            .eq('id', vendedorId)
+            .maybeSingle();
+          scopedAccountId = (vendRow as any)?.account_id ?? null;
+        }
+
         // First try vendedor-specific tiers
-        if (vendedorId !== null) {
+        if (vendedorId !== null && scopedAccountId) {
           const { data: specific } = await supabase
             .from('commission_tiers')
             .select('*')
-            .eq('account_id', activeAccountId)
+            .eq('account_id', scopedAccountId)
             .eq('month', month)
             .eq('vendedor_id', vendedorId)
             .order('sort_order', { ascending: true });
@@ -69,10 +87,16 @@ export function useCommissionTiers({
         }
 
         // Fallback to global tiers (vendedor_id IS NULL)
+        // Consolidated + no vendedor selected: pick the first account's global tiers as default.
+        const fallbackAccountId = scopedAccountId ?? accountIds[0];
+        if (!fallbackAccountId) {
+          if (!cancelled) setRawTiers([]);
+          return;
+        }
         const { data: global } = await supabase
           .from('commission_tiers')
           .select('*')
-          .eq('account_id', activeAccountId)
+          .eq('account_id', fallbackAccountId)
           .eq('month', month)
           .is('vendedor_id', null)
           .order('sort_order', { ascending: true });
@@ -93,7 +117,7 @@ export function useCommissionTiers({
 
     fetchTiers();
     return () => { cancelled = true; };
-  }, [vendedorId, month, activeAccountId]);
+  }, [vendedorId, month, activeAccountId, isConsolidatedSeller, accountIdsKey]);
 
   const enriched = useMemo(() => {
     return rawTiers.map((tier) => {
