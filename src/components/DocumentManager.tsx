@@ -79,13 +79,17 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   // Mapa nome-normalizado → data da venda (DD/MM/YYYY)
   const [clienteDataByName, setClienteDataByName] = useState<Record<string, string>>({});
 
-  // Normaliza nome pra match: remove acentos, símbolos, espaços extras, lowercase
-  const normalizeForMatch = (raw: string): string =>
-    String(raw || '')
+  // Normaliza nome pra match: remove acentos, símbolos, espaços extras, lowercase.
+  // Nome de pasta tem padrão "<CLIENTE> - <VENDEDOR>" — corta no primeiro " - "
+  // pra extrair só o nome do cliente.
+  const normalizeForMatch = (raw: string): string => {
+    const noSuffix = String(raw || '').split(/\s+-\s+/)[0];
+    return noSuffix
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '');
+  };
 
   const isBeforeSystem = config.driveLink
     ? (year < SYSTEM_START.year || (year === SYSTEM_START.year && month < SYSTEM_START.month))
