@@ -470,7 +470,8 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     if (data && !error) {
       setClientes(prev => [...prev, mapRowToCliente(data)]);
     } else if (error) {
-      toast.error('Erro ao adicionar cliente: ' + error.message);
+      console.error('[addCliente] erro completo:', { message: error.message, details: (error as any).details, hint: (error as any).hint, code: (error as any).code, row });
+      toast.error(`Erro ao adicionar cliente: ${error.message}${(error as any).details ? ' — ' + (error as any).details : ''}`);
     }
   }, [activeAccountId]);
 
