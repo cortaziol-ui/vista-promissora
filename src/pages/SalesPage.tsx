@@ -428,53 +428,52 @@ export default function SalesPage() {
         )}
       </div>
 
-      <div className={`grid ${isVertical ? 'grid-cols-3 gap-2' : 'grid-cols-1 lg:grid-cols-3 gap-3'}`}>
-        <div className={`${isVertical ? 'col-span-2' : 'lg:col-span-2'} glass-card ${isVertical ? 'p-2.5' : 'p-3'}`}>
-          <h3 className={`${isVertical ? 'text-xs' : 'text-sm'} font-semibold text-foreground ${isVertical ? 'mb-1.5' : 'mb-2'}`}>Vendas por Dia</h3>
-          <DailySalesGrid dailySales={dailySales} selectedMonth={selectedMonth} isVertical={isVertical} />
-        </div>
-        {/* Top 3 do mês anterior */}
-        <div className={`glass-card ${isVertical ? 'p-2.5 flex flex-col justify-center' : 'p-3'} bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20`}>
-          <h3 className={`${isVertical ? 'text-xs' : 'text-sm'} font-semibold text-foreground mb-0.5`}>Top 3 Vendedores</h3>
-          <p className={`${isVertical ? 'text-[10px]' : 'text-xs'} text-muted-foreground ${isVertical ? 'mb-1.5' : 'mb-2'}`}>{prevMonthLabel}</p>
-          {top3PrevMonth.length === 0 ? (
-            <p className={`${isVertical ? 'text-base' : 'text-sm'} text-muted-foreground text-center py-8`}>Sem dados do mês anterior</p>
-          ) : (
-            <div className={`flex flex-col items-center ${isVertical ? 'gap-1.5' : 'gap-4'}`}>
-              {top3PrevMonth.map((v, i) => {
-                const medals = ['🥇', '🥈', '🥉'];
-                const sizes = isVertical
-                  ? ['w-8 h-8 text-sm', 'w-7 h-7 text-xs', 'w-7 h-7 text-xs']
-                  : ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
-                const nameSizes = isVertical
-                  ? ['text-xs font-bold', 'text-xs font-semibold', 'text-xs font-semibold']
-                  : ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
-                const glows = [
-                  'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
-                  'ring-2 ring-gray-400/30',
-                  'ring-2 ring-amber-700/30',
-                ];
-                return (
-                  <div key={v.nome} className={`flex items-center ${isVertical ? 'gap-2' : 'gap-4'} w-full`}>
-                    <span className={`${isVertical ? 'text-sm w-5' : 'text-2xl w-8'} text-center`}>{medals[i]}</span>
-                    <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
-                      {v.foto ? (
-                        <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{v.avatar}</span>
-                      )}
+      {/* DESKTOP: Performance por Vendedor sobe pra cá (Vendas por Dia + Top 3 descem pra depois da tabela) */}
+      {/* VERTICAL: ordem original (Vendas por Dia + Top 3 primeiro, Performance depois) */}
+      {isVertical && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-2 glass-card p-2.5">
+            <h3 className="text-xs font-semibold text-foreground mb-1.5">Vendas por Dia</h3>
+            <DailySalesGrid dailySales={dailySales} selectedMonth={selectedMonth} isVertical={isVertical} />
+          </div>
+          <div className="glass-card p-2.5 flex flex-col justify-center bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20">
+            <h3 className="text-xs font-semibold text-foreground mb-0.5">Top 3 Vendedores</h3>
+            <p className="text-[10px] text-muted-foreground mb-1.5">{prevMonthLabel}</p>
+            {top3PrevMonth.length === 0 ? (
+              <p className="text-base text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5">
+                {top3PrevMonth.map((v, i) => {
+                  const medals = ['🥇', '🥈', '🥉'];
+                  const sizes = ['w-8 h-8 text-sm', 'w-7 h-7 text-xs', 'w-7 h-7 text-xs'];
+                  const nameSizes = ['text-xs font-bold', 'text-xs font-semibold', 'text-xs font-semibold'];
+                  const glows = [
+                    'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
+                    'ring-2 ring-gray-400/30',
+                    'ring-2 ring-amber-700/30',
+                  ];
+                  return (
+                    <div key={v.nome} className="flex items-center gap-2 w-full">
+                      <span className="text-sm w-5 text-center">{medals[i]}</span>
+                      <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
+                        {v.foto ? (
+                          <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{v.avatar}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
+                        <p className="text-[10px] text-muted-foreground">{v.vendas} vendas</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
-                      <p className={`${isVertical ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>{v.vendas} vendas</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Seller Detail Table */}
       <div className={`glass-card ${isVertical ? 'p-2.5' : 'p-3'}`}>
@@ -629,6 +628,52 @@ export default function SalesPage() {
           </div>
         )}
       </div>
+
+      {/* DESKTOP: Vendas por Dia + Top 3 descem pra baixo da tabela Performance */}
+      {!isVertical && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="lg:col-span-2 glass-card p-3">
+            <h3 className="text-sm font-semibold text-foreground mb-2">Vendas por Dia</h3>
+            <DailySalesGrid dailySales={dailySales} selectedMonth={selectedMonth} isVertical={isVertical} />
+          </div>
+          <div className="glass-card p-3 bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20">
+            <h3 className="text-sm font-semibold text-foreground mb-0.5">Top 3 Vendedores</h3>
+            <p className="text-xs text-muted-foreground mb-2">{prevMonthLabel}</p>
+            {top3PrevMonth.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                {top3PrevMonth.map((v, i) => {
+                  const medals = ['🥇', '🥈', '🥉'];
+                  const sizes = ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
+                  const nameSizes = ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
+                  const glows = [
+                    'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
+                    'ring-2 ring-gray-400/30',
+                    'ring-2 ring-amber-700/30',
+                  ];
+                  return (
+                    <div key={v.nome} className="flex items-center gap-4 w-full">
+                      <span className="text-2xl w-8 text-center">{medals[i]}</span>
+                      <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
+                        {v.foto ? (
+                          <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{v.avatar}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
+                        <p className="text-xs text-muted-foreground">{v.vendas} vendas</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Commission section - visible for sellers */}
       {commissionStats.length > 0 && (
