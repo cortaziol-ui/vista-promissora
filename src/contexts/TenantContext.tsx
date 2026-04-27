@@ -71,8 +71,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const accts = userAccounts.map(ua => ua.account);
       setAccounts(accts);
 
-      // If no active account stored, pick the default or first
-      if (!activeAccountId || !accts.find(a => a.id === activeAccountId)) {
+      // Seller with multiple accounts → consolidated view (no active account selected).
+      if (user.role === 'seller' && accts.length > 1) {
+        setActiveAccountId(null);
+        localStorage.removeItem(STORAGE_KEY);
+      } else if (!activeAccountId || !accts.find(a => a.id === activeAccountId)) {
+        // Otherwise, pick the default or first
         const defaultAcct = userAccounts.find(ua => ua.is_default);
         const firstId = defaultAcct ? defaultAcct.account_id : accts[0]?.id || null;
         setActiveAccountId(firstId);

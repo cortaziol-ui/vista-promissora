@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export interface Parcela {
@@ -185,7 +186,8 @@ function mapClienteToRow(c: Partial<Cliente>) {
 const SalesDataContext = createContext<SalesDataContextType | null>(null);
 
 export function SalesDataProvider({ children }: { children: ReactNode }) {
-  const { activeAccountId, loading: tenantLoading } = useTenant();
+  const { activeAccountId, accounts, loading: tenantLoading } = useTenant();
+  const { user } = useAuth();
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [metaMensalGlobal, setMetaMensalGlobalState] = useState<number>(450000);
@@ -193,65 +195,104 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   const [metaComercialVendas, setMetaComercialVendasState] = useState<number>(30);
   const [loading, setLoading] = useState(true);
 
-  // Helper to fetch all clientes for the active account
+  // Consolidated mode: seller user with multiple accounts and no active account selected.
+  // Loads data from ALL the user's accounts at once (used by vendasgeral@outcom.com).
+  const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
+  const accountIds = accounts.map(a => a.id);
+  const accountIdsKey = accountIds.join(',');
+
+  // Helper to fetch all clientes for the active scope (single account or consolidated)
   const fetchClientes = useCallback(async () => {
+    if (isConsolidatedSeller) {
+      const { data } = await supabase.from('clientes').select('*').in('account_id', accountIds).order('id');
+      if (data) setClientes(data.map(mapRowToCliente));
+      return;
+    }
     if (!activeAccountId) return;
     const { data } = await supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id');
     if (data) {
       setClientes(data.map(mapRowToCliente));
     }
-  }, [activeAccountId]);
+  }, [activeAccountId, isConsolidatedSeller, accountIdsKey]);
 
-  // Fetch initial data — re-runs when activeAccountId changes
+  // Fetch initial data — re-runs when activeAccountId or consolidated scope changes
   useEffect(() => {
-    if (tenantLoading || !activeAccountId) {
-      if (!tenantLoading && !activeAccountId) setLoading(false);
+    if (tenantLoading) return;
+
+    if (!activeAccountId && !isConsolidatedSeller) {
+      setLoading(false);
       return;
     }
 
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const [vendRes, cliRes, settRes, metaEmpRes, metaComRes] = await Promise.all([
-          supabase.from('vendedores').select('*').eq('account_id', activeAccountId).order('id'),
-          supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id'),
-          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_mensal').maybeSingle(),
-          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_empresa_vendas').maybeSingle(),
-          supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_comercial_vendas').maybeSingle(),
-        ]);
+        if (isConsolidatedSeller) {
+          // Consolidated: load from all of the user's accounts and aggregate.
+          const [vendRes, cliRes, settRes] = await Promise.all([
+            supabase.from('vendedores').select('*').in('account_id', accountIds).order('id'),
+            supabase.from('clientes').select('*').in('account_id', accountIds).order('id'),
+            supabase.from('company_settings').select('*').in('account_id', accountIds),
+          ]);
 
-        if (vendRes.data) {
-          setVendedores(vendRes.data.map((v: any) => ({
-            id: v.id,
-            nome: v.nome,
-            cargo: v.cargo,
-            meta: Number(v.meta),
-            avatar: v.avatar,
-            aniversario: v.aniversario || undefined,
-            foto: v.foto || undefined,
-          })));
-        }
+          if (vendRes.data) {
+            setVendedores(vendRes.data.map((v: any) => ({
+              id: v.id,
+              nome: v.nome,
+              cargo: v.cargo,
+              meta: Number(v.meta),
+              avatar: v.avatar,
+              aniversario: v.aniversario || undefined,
+              foto: v.foto || undefined,
+            })));
+          }
 
-        if (cliRes.data) {
-          setClientes(cliRes.data.map(mapRowToCliente));
-        }
+          if (cliRes.data) {
+            setClientes(cliRes.data.map(mapRowToCliente));
+          }
 
-        if (settRes.data) {
-          setMetaMensalGlobalState(Number(settRes.data.value) || 450000);
+          // Sum settings across accounts (each account contributes its row per key)
+          let mensal = 0, empresa = 0, comercial = 0;
+          let hasMensal = false, hasEmpresa = false, hasComercial = false;
+          if (settRes.data) {
+            for (const row of settRes.data as any[]) {
+              const v = Number(row.value) || 0;
+              if (row.key === 'meta_mensal') { mensal += v; hasMensal = true; }
+              if (row.key === 'meta_empresa_vendas') { empresa += v; hasEmpresa = true; }
+              if (row.key === 'meta_comercial_vendas') { comercial += v; hasComercial = true; }
+            }
+          }
+          setMetaMensalGlobalState(hasMensal ? mensal : 450000 * accounts.length);
+          setMetaEmpresaVendasState(hasEmpresa ? empresa : 30 * accounts.length);
+          setMetaComercialVendasState(hasComercial ? comercial : 30 * accounts.length);
         } else {
-          setMetaMensalGlobalState(450000);
-        }
+          const [vendRes, cliRes, settRes, metaEmpRes, metaComRes] = await Promise.all([
+            supabase.from('vendedores').select('*').eq('account_id', activeAccountId).order('id'),
+            supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id'),
+            supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_mensal').maybeSingle(),
+            supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_empresa_vendas').maybeSingle(),
+            supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_comercial_vendas').maybeSingle(),
+          ]);
 
-        if (metaEmpRes.data) {
-          setMetaEmpresaVendasState(Number(metaEmpRes.data.value) || 30);
-        } else {
-          setMetaEmpresaVendasState(30);
-        }
+          if (vendRes.data) {
+            setVendedores(vendRes.data.map((v: any) => ({
+              id: v.id,
+              nome: v.nome,
+              cargo: v.cargo,
+              meta: Number(v.meta),
+              avatar: v.avatar,
+              aniversario: v.aniversario || undefined,
+              foto: v.foto || undefined,
+            })));
+          }
 
-        if (metaComRes.data) {
-          setMetaComercialVendasState(Number(metaComRes.data.value) || 30);
-        } else {
-          setMetaComercialVendasState(30);
+          if (cliRes.data) {
+            setClientes(cliRes.data.map(mapRowToCliente));
+          }
+
+          setMetaMensalGlobalState(settRes.data ? Number(settRes.data.value) || 450000 : 450000);
+          setMetaEmpresaVendasState(metaEmpRes.data ? Number(metaEmpRes.data.value) || 30 : 30);
+          setMetaComercialVendasState(metaComRes.data ? Number(metaComRes.data.value) || 30 : 30);
         }
       } catch (e) {
         console.error("[SalesDataProvider] Error fetching data:", e);
@@ -261,10 +302,27 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     };
 
     fetchAll();
-  }, [activeAccountId, tenantLoading]);
+  }, [activeAccountId, tenantLoading, isConsolidatedSeller, accountIdsKey]);
 
-  // Supabase realtime subscription for clientes (filtered by account)
+  // Supabase realtime subscription for clientes (single account OR all consolidated accounts)
   useEffect(() => {
+    if (isConsolidatedSeller) {
+      // One channel per account (Supabase filters don't support IN); merge via fetchClientes refetch.
+      const channels = accountIds.map(accId =>
+        supabase
+          .channel(`clientes-realtime-${accId}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clientes', filter: `account_id=eq.${accId}` }, () => { fetchClientes(); })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clientes', filter: `account_id=eq.${accId}` }, () => { fetchClientes(); })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'clientes', filter: `account_id=eq.${accId}` }, () => { fetchClientes(); })
+          .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR') {
+              console.error(`[SalesDataProvider] Realtime subscription error for account ${accId}`);
+            }
+          })
+      );
+      return () => { channels.forEach(c => supabase.removeChannel(c)); };
+    }
+
     if (!activeAccountId) return;
 
     const channel = supabase
@@ -293,7 +351,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchClientes, activeAccountId]);
+  }, [fetchClientes, activeAccountId, isConsolidatedSeller, accountIdsKey]);
 
   const setMetaMensalGlobal = useCallback(async (v: number) => {
     if (!activeAccountId) return;
@@ -365,7 +423,10 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addCliente = useCallback(async (c: Omit<Cliente, 'id'>) => {
-    if (!activeAccountId) return;
+    if (!activeAccountId) {
+      toast.error('Nenhuma subconta selecionada — selecione Outcom 1 ou Outcom 2 antes de cadastrar.');
+      return;
+    }
     const row = mapClienteToRow(c as Partial<Cliente>);
     row.data = c.data;
     row.nome = c.nome;

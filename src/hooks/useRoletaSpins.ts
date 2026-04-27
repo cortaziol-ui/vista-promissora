@@ -88,26 +88,31 @@ function parseLocalDateTime(data: string, hora: string): string {
 
 export function useRoletaSpins() {
   const { user } = useAuth();
-  const { activeAccountId } = useTenant();
+  const { activeAccountId, accounts } = useTenant();
   const [spins, setSpins] = useState<RoletaSpinRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const migratedRef = useRef(false);
 
+  const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
+  const accountIds = accounts.map(a => a.id);
+
   // --- Fetch spins from Supabase ---
   const fetchSpins = useCallback(async () => {
-    if (!activeAccountId) return [];
+    if (!activeAccountId && !isConsolidatedSeller) return [];
     try {
-      const { data, error } = await (supabase.from as any)('roleta_spins')
-        .select('*')
-        .eq('account_id', activeAccountId)
+      const baseQuery = (supabase.from as any)('roleta_spins').select('*');
+      const query = isConsolidatedSeller
+        ? baseQuery.in('account_id', accountIds)
+        : baseQuery.eq('account_id', activeAccountId);
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
       const records = (data as DbRow[]).map(rowToRecord);
       setSpins(records);
-      // Sync to localStorage for fallback
-      saveLocalSpins(records.slice(0, 50));
+      // Sync to localStorage for fallback (only in single-account mode to avoid mixing scopes)
+      if (!isConsolidatedSeller) saveLocalSpins(records.slice(0, 50));
       return records;
     } catch (err) {
       console.error('[useRoletaSpins] fetchSpins error, falling back to localStorage:', err);
@@ -117,7 +122,7 @@ export function useRoletaSpins() {
     } finally {
       setLoading(false);
     }
-  }, [activeAccountId]);
+  }, [activeAccountId, isConsolidatedSeller, accountIds.join(',')]);
 
   // --- Migrate localStorage data to Supabase (once) ---
   const migrateLocalStorage = useCallback(async (userId: string) => {
@@ -226,6 +231,11 @@ export function useRoletaSpins() {
   const saveSpin = useCallback(
     async (record: Omit<RoletaSpinRecord, 'id' | 'createdAt'>): Promise<RoletaSpinRecord | null> => {
       const now = new Date();
+
+      if (isConsolidatedSeller) {
+        toast.error('Modo consolidado é apenas para visualização. Use uma conta específica para girar a roleta.');
+        return null;
+      }
 
       if (!user?.id) {
         console.error('[useRoletaSpins] saveSpin: user not authenticated');
