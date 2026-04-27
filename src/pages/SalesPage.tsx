@@ -256,10 +256,9 @@ export default function SalesPage() {
         const remainingSales = Math.max(0, meta - totalSales);
         const remainingDaysInMonth = workingDaysList.filter(d => d >= today).length;
         const dynamicDaily = remainingDaysInMonth > 0 ? Math.ceil(remainingSales / remainingDaysInMonth) : 0;
-        // Only goes UP, never below the base
+        // Only goes UP, never below the base. Mantém meta base mesmo após
+        // bater meta mensal — vendedor não fica com MD=0 ao superar meta.
         dailyGoal = Math.max(baseDailyGoal, dynamicDaily);
-        // If total sales already met the monthly goal, show 0
-        if (totalSales >= meta) dailyGoal = 0;
       }
 
       // Current week sales for display
