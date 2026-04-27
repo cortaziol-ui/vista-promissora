@@ -92,8 +92,15 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     : false;
   const monthLabel = `${MONTHS[month]} ${year}`;
 
-  const fullPath = config.pathPrefix
-    ? (path.length > 0 ? `${config.pathPrefix}/${path.join('/')}` : config.pathPrefix)
+  // Isola docs por subconta. Outcom 1 fica no path legado (sem prefixo) pra
+  // não migrar arquivos existentes; Outcom 2+ usa prefixo `acct-<id>/`.
+  const OUTCOM_1_ID = 'a0000000-0000-0000-0000-000000000001';
+  const accountPrefix = activeAccountId && activeAccountId !== OUTCOM_1_ID
+    ? `acct-${activeAccountId}`
+    : '';
+  const basePath = [accountPrefix, config.pathPrefix].filter(Boolean).join('/');
+  const fullPath = basePath
+    ? (path.length > 0 ? `${basePath}/${path.join('/')}` : basePath)
     : path.join('/');
 
   /* ── Helper: list all items at a prefix, paginated (Supabase default limit is 100) ── */
@@ -126,6 +133,12 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   useEffect(() => {
     if (!isBeforeSystem) fetchItems();
   }, [fetchItems, isBeforeSystem]);
+
+  // Reseta caminho ao trocar de subconta (pasta de Outcom 1 não existe em Outcom 2)
+  useEffect(() => {
+    setPath([]);
+    setSearch('');
+  }, [activeAccountId]);
 
   // Busca clientes da subconta ativa pra exibir a data da venda nos cards de pasta
   useEffect(() => {
