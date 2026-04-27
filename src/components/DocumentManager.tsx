@@ -74,6 +74,9 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Mapa nome-da-pasta-normalizado → data da venda (DD/MM/YYYY)
+  const [clienteDataByName, setClienteDataByName] = useState<Record<string, string>>({});
+
   const isBeforeSystem = config.driveLink
     ? (year < SYSTEM_START.year || (year === SYSTEM_START.year && month < SYSTEM_START.month))
     : false;
@@ -113,6 +116,32 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   useEffect(() => {
     if (!isBeforeSystem) fetchItems();
   }, [fetchItems, isBeforeSystem]);
+
+  // Busca clientes da subconta ativa pra exibir a data da venda nos cards de pasta
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('nome, data');
+      if (cancelled || error || !data) return;
+      const map: Record<string, string> = {};
+      for (const row of data) {
+        const key = sanitizeName(String(row.nome || '')).toLowerCase();
+        if (!key) continue;
+        // Mantém a data mais recente caso haja clientes homônimos
+        const existing = map[key];
+        if (!existing) { map[key] = String(row.data || ''); continue; }
+        const toTs = (d: string) => {
+          const [dd, mm, yyyy] = d.split('/');
+          return new Date(Number(yyyy), Number(mm) - 1, Number(dd)).getTime() || 0;
+        };
+        if (toTs(String(row.data || '')) > toTs(existing)) map[key] = String(row.data || '');
+      }
+      setClienteDataByName(map);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   /* ── Month navigation ── */
   const prevMonth = () => {
@@ -381,8 +410,25 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const folders = items.filter(i => isFolder(i));
   const files = items.filter(i => !isFolder(i));
   const q = search.toLowerCase();
-  const filteredFolders = folders.filter(f => !search || f.name.toLowerCase().includes(q));
+  let filteredFolders = folders.filter(f => !search || f.name.toLowerCase().includes(q));
   const filteredFiles = files.filter(f => !search || f.name.toLowerCase().includes(q));
+
+  // Na raiz: ordena pastas pela data da venda (mais antiga = #1, sem data = no fim)
+  if (path.length === 0) {
+    const toTs = (d: string | undefined) => {
+      if (!d) return Number.POSITIVE_INFINITY;
+      const [dd, mm, yyyy] = d.split('/');
+      const t = new Date(Number(yyyy), Number(mm) - 1, Number(dd)).getTime();
+      return isNaN(t) ? Number.POSITIVE_INFINITY : t;
+    };
+    filteredFolders = [...filteredFolders].sort((a, b) => {
+      const da = clienteDataByName[a.name.toLowerCase()];
+      const db = clienteDataByName[b.name.toLowerCase()];
+      const diff = toTs(da) - toTs(db);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name);
+    });
+  }
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
 
@@ -526,16 +572,29 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-3 font-medium">Pastas</p>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {filteredFolders.map(folder => (
+                      {filteredFolders.map((folder, idx) => {
+                        const dataVenda = path.length === 0
+                          ? clienteDataByName[folder.name.toLowerCase()]
+                          : undefined;
+                        const numero = path.length === 0 ? `${idx + 1}.` : null;
+                        return (
                         <div
                           key={folder.name}
                           className="group flex items-center gap-3 pl-3 pr-1 py-2.5 rounded-lg bg-secondary/50 hover:bg-secondary border border-border/30 hover:border-border/60 cursor-pointer transition-all"
                           onClick={() => openFolder(folder.name)}
                         >
                           <Folder className="w-5 h-5 text-muted-foreground shrink-0" />
-                          <span className="text-sm text-white font-medium flex-1 select-none break-words leading-snug uppercase">
-                            {folder.name}
-                          </span>
+                          <div className="flex-1 min-w-0 select-none">
+                            <p className="text-sm text-white font-medium break-words leading-snug uppercase">
+                              {numero && <span className="text-muted-foreground font-normal mr-1">{numero}</span>}
+                              {folder.name}
+                            </p>
+                            {dataVenda && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Venda: {dataVenda}
+                              </p>
+                            )}
+                          </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
                               <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-background/60 transition-opacity">
@@ -557,7 +616,8 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   </div>
                 )}
