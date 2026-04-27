@@ -132,9 +132,9 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     if (!activeAccountId) return;
     let cancelled = false;
     (async () => {
-      const { data, error, count } = await supabase
+      const { data, error } = await supabase
         .from('clientes')
-        .select('nome, data', { count: 'exact' })
+        .select('nome, data')
         .eq('account_id', activeAccountId)
         .limit(5000);
       if (cancelled) return;
@@ -155,10 +155,6 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
         const existing = map[key];
         if (!existing || toTs(dt) > toTs(existing)) map[key] = dt;
       }
-      console.log('[DocumentManager] activeAccountId:', activeAccountId);
-      console.log('[DocumentManager] count exact:', count, 'retornados:', data.length);
-      console.log('[DocumentManager] data sample:', data.slice(0, 3));
-      console.log('[DocumentManager] mapa keys:', Object.keys(map).slice(0, 10));
       setClienteDataByName(map);
     })();
     return () => { cancelled = true; };
