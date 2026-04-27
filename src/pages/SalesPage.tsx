@@ -363,8 +363,8 @@ export default function SalesPage() {
 
   return (
     <div className={isVertical ? 'flex flex-col gap-2' : 'space-y-3'}>
-      {/* Birthday banner */}
-      {aniversariantes.length > 0 && (
+      {/* Birthday banner — apenas vertical (no desktop, aniversariantes vão pro card Top 3) */}
+      {isVertical && aniversariantes.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-500/20">
           <span className="text-base">🎂</span>
           <p className="text-xs text-foreground">
@@ -637,40 +637,74 @@ export default function SalesPage() {
             <DailySalesGrid dailySales={dailySales} selectedMonth={selectedMonth} isVertical={isVertical} />
           </div>
           <div className="glass-card p-3 bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/20">
-            <h3 className="text-sm font-semibold text-foreground mb-0.5">Top 3 Vendedores</h3>
-            <p className="text-xs text-muted-foreground mb-2">{prevMonthLabel}</p>
-            {top3PrevMonth.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
-            ) : (
-              <div className="flex flex-col items-center gap-4">
-                {top3PrevMonth.map((v, i) => {
-                  const medals = ['🥇', '🥈', '🥉'];
-                  const sizes = ['w-16 h-16 text-3xl', 'w-12 h-12 text-2xl', 'w-12 h-12 text-2xl'];
-                  const nameSizes = ['text-base font-bold', 'text-sm font-semibold', 'text-sm font-semibold'];
-                  const glows = [
-                    'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
-                    'ring-2 ring-gray-400/30',
-                    'ring-2 ring-amber-700/30',
-                  ];
-                  return (
-                    <div key={v.nome} className="flex items-center gap-4 w-full">
-                      <span className="text-2xl w-8 text-center">{medals[i]}</span>
-                      <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
-                        {v.foto ? (
-                          <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
-                        ) : (
-                          <span>{v.avatar}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-foreground ${nameSizes[i]}`}>{v.nome}</p>
-                        <p className="text-xs text-muted-foreground">{v.vendas} vendas</p>
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="grid grid-cols-2 gap-3 divide-x divide-border/30">
+              {/* Top 3 Vendedores */}
+              <div className="pr-1">
+                <h3 className="text-sm font-semibold text-foreground mb-0.5">Top 3 Vendedores</h3>
+                <p className="text-xs text-muted-foreground mb-2">{prevMonthLabel}</p>
+                {top3PrevMonth.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Sem dados do mês anterior</p>
+                ) : (
+                  <div className="flex flex-col items-center gap-3">
+                    {top3PrevMonth.map((v, i) => {
+                      const medals = ['🥇', '🥈', '🥉'];
+                      const sizes = ['w-12 h-12 text-2xl', 'w-10 h-10 text-xl', 'w-10 h-10 text-xl'];
+                      const nameSizes = ['text-sm font-bold', 'text-xs font-semibold', 'text-xs font-semibold'];
+                      const glows = [
+                        'ring-2 ring-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)]',
+                        'ring-2 ring-gray-400/30',
+                        'ring-2 ring-amber-700/30',
+                      ];
+                      return (
+                        <div key={v.nome} className="flex items-center gap-2 w-full">
+                          <span className="text-lg w-6 text-center">{medals[i]}</span>
+                          <div className={`${sizes[i]} rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ${glows[i]}`}>
+                            {v.foto ? (
+                              <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{v.avatar}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-foreground ${nameSizes[i]} truncate`}>{v.nome}</p>
+                            <p className="text-[11px] text-muted-foreground">{v.vendas} vendas</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Aniversariantes do mês */}
+              <div className="pl-3">
+                <h3 className="text-sm font-semibold text-foreground mb-0.5">
+                  <span className="mr-1">🎂</span>Aniversariantes
+                </h3>
+                <p className="text-xs text-muted-foreground mb-2">Do mês</p>
+                {aniversariantes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhum este mês</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {aniversariantes.map(v => (
+                      <div key={v.id} className="flex items-center gap-2 w-full">
+                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-pink-400/30">
+                          {v.foto ? (
+                            <img src={v.foto} alt={v.nome} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xl">{v.avatar}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground text-xs font-semibold truncate">{v.nome}</p>
+                          <p className="text-[11px] text-muted-foreground">{v.diaAniversario}/{String(new Date().getMonth() + 1).padStart(2, '0')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
