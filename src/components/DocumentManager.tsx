@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -51,6 +52,7 @@ export interface DocumentManagerConfig {
 }
 
 export default function DocumentManager({ config }: { config: DocumentManagerConfig }) {
+  const { activeAccountId } = useTenant();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -74,8 +76,16 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mapa nome-da-pasta-normalizado → data da venda (DD/MM/YYYY)
+  // Mapa nome-normalizado → data da venda (DD/MM/YYYY)
   const [clienteDataByName, setClienteDataByName] = useState<Record<string, string>>({});
+
+  // Normaliza nome pra match: remove acentos, símbolos, espaços extras, lowercase
+  const normalizeForMatch = (raw: string): string =>
+    String(raw || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
 
   const isBeforeSystem = config.driveLink
     ? (year < SYSTEM_START.year || (year === SYSTEM_START.year && month < SYSTEM_START.month))
@@ -119,29 +129,36 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
 
   // Busca clientes da subconta ativa pra exibir a data da venda nos cards de pasta
   useEffect(() => {
+    if (!activeAccountId) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
         .from('clientes')
-        .select('nome, data');
-      if (cancelled || error || !data) return;
-      const map: Record<string, string> = {};
-      for (const row of data) {
-        const key = sanitizeName(String(row.nome || '')).toLowerCase();
-        if (!key) continue;
-        // Mantém a data mais recente caso haja clientes homônimos
-        const existing = map[key];
-        if (!existing) { map[key] = String(row.data || ''); continue; }
-        const toTs = (d: string) => {
-          const [dd, mm, yyyy] = d.split('/');
-          return new Date(Number(yyyy), Number(mm) - 1, Number(dd)).getTime() || 0;
-        };
-        if (toTs(String(row.data || '')) > toTs(existing)) map[key] = String(row.data || '');
+        .select('nome, data')
+        .eq('account_id', activeAccountId);
+      if (cancelled) return;
+      if (error) {
+        console.error('[DocumentManager] erro ao buscar clientes:', error);
+        return;
       }
+      if (!data) return;
+      const map: Record<string, string> = {};
+      const toTs = (d: string) => {
+        const [dd, mm, yyyy] = (d || '').split('/');
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd)).getTime() || 0;
+      };
+      for (const row of data) {
+        const key = normalizeForMatch(row.nome);
+        if (!key) continue;
+        const dt = String(row.data || '');
+        const existing = map[key];
+        if (!existing || toTs(dt) > toTs(existing)) map[key] = dt;
+      }
+      console.log('[DocumentManager] clientes:', data.length, 'sample keys:', Object.keys(map).slice(0, 5));
       setClienteDataByName(map);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [activeAccountId]);
 
   /* ── Month navigation ── */
   const prevMonth = () => {
@@ -422,8 +439,8 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
       return isNaN(t) ? Number.POSITIVE_INFINITY : t;
     };
     filteredFolders = [...filteredFolders].sort((a, b) => {
-      const da = clienteDataByName[a.name.toLowerCase()];
-      const db = clienteDataByName[b.name.toLowerCase()];
+      const da = clienteDataByName[normalizeForMatch(a.name)];
+      const db = clienteDataByName[normalizeForMatch(b.name)];
       const diff = toTs(da) - toTs(db);
       if (diff !== 0) return diff;
       return a.name.localeCompare(b.name);
@@ -574,7 +591,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                       {filteredFolders.map((folder, idx) => {
                         const dataVenda = path.length === 0
-                          ? clienteDataByName[folder.name.toLowerCase()]
+                          ? clienteDataByName[normalizeForMatch(folder.name)]
                           : undefined;
                         const numero = path.length === 0 ? `${idx + 1}.` : null;
                         return (
