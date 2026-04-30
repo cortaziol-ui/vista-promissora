@@ -81,6 +81,27 @@ export function AppSidebar() {
     }
   };
 
+  // Atalho Alt+1..Alt+9 troca de subconta sem precisar abrir o dropdown.
+  // Só vale para roles que têm o switcher visível.
+  useEffect(() => {
+    const canSwitch = isMultiTenant && ['admin', 'manager', 'administrativo'].includes(userRole);
+    if (!canSwitch || accounts.length === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      const idx = parseInt(e.key, 10);
+      if (isNaN(idx) || idx < 1 || idx > accounts.length) return;
+      e.preventDefault();
+      const acc = accounts[idx - 1];
+      switchAccount(acc.id);
+      setAccountMenuOpen(false);
+      if (location.pathname === '/painel') navigate('/');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isMultiTenant, userRole, accounts, switchAccount, navigate, location.pathname]);
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
@@ -120,7 +141,7 @@ export function AppSidebar() {
                       <span className="font-medium text-primary">Painel de Controle</span>
                     </button>
                   )}
-                  {accounts.map((account) => (
+                  {accounts.map((account, idx) => (
                     <button
                       key={account.id}
                       onClick={() => handleSwitchAccount(account.id)}
@@ -129,7 +150,12 @@ export function AppSidebar() {
                       }`}
                     >
                       <div className={`w-2 h-2 rounded-full shrink-0 ${account.id === activeAccount?.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                      <span className="truncate">{account.name}</span>
+                      <span className="truncate flex-1 text-left">{account.name}</span>
+                      {idx < 9 && (
+                        <span className="text-[10px] font-mono text-muted-foreground/70 px-1.5 py-0.5 rounded bg-muted/50 shrink-0">
+                          Alt+{idx + 1}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>

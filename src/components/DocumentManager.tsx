@@ -202,14 +202,16 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     if (!name) return;
 
     setCreating(true);
-    const basePath = path.length > 0 ? `${fullPath}/${name}` : (config.pathPrefix ? `${config.pathPrefix}/${name}` : name);
+    // Concatena sempre a partir de fullPath (que já inclui accountPrefix em Outcom 2+)
+    // para garantir que pastas criadas na raiz vão pro path da subconta ativa.
+    const folderPath = fullPath ? `${fullPath}/${name}` : name;
 
     try {
       const placeholder = new Blob([''], { type: 'text/plain' });
 
       const { error: e1 } = await supabase.storage
         .from(config.bucket)
-        .upload(`${basePath}/${PLACEHOLDER}`, placeholder, { upsert: true });
+        .upload(`${folderPath}/${PLACEHOLDER}`, placeholder, { upsert: true });
       if (e1) throw e1;
 
       // If at root level, also create default subfolder
@@ -217,7 +219,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
         const { error: e2 } = await supabase.storage
           .from(config.bucket)
           .upload(
-            `${basePath}/${sanitizeName(config.defaultSubfolder)}/${PLACEHOLDER}`,
+            `${folderPath}/${sanitizeName(config.defaultSubfolder)}/${PLACEHOLDER}`,
             placeholder,
             { upsert: true },
           );

@@ -18,8 +18,8 @@ export interface RoletaSpinRecord {
 
 const LOCAL_KEY_SPINS = 'roleta_historico_v2';
 const LOCAL_KEY_LIMITS = 'roleta_limites_v2';
-const MIGRATION_FLAG = 'roleta_migrated_to_supabase';
-const RECOVERY_FLAG = 'roleta_recovery_20260407';
+const MIGRATION_FLAG = 'roleta_migrated_to_supabase_v2';
+const RECOVERY_FLAG = 'roleta_recovery_20260430';
 
 // No cooldown limits — spins are unlimited once conditions are met
 
@@ -91,7 +91,7 @@ export function useRoletaSpins() {
   const { activeAccountId, accounts } = useTenant();
   const [spins, setSpins] = useState<RoletaSpinRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const migratedRef = useRef(false);
+  const migratedForAccountRef = useRef<string | null>(null);
 
   const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
   const accountIds = accounts.map(a => a.id);
@@ -126,6 +126,7 @@ export function useRoletaSpins() {
 
   // --- Migrate localStorage data to Supabase (once) ---
   const migrateLocalStorage = useCallback(async (userId: string) => {
+    if (!activeAccountId) return;
     if (localStorage.getItem(MIGRATION_FLAG)) return;
 
     const localSpins = loadLocalSpins();
@@ -146,6 +147,7 @@ export function useRoletaSpins() {
             hora: s.hora,
             status: s.status,
             created_by: userId,
+            account_id: activeAccountId,
             created_at: parseLocalDateTime(s.data, s.hora),
           });
         } catch {
@@ -156,10 +158,11 @@ export function useRoletaSpins() {
     } catch (err) {
       console.error('[useRoletaSpins] migration error:', err);
     }
-  }, []);
+  }, [activeAccountId]);
 
   // --- Recover local spins that failed to save to Supabase (one-time) ---
   const recoverLocalSpins = useCallback(async (userId: string) => {
+    if (!activeAccountId) return;
     if (localStorage.getItem(RECOVERY_FLAG)) return;
 
     const localSpins = loadLocalSpins();
@@ -168,12 +171,13 @@ export function useRoletaSpins() {
       return;
     }
 
-    // Fetch existing spins to avoid duplicates
+    // Fetch existing spins (in this account) to avoid duplicates
     let existingKeys = new Set<string>();
     try {
       const { data } = await (supabase.from as any)('roleta_spins')
         .select('vendedor, motivo, data, hora')
-        .limit(200);
+        .eq('account_id', activeAccountId)
+        .limit(500);
       if (data) {
         existingKeys = new Set(
           (data as Array<{ vendedor: string; motivo: string; data: string; hora: string }>)
@@ -200,6 +204,7 @@ export function useRoletaSpins() {
           hora: s.hora,
           status: s.status,
           created_by: userId,
+          account_id: activeAccountId,
           created_at: parseLocalDateTime(s.data, s.hora),
         });
         if (!error) recovered++;
@@ -212,20 +217,25 @@ export function useRoletaSpins() {
       toast.success(`${recovered} girada(s) recuperada(s) com sucesso!`);
     }
     localStorage.setItem(RECOVERY_FLAG, 'true');
-  }, []);
+  }, [activeAccountId]);
 
   // --- Init: migrate + recover + fetch ---
   useEffect(() => {
     if (!user) return;
-    if (migratedRef.current) return;
-    migratedRef.current = true;
-
+    // Always fetch (handles consolidated mode and normal mode).
+    // Only run migrate/recover once per account once activeAccountId resolves.
+    const accountKey = activeAccountId ?? (isConsolidatedSeller ? 'consolidated' : null);
     (async () => {
-      await migrateLocalStorage(user.id);
-      await recoverLocalSpins(user.id);
+      if (accountKey && migratedForAccountRef.current !== accountKey) {
+        migratedForAccountRef.current = accountKey;
+        if (activeAccountId) {
+          await migrateLocalStorage(user.id);
+          await recoverLocalSpins(user.id);
+        }
+      }
       await fetchSpins();
     })();
-  }, [user, migrateLocalStorage, recoverLocalSpins, fetchSpins]);
+  }, [user, activeAccountId, isConsolidatedSeller, migrateLocalStorage, recoverLocalSpins, fetchSpins]);
 
   // --- Save a new spin ---
   const saveSpin = useCallback(
@@ -248,6 +258,12 @@ export function useRoletaSpins() {
         limits[`${record.vendedor}_${record.motivo}`] = now.toISOString();
         saveLocalLimits(limits);
         return fallback;
+      }
+
+      if (!activeAccountId) {
+        console.error('[useRoletaSpins] saveSpin: account not loaded yet');
+        toast.error('Erro ao salvar girada: subconta ainda carregando. Tente novamente em instantes.');
+        return null;
       }
 
       // Try Supabase first
@@ -297,7 +313,7 @@ export function useRoletaSpins() {
         return fallback;
       }
     },
-    [user, spins],
+    [user, spins, activeAccountId, isConsolidatedSeller],
   );
 
   // --- Check rate limit (disabled — always allowed) ---
