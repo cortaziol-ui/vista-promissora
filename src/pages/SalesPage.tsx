@@ -755,9 +755,9 @@ export default function SalesPage() {
                         — LN: {lnVendas}/{lnMeta} · RT: {rtVendas}/{rtMeta}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 divide-x divide-border/30">
-                      <div className="pr-1">
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-1 text-center">Limpa Nome</p>
+                    <div className="grid grid-cols-2 gap-6 divide-x-2 divide-border/60">
+                      <div className="pr-3">
+                        <p className={`${isVertical ? 'text-sm' : 'text-base'} font-bold text-foreground mb-3 text-center tracking-wide`}>Limpa Nome</p>
                         <CommissionProgress
                           vendedorNome={stat.vendedor.nome}
                           vendedorId={stat.vendedor.id}
@@ -768,8 +768,8 @@ export default function SalesPage() {
                           serviceType="LIMPA_NOME"
                         />
                       </div>
-                      <div className="pl-3">
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-1 text-center">Rating</p>
+                      <div className="pl-6">
+                        <p className={`${isVertical ? 'text-sm' : 'text-base'} font-bold text-foreground mb-3 text-center tracking-wide`}>Rating</p>
                         <CommissionProgress
                           vendedorNome={stat.vendedor.nome}
                           vendedorId={stat.vendedor.id}

@@ -127,7 +127,8 @@ export function useCommissionTiers({
   const enriched = useMemo(() => {
     return rawTiers.map((tier) => {
       const vendasNecessarias = Math.ceil((meta * tier.pct_meta) / 100);
-      const unlocked = vendas >= vendasNecessarias;
+      // Sem meta cadastrada (meta <= 0), nada esta unlocked — evita marcar tudo como completo quando vendedor nao tem meta do servico
+      const unlocked = meta > 0 && vendas >= vendasNecessarias;
       return { ...tier, unlocked, vendasNecessarias };
     });
   }, [rawTiers, vendas, meta]);
