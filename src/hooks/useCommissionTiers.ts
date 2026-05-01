@@ -80,6 +80,7 @@ export function useCommissionTiers({
             .eq('month', month)
             .eq('service_type', serviceType)
             .eq('vendedor_id', vendedorId)
+            .lte('pct_meta', 200)
             .order('sort_order', { ascending: true });
 
           if (!cancelled && specific && specific.length > 0) {
@@ -102,6 +103,7 @@ export function useCommissionTiers({
           .eq('month', month)
           .eq('service_type', serviceType)
           .is('vendedor_id', null)
+          .lte('pct_meta', 200)
           .order('sort_order', { ascending: true });
 
         if (!cancelled) {

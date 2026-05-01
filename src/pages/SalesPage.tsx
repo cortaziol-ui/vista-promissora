@@ -39,6 +39,10 @@ export default function SalesPage() {
     vendorGoals: monthlyVendorGoals,
   } = useMonthlyData(selectedMonth, serviceFilter);
 
+  // Sibling stats para split LN/RT no card de cada vendedor quando filtro = GERAL
+  const limpaNomeData = useMonthlyData(selectedMonth, 'LIMPA_NOME');
+  const ratingData = useMonthlyData(selectedMonth, 'RATING');
+
   const availableMonths = useAvailableMonths(clientes);
   const [filterVendedor, setFilterVendedor] = useState('all');
   const [tableView, setTableView] = useState<'geral' | 'semana'>('geral');
@@ -733,24 +737,73 @@ export default function SalesPage() {
         <div className={`glass-card ${isVertical ? 'p-3' : 'p-5'}`}>
           <h3 className={`${isVertical ? 'text-base' : 'text-sm'} font-semibold text-foreground ${isVertical ? 'mb-2' : 'mb-4'}`}>Premiacoes por Vendedor</h3>
           <div className={`${isVertical ? 'space-y-3' : 'space-y-4'}`}>
-            {commissionStats.map(stat => (
-              <div key={stat.vendedor.id} className={`${isVertical ? 'p-3' : 'p-4'} rounded-lg bg-secondary/30 border border-border/30`}>
-                <div className={`flex items-center gap-2 ${isVertical ? 'mb-2' : 'mb-3'}`}>
-                  <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
-                  <span className={`font-medium text-foreground ${isVertical ? 'text-base' : ''}`}>{stat.vendedor.nome}</span>
-                  <span className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground`}>— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta} vendas</span>
+            {commissionStats.map(stat => {
+              const lnStat = limpaNomeData.vendedorStats.find(s => s.vendedor.id === stat.vendedor.id);
+              const rtStat = ratingData.vendedorStats.find(s => s.vendedor.id === stat.vendedor.id);
+              const lnVendas = lnStat?.vendas ?? 0;
+              const lnMeta = limpaNomeData.vendorGoals.get(stat.vendedor.id) ?? 0;
+              const rtVendas = rtStat?.vendas ?? 0;
+              const rtMeta = ratingData.vendorGoals.get(stat.vendedor.id) ?? 0;
+
+              if (serviceFilter === 'GERAL') {
+                return (
+                  <div key={stat.vendedor.id} className={`${isVertical ? 'p-3' : 'p-4'} rounded-lg bg-secondary/30 border border-border/30`}>
+                    <div className={`flex items-center gap-2 ${isVertical ? 'mb-2' : 'mb-3'}`}>
+                      <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
+                      <span className={`font-medium text-foreground ${isVertical ? 'text-base' : ''}`}>{stat.vendedor.nome}</span>
+                      <span className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground`}>
+                        — LN: {lnVendas}/{lnMeta} · RT: {rtVendas}/{rtMeta}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 divide-x divide-border/30">
+                      <div className="pr-1">
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-1 text-center">Limpa Nome</p>
+                        <CommissionProgress
+                          vendedorNome={stat.vendedor.nome}
+                          vendedorId={stat.vendedor.id}
+                          vendas={lnVendas}
+                          meta={lnMeta}
+                          month={selectedMonth}
+                          size={isVertical ? 'compact' : 'default'}
+                          serviceType="LIMPA_NOME"
+                        />
+                      </div>
+                      <div className="pl-3">
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-1 text-center">Rating</p>
+                        <CommissionProgress
+                          vendedorNome={stat.vendedor.nome}
+                          vendedorId={stat.vendedor.id}
+                          vendas={rtVendas}
+                          meta={rtMeta}
+                          month={selectedMonth}
+                          size={isVertical ? 'compact' : 'default'}
+                          serviceType="RATING"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={stat.vendedor.id} className={`${isVertical ? 'p-3' : 'p-4'} rounded-lg bg-secondary/30 border border-border/30`}>
+                  <div className={`flex items-center gap-2 ${isVertical ? 'mb-2' : 'mb-3'}`}>
+                    <VendorAvatar foto={stat.vendedor.foto} avatar={stat.vendedor.avatar} />
+                    <span className={`font-medium text-foreground ${isVertical ? 'text-base' : ''}`}>{stat.vendedor.nome}</span>
+                    <span className={`${isVertical ? 'text-sm' : 'text-xs'} text-muted-foreground`}>— {stat.vendas}/{monthlyVendorGoals.get(stat.vendedor.id) ?? 0} vendas</span>
+                  </div>
+                  <CommissionProgress
+                    vendedorNome={stat.vendedor.nome}
+                    vendedorId={stat.vendedor.id}
+                    vendas={stat.vendas}
+                    meta={monthlyVendorGoals.get(stat.vendedor.id) ?? 0}
+                    month={selectedMonth}
+                    size={isVertical ? 'compact' : 'default'}
+                    serviceType={serviceFilter}
+                  />
                 </div>
-                <CommissionProgress
-                  vendedorNome={stat.vendedor.nome}
-                  vendedorId={stat.vendedor.id}
-                  vendas={stat.vendas}
-                  meta={monthlyVendorGoals.get(stat.vendedor.id) ?? (serviceFilter === 'GERAL' ? stat.vendedor.meta : 0)}
-                  month={selectedMonth}
-                  size={isVertical ? 'compact' : 'default'}
-                  serviceType={serviceFilter}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
