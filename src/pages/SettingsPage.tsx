@@ -566,8 +566,8 @@ export default function SettingsPage() {
                           onClick={() => setPendingToggle({ id: v.id, nome: v.nome, toInactive: isVendorActiveToday(v) })}
                         >
                           {isVendorActiveToday(v)
-                            ? <PowerOff className="w-3.5 h-3.5 text-muted-foreground" />
-                            : <Power className="w-3.5 h-3.5 text-emerald-500" />}
+                            ? <Power className="w-3.5 h-3.5 text-emerald-500" />
+                            : <PowerOff className="w-3.5 h-3.5 text-muted-foreground" />}
                         </Button>
                       )}
                     </div>
