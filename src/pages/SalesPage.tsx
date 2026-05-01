@@ -207,13 +207,27 @@ export default function SalesPage() {
     // Compute weeks for a given vendor (null = global)
     const computeVendorWeeks = (meta: number, vendorName: string | null): VendorWeeklyData => {
       const dailyBase = totalWorkingDays > 0 ? meta / totalWorkingDays : 0;
+      // Largest Remainder Method: arredonda cada baseMeta proporcional a workingDays,
+      // garantindo que sum(baseMeta) === meta. Evita perda/ganho de 1-3 vendas por arredondamento.
+      const exactBaseMetas = weekRanges.map(wr => dailyBase * wr.days.length);
+      const flooredBaseMetas = exactBaseMetas.map(v => Math.floor(v));
+      let leftover = meta - flooredBaseMetas.reduce((s, v) => s + v, 0);
+      const remainders = exactBaseMetas
+        .map((v, i) => ({ idx: i, frac: v - Math.floor(v) }))
+        .sort((a, b) => b.frac - a.frac);
+      const baseMetaByWeek = [...flooredBaseMetas];
+      for (const r of remainders) {
+        if (leftover <= 0) break;
+        baseMetaByWeek[r.idx] += 1;
+        leftover -= 1;
+      }
       let carry = 0; // deficit from previous weeks
       let currentWeekIdx = 0;
 
       const weeks: WeekInfo[] = weekRanges.map((wr, idx) => {
         const workingDays = wr.days.length;
-        const baseMeta = Math.round(dailyBase * workingDays);
-        const adjustedMeta = Math.round(baseMeta + carry);
+        const baseMeta = baseMetaByWeek[idx];
+        const adjustedMeta = baseMeta + carry;
         const sales = salesInRange(vendorName, wr.fromDay, wr.toDay);
         const isCurrent = isCurrentMonth && today >= wr.fromDay && today <= wr.toDay;
         if (isCurrent) currentWeekIdx = idx;
@@ -250,13 +264,25 @@ export default function SalesPage() {
           totalDeficit += Math.max(0, w.adjustedMeta - w.sales);
         }
       });
-      // Spread deficit across current + future weeks
+      // Spread deficit across current + future weeks (largest-remainder pra preservar soma)
       const remainingWeeks = weeks.filter(w => w.isCurrent || (isCurrentMonth && today < w.fromDay));
       const totalRemainingWorkingDays = remainingWeeks.reduce((s, w) => s + w.workingDays, 0);
       if (totalDeficit > 0 && totalRemainingWorkingDays > 0) {
-        remainingWeeks.forEach(w => {
-          const share = Math.round((w.workingDays / totalRemainingWorkingDays) * totalDeficit);
-          w.adjustedMeta = Math.round((meta / totalWorkingDays) * w.workingDays) + share;
+        const exactShares = remainingWeeks.map(w => (w.workingDays / totalRemainingWorkingDays) * totalDeficit);
+        const flooredShares = exactShares.map(v => Math.floor(v));
+        let leftoverShare = totalDeficit - flooredShares.reduce((s, v) => s + v, 0);
+        const sharesOrder = exactShares
+          .map((v, i) => ({ idx: i, frac: v - Math.floor(v) }))
+          .sort((a, b) => b.frac - a.frac);
+        const sharePerWeek = [...flooredShares];
+        for (const r of sharesOrder) {
+          if (leftoverShare <= 0) break;
+          sharePerWeek[r.idx] += 1;
+          leftoverShare -= 1;
+        }
+        remainingWeeks.forEach((w, i) => {
+          // Use the already-computed baseMeta from the same week; share adds to it.
+          w.adjustedMeta = w.baseMeta + sharePerWeek[i];
           w.completed = w.sales >= w.adjustedMeta;
         });
       }
