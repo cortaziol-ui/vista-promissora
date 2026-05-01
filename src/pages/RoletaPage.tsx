@@ -3,6 +3,7 @@ import { useSalesData } from '@/contexts/SalesDataContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { useRoletaSpins } from '@/hooks/useRoletaSpins';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -136,6 +137,7 @@ export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller, isManager, isAdmin } = useAuth();
+  const { activeAccountId } = useTenant();
   const { spins, loading: spinsLoading, saveSpin, updateSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
   const canEditSpin = isAdmin || isManager;
 
@@ -160,18 +162,20 @@ export default function RoletaPage() {
   const [editLabel, setEditLabel] = useState('');
   const [editPeso, setEditPeso] = useState(0);
 
-  // Load custom prizes from DB
+  // Load custom prizes from DB (scoped to active account)
   useEffect(() => {
+    if (!activeAccountId) return;
     (async () => {
       try {
-        const { data } = await supabase
-          .from('company_settings')
+        const { data } = await (supabase.from as any)('company_settings')
           .select('value')
+          .eq('account_id', activeAccountId)
           .eq('key', 'roleta_prizes')
           .maybeSingle();
+        // Reset to defaults when switching accounts
+        const merged = { ...DEFAULT_PRIZE_MAP };
         if (data?.value) {
           const saved = data.value as Record<string, Array<{ label: string; peso: number; color: string }>>;
-          const merged = { ...DEFAULT_PRIZE_MAP };
           for (const [motivo, prizes] of Object.entries(saved)) {
             if (merged[motivo] && Array.isArray(prizes)) {
               merged[motivo] = prizes.map((p, i) => ({
@@ -181,29 +185,35 @@ export default function RoletaPage() {
               }));
             }
           }
-          setPrizeMap(merged);
         }
+        setPrizeMap(merged);
       } catch {
         // fallback to defaults
       }
     })();
-  }, []);
+  }, [activeAccountId]);
 
   const savePrizeMap = useCallback(async (updated: Record<string, PrizeOption[]>) => {
+    if (!activeAccountId) {
+      toast.error('Sem conta ativa — selecione uma conta antes de editar prêmios.');
+      return;
+    }
     setPrizeMap(updated);
     try {
       const payload = Object.fromEntries(
         Object.entries(updated).map(([k, v]) => [k, v.map(p => ({ label: p.label, peso: p.peso, color: p.color }))])
       );
-      const { error } = await supabase
-        .from('company_settings')
-        .upsert({ key: 'roleta_prizes', value: payload as any, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      const { error } = await (supabase.from as any)('company_settings')
+        .upsert(
+          { account_id: activeAccountId, key: 'roleta_prizes', value: payload as any, updated_at: new Date().toISOString() },
+          { onConflict: 'account_id,key' }
+        );
       if (error) throw error;
       toast.success('Prêmio atualizado!');
     } catch {
       toast.error('Erro ao salvar prêmio.');
     }
-  }, []);
+  }, [activeAccountId]);
 
   const handleEditPrize = (motivo: string, index: number) => {
     const prize = prizeMap[motivo]?.[index];
