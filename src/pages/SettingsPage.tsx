@@ -541,7 +541,10 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            Edite o valor da premiação para cada faixa de meta atingida no serviço de <span className="font-semibold text-foreground">{serviceTypeLabel(editingService)}</span>. As % são fixas. Para alterar o serviço, use o seletor no topo da seção "Metas da Empresa".
+            {editingService === 'GERAL'
+              ? <>Visualizando as faixas de premiação do serviço <span className="font-semibold text-foreground">Geral</span> (somatório de Limpa Nome + Rating). Para editar valores, troque o seletor pra Limpa Nome ou Rating.</>
+              : <>Edite o valor da premiação para cada faixa de meta atingida no serviço de <span className="font-semibold text-foreground">{serviceTypeLabel(editingService)}</span>. As % são fixas. Para alterar o serviço, use o seletor no topo da seção "Metas da Empresa".</>
+            }
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {tiers.map(t => (
@@ -550,15 +553,19 @@ export default function SettingsPage() {
                 <p className="text-sm font-semibold text-foreground mb-2">{t.pct_meta}%</p>
                 <div className="flex items-center gap-1 justify-center">
                   <span className="text-xs text-muted-foreground">R$</span>
-                  <Input
-                    type="number"
-                    defaultValue={t.premiacao}
-                    onBlur={e => {
-                      const val = Number(e.target.value);
-                      if (val !== t.premiacao && val >= 0) handleUpdateTierPremiacao(t.id, val);
-                    }}
-                    className="bg-secondary border-border/50 w-20 text-center text-sm h-8"
-                  />
+                  {editingService === 'GERAL' ? (
+                    <span className="text-sm font-semibold text-foreground">{t.premiacao}</span>
+                  ) : (
+                    <Input
+                      type="number"
+                      defaultValue={t.premiacao}
+                      onBlur={e => {
+                        const val = Number(e.target.value);
+                        if (val !== t.premiacao && val >= 0) handleUpdateTierPremiacao(t.id, val);
+                      }}
+                      className="bg-secondary border-border/50 w-20 text-center text-sm h-8"
+                    />
+                  )}
                 </div>
               </div>
             ))}
