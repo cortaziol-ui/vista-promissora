@@ -133,6 +133,38 @@ export default function SettingsPage() {
   // Commission tiers state
   interface Tier { id: string; faixa_nome: string; pct_meta: number; premiacao: number; sort_order: number; }
   const [tiers, setTiers] = useState<Tier[]>([]);
+  // Tiers de LN e RT carregados sempre que activeAccount/mes mudam — usados pra
+  // exibir soma das premiacoes (LN + RT) quando editingService === 'GERAL'.
+  const [tiersLN, setTiersLN] = useState<Tier[]>([]);
+  const [tiersRT, setTiersRT] = useState<Tier[]>([]);
+
+  useEffect(() => {
+    if (!activeAccountId) return;
+    let cancelled = false;
+    (async () => {
+      const [ln, rt] = await Promise.all([
+        (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).eq('service_type', 'LIMPA_NOME').is('vendedor_id', null).lte('pct_meta', 200).order('sort_order'),
+        (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).eq('service_type', 'RATING').is('vendedor_id', null).lte('pct_meta', 200).order('sort_order'),
+      ]);
+      if (cancelled) return;
+      setTiersLN((ln.data as Tier[]) ?? []);
+      setTiersRT((rt.data as Tier[]) ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [activeAccountId, monthYM]);
+
+  // Quando editingService === 'GERAL', mostra soma das premiacoes LN + RT
+  // matched por sort_order. Caso contrario, usa o estado tiers normal.
+  const displayedTiers: Tier[] = (() => {
+    if (editingService !== 'GERAL') return tiers;
+    if (tiers.length === 0) return [];
+    return tiers.map(t => {
+      const ln = tiersLN.find(x => x.sort_order === t.sort_order);
+      const rt = tiersRT.find(x => x.sort_order === t.sort_order);
+      const sum = (ln?.premiacao ?? 0) + (rt?.premiacao ?? 0);
+      return { ...t, premiacao: sum };
+    });
+  })();
 
   const fetchTiers = useCallback(async () => {
     if (!activeAccountId) return;
@@ -536,7 +568,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Commission Tiers */}
-      {isAdmin && tiers.length > 0 && (
+      {isAdmin && displayedTiers.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div className="flex items-center gap-2">
@@ -553,7 +585,7 @@ export default function SettingsPage() {
             }
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {tiers.map(t => (
+            {displayedTiers.map(t => (
               <div key={t.id} className="p-3 rounded-lg bg-secondary/30 border border-border/30 text-center">
                 <p className="text-xs text-muted-foreground">{t.faixa_nome}</p>
                 <p className="text-sm font-semibold text-foreground mb-2">{t.pct_meta}%</p>
