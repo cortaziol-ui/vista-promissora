@@ -285,8 +285,7 @@ export default function SettingsPage() {
 
   const handleStartEditVendor = (id: number) => {
     setEditingVendorId(id);
-    const fallback = editingService === 'GERAL' ? (vendedores.find(v => v.id === id)?.meta ?? 0) : 0;
-    setVendorMetaDraft(vendorGoals.get(id) ?? fallback);
+    setVendorMetaDraft(vendorGoals.get(id) ?? 0);
   };
 
   const handleSaveVendorMeta = (id: number, nome: string) => {
@@ -494,14 +493,18 @@ export default function SettingsPage() {
                   </td>
                   <td className="py-3 px-2 text-muted-foreground">{v.cargo}</td>
                   <td className="py-3 px-2 text-right">
-                    {editingVendorId === v.id ? (
+                    {editingService === 'GERAL' ? (
+                      <span className="text-foreground">
+                        {(limpaNomeGoals.vendorGoals.get(v.id) ?? 0) + (ratingGoals.vendorGoals.get(v.id) ?? 0)} vendas
+                      </span>
+                    ) : editingVendorId === v.id ? (
                       <div className="flex items-center justify-end gap-2">
                         <Input type="number" value={vendorMetaDraft} onChange={e => setVendorMetaDraft(Number(e.target.value))} className="bg-secondary border-border/50 w-24 text-right" autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveVendorMeta(v.id, v.nome)} />
                         <Button size="sm" variant="ghost" onClick={() => handleSaveVendorMeta(v.id, v.nome)}><Check className="w-3.5 h-3.5 text-green-500" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => setEditingVendorId(null)}><X className="w-3.5 h-3.5 text-red-400" /></Button>
                       </div>
                     ) : (
-                      <span className="text-foreground">{vendorGoals.get(v.id) ?? (editingService === 'GERAL' ? v.meta : 0)} vendas</span>
+                      <span className="text-foreground">{vendorGoals.get(v.id) ?? 0} vendas</span>
                     )}
                   </td>
                   <td className="py-3 px-2 text-center">
@@ -509,7 +512,9 @@ export default function SettingsPage() {
                   </td>
                   <td className="py-3 px-2 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
+                      {editingService !== 'GERAL' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
+                      )}
                       {isAdmin && (
                         <Button variant="ghost" size="sm" onClick={async () => { const ok = await deleteVendedor(v.id); if (ok) { toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); } else { toast({ title: 'Erro', description: `${v.nome} tem clientes vinculados.`, variant: 'destructive' }); } }}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
