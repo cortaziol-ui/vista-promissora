@@ -65,9 +65,21 @@ const PRIZES_POR_VENDA: PrizeOption[] = [
 const DEFAULT_PRIZE_MAP: Record<string, PrizeOption[]> = {
   por_venda: PRIZES_POR_VENDA,
   volume_diario: PRIZES_VOLUME_DIARIO,
-  meta_semanal_100: PRIZES_META_SEMANAL,
-  meta_mensal_70: PRIZES_META_MENSAL_70,
-  meta_mensal_100: PRIZES_META_MENSAL_100,
+  meta_semanal_100_limpa_nome: PRIZES_META_SEMANAL,
+  meta_semanal_100_rating: PRIZES_META_SEMANAL,
+  meta_mensal_70_limpa_nome: PRIZES_META_MENSAL_70,
+  meta_mensal_70_rating: PRIZES_META_MENSAL_70,
+  meta_mensal_100_limpa_nome: PRIZES_META_MENSAL_100,
+  meta_mensal_100_rating: PRIZES_META_MENSAL_100,
+};
+
+// Mapa de chaves antigas pras novas (migra premios salvos no banco quando o
+// usuario abre a roleta pela 1a vez depois desta mudanca; mesmos premios pra
+// LN e RT como ponto de partida).
+const LEGACY_PRIZE_KEY_MAP: Record<string, string[]> = {
+  meta_semanal_100: ['meta_semanal_100_limpa_nome', 'meta_semanal_100_rating'],
+  meta_mensal_70:   ['meta_mensal_70_limpa_nome',   'meta_mensal_70_rating'],
+  meta_mensal_100:  ['meta_mensal_100_limpa_nome',  'meta_mensal_100_rating'],
 };
 
 interface MotiveConfig {
@@ -91,31 +103,55 @@ const MOTIVES: MotiveConfig[] = [
   {
     id: 'volume_diario',
     titulo: 'Volume Diário',
-    descricao: '3 vendas em um dia',
+    descricao: '3 vendas em um dia (LN + Rating somados)',
     icon: <Zap className="w-5 h-5" />,
     color: '#00BCD4',
     bgColor: 'rgba(0, 188, 212, 0.15)',
   },
   {
-    id: 'meta_semanal_100',
-    titulo: 'Meta Semanal',
-    descricao: '100% da meta semanal atingida',
+    id: 'meta_semanal_100_limpa_nome',
+    titulo: 'Meta Semanal Limpa Nome',
+    descricao: '100% da meta semanal de Limpa Nome atingida',
     icon: <Target className="w-5 h-5" />,
     color: '#4CAF50',
     bgColor: 'rgba(76, 175, 80, 0.15)',
   },
   {
-    id: 'meta_mensal_70',
-    titulo: 'Meta Mensal 70%',
-    descricao: '70% da meta mensal atingida',
+    id: 'meta_semanal_100_rating',
+    titulo: 'Meta Semanal Rating',
+    descricao: '100% da meta semanal de Rating atingida',
+    icon: <Target className="w-5 h-5" />,
+    color: '#4CAF50',
+    bgColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  {
+    id: 'meta_mensal_70_limpa_nome',
+    titulo: '70% Meta Mensal Limpa Nome',
+    descricao: '70% da meta mensal de Limpa Nome atingida',
     icon: <Trophy className="w-5 h-5" />,
     color: '#FF9800',
     bgColor: 'rgba(255, 152, 0, 0.15)',
   },
   {
-    id: 'meta_mensal_100',
-    titulo: 'Meta Mensal 100%',
-    descricao: '100% da meta mensal atingida',
+    id: 'meta_mensal_70_rating',
+    titulo: '70% Meta Mensal Rating',
+    descricao: '70% da meta mensal de Rating atingida',
+    icon: <Trophy className="w-5 h-5" />,
+    color: '#FF9800',
+    bgColor: 'rgba(255, 152, 0, 0.15)',
+  },
+  {
+    id: 'meta_mensal_100_limpa_nome',
+    titulo: '100% Meta Mensal Limpa Nome',
+    descricao: '100% da meta mensal de Limpa Nome atingida',
+    icon: <Crown className="w-5 h-5" />,
+    color: '#FFD700',
+    bgColor: 'rgba(255, 215, 0, 0.15)',
+  },
+  {
+    id: 'meta_mensal_100_rating',
+    titulo: '100% Meta Mensal Rating',
+    descricao: '100% da meta mensal de Rating atingida',
     icon: <Crown className="w-5 h-5" />,
     color: '#FFD700',
     bgColor: 'rgba(255, 215, 0, 0.15)',
@@ -136,6 +172,8 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
 export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
+  const lnData = useMonthlyData(getCurrentMonth(), 'LIMPA_NOME');
+  const rtData = useMonthlyData(getCurrentMonth(), 'RATING');
   const { isSeller, isManager, isAdmin } = useAuth();
   const { activeAccountId } = useTenant();
   const { spins, loading: spinsLoading, saveSpin, updateSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
@@ -176,13 +214,23 @@ export default function RoletaPage() {
         const merged = { ...DEFAULT_PRIZE_MAP };
         if (data?.value) {
           const saved = data.value as Record<string, Array<{ label: string; peso: number; color: string }>>;
+          // Helper: aplica os premios salvos numa chave especifica de merged
+          const applyTo = (targetKey: string, prizes: Array<{ label: string; peso: number; color: string }>) => {
+            if (!merged[targetKey] || !Array.isArray(prizes)) return;
+            merged[targetKey] = prizes.map((p, i) => ({
+              label: p.label,
+              peso: p.peso,
+              color: p.color || merged[targetKey]?.[i]?.color || '#4CAF50',
+            }));
+          };
           for (const [motivo, prizes] of Object.entries(saved)) {
-            if (merged[motivo] && Array.isArray(prizes)) {
-              merged[motivo] = prizes.map((p, i) => ({
-                label: p.label,
-                peso: p.peso,
-                color: p.color || merged[motivo]?.[i]?.color || '#4CAF50',
-              }));
+            if (merged[motivo]) {
+              applyTo(motivo, prizes);
+            } else if (LEGACY_PRIZE_KEY_MAP[motivo]) {
+              // Chave antiga (pre-split LN/RT): herda os mesmos premios pra ambas chaves novas
+              for (const newKey of LEGACY_PRIZE_KEY_MAP[motivo]) {
+                applyTo(newKey, prizes);
+              }
             }
           }
         }
@@ -398,10 +446,9 @@ export default function RoletaPage() {
     const vendedor = vendedores.find(v => v.nome === selectedVendedor);
     if (!vendedor) return 'Vendedor não encontrado';
 
-    const today = new Date().toLocaleDateString('pt-BR');
-    const vendorClientes = clientes.filter(c => c.vendedor === selectedVendedor);
     const todaySales = getTodaySalesCount(selectedVendedor);
-    const stat = vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
+    const lnStat = lnData.vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
+    const rtStat = rtData.vendedorStats.find(s => s.vendedor.nome === selectedVendedor);
 
     if (selectedMotivo === 'por_venda') {
       if (availableSpins <= 0) {
@@ -414,30 +461,47 @@ export default function RoletaPage() {
       return `Você tem ${todaySales} venda${todaySales !== 1 ? 's' : ''} hoje. Precisa de 3 para girar. 💪`;
     }
 
-    if (selectedMotivo === 'meta_semanal_100') {
-      const weeklyTarget = (stat?.vendedor.meta || 0) / 4;
-      const weekSales = stat?.vendas || 0;
-      if (weekSales < weeklyTarget) {
-        return `Meta semanal: ${weeklyTarget > 0 ? ((weekSales / weeklyTarget) * 100).toFixed(1) : 0}%. Precisa de 100%. 💪`;
+    // Helper interno: valida meta semanal/mensal pra um servico especifico
+    const validateMeta = (
+      servicoLabel: string,
+      stat: typeof lnStat,
+      type: 'semanal_100' | 'mensal_70' | 'mensal_100',
+    ): string | null => {
+      const meta = lnData.vendorGoals.get(vendedor.id) ?? 0;
+      const metaServico =
+        servicoLabel === 'Limpa Nome'
+          ? (lnData.vendorGoals.get(vendedor.id) ?? 0)
+          : (rtData.vendorGoals.get(vendedor.id) ?? 0);
+      if (metaServico <= 0) {
+        return `Vendedor sem meta de ${servicoLabel} cadastrada para este mês. Configure em Settings. 💪`;
       }
-    }
+      const vendas = stat?.vendas ?? 0;
+      const pct = (vendas / metaServico) * 100;
 
-    if (selectedMotivo === 'meta_mensal_70') {
-      const pct = stat?.pctMeta || 0;
-      if (pct < 70) {
-        return `Meta mensal: ${pct.toFixed(1)}%. Precisa de 70%. 💪`;
+      if (type === 'semanal_100') {
+        const weeklyTarget = metaServico / 4;
+        if (vendas < weeklyTarget) {
+          return `Meta semanal ${servicoLabel}: ${weeklyTarget > 0 ? ((vendas / weeklyTarget) * 100).toFixed(1) : 0}%. Precisa de 100%. 💪`;
+        }
+      } else if (type === 'mensal_70' && pct < 70) {
+        return `Meta mensal ${servicoLabel}: ${pct.toFixed(1)}%. Precisa de 70%. 💪`;
+      } else if (type === 'mensal_100' && pct < 100) {
+        return `Meta mensal ${servicoLabel}: ${pct.toFixed(1)}%. Precisa de 100%. 💪`;
       }
-    }
+      // ts-noop
+      void meta;
+      return null;
+    };
 
-    if (selectedMotivo === 'meta_mensal_100') {
-      const pct = stat?.pctMeta || 0;
-      if (pct < 100) {
-        return `Meta mensal: ${pct.toFixed(1)}%. Precisa de 100%. 💪`;
-      }
-    }
+    if (selectedMotivo === 'meta_semanal_100_limpa_nome') return validateMeta('Limpa Nome', lnStat, 'semanal_100');
+    if (selectedMotivo === 'meta_semanal_100_rating')     return validateMeta('Rating',     rtStat, 'semanal_100');
+    if (selectedMotivo === 'meta_mensal_70_limpa_nome')   return validateMeta('Limpa Nome', lnStat, 'mensal_70');
+    if (selectedMotivo === 'meta_mensal_70_rating')       return validateMeta('Rating',     rtStat, 'mensal_70');
+    if (selectedMotivo === 'meta_mensal_100_limpa_nome')  return validateMeta('Limpa Nome', lnStat, 'mensal_100');
+    if (selectedMotivo === 'meta_mensal_100_rating')      return validateMeta('Rating',     rtStat, 'mensal_100');
 
     return null;
-  }, [selectedVendedor, selectedMotivo, vendedores, clientes, vendedorStats, availableSpins, getTodaySalesCount]);
+  }, [selectedVendedor, selectedMotivo, vendedores, lnData, rtData, availableSpins, getTodaySalesCount]);
 
   const handleSpin = useCallback(async () => {
     const error = await validateSpin();
