@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { toast } from '@/components/ui/sonner';
+import { parsePrizeQuantity } from '@/lib/prizeQuantity';
 
 export interface RoletaSpinRecord {
   id: string;
@@ -13,6 +14,8 @@ export interface RoletaSpinRecord {
   data: string;
   hora: string;
   status: 'pendente' | 'pago';
+  quantidadeTotal: number;
+  quantidadeEntregue: number;
   createdAt?: string;
 }
 
@@ -62,11 +65,15 @@ interface DbRow {
   data: string;
   hora: string;
   status: string;
+  quantidade_total: number | null;
+  quantidade_entregue: number | null;
   created_at: string;
   created_by: string | null;
 }
 
 function rowToRecord(row: DbRow): RoletaSpinRecord {
+  const total = row.quantidade_total ?? parsePrizeQuantity(row.premio);
+  const entregue = row.quantidade_entregue ?? (row.status === 'pago' ? total : 0);
   return {
     id: row.id,
     vendedor: row.vendedor,
@@ -76,6 +83,8 @@ function rowToRecord(row: DbRow): RoletaSpinRecord {
     data: row.data,
     hora: row.hora,
     status: row.status as 'pendente' | 'pago',
+    quantidadeTotal: total,
+    quantidadeEntregue: entregue,
     createdAt: row.created_at,
   };
 }
@@ -138,6 +147,8 @@ export function useRoletaSpins() {
     try {
       for (const s of localSpins) {
         try {
+          const total = s.quantidadeTotal ?? parsePrizeQuantity(s.premio);
+          const entregue = s.quantidadeEntregue ?? (s.status === 'pago' ? total : 0);
           await (supabase.from as any)('roleta_spins').insert({
             vendedor: s.vendedor,
             motivo: s.motivo,
@@ -146,6 +157,8 @@ export function useRoletaSpins() {
             data: s.data,
             hora: s.hora,
             status: s.status,
+            quantidade_total: total,
+            quantidade_entregue: entregue,
             created_by: userId,
             account_id: activeAccountId,
             created_at: parseLocalDateTime(s.data, s.hora),
@@ -195,6 +208,8 @@ export function useRoletaSpins() {
       if (existingKeys.has(key)) continue;
 
       try {
+        const total = s.quantidadeTotal ?? parsePrizeQuantity(s.premio);
+        const entregue = s.quantidadeEntregue ?? (s.status === 'pago' ? total : 0);
         const { error } = await (supabase.from as any)('roleta_spins').insert({
           vendedor: s.vendedor,
           motivo: s.motivo,
@@ -203,6 +218,8 @@ export function useRoletaSpins() {
           data: s.data,
           hora: s.hora,
           status: s.status,
+          quantidade_total: total,
+          quantidade_entregue: entregue,
           created_by: userId,
           account_id: activeAccountId,
           created_at: parseLocalDateTime(s.data, s.hora),
@@ -239,8 +256,12 @@ export function useRoletaSpins() {
 
   // --- Save a new spin ---
   const saveSpin = useCallback(
-    async (record: Omit<RoletaSpinRecord, 'id' | 'createdAt'>): Promise<RoletaSpinRecord | null> => {
+    async (
+      record: Omit<RoletaSpinRecord, 'id' | 'createdAt' | 'quantidadeTotal' | 'quantidadeEntregue'>,
+    ): Promise<RoletaSpinRecord | null> => {
       const now = new Date();
+      const quantidadeTotal = parsePrizeQuantity(record.premio);
+      const quantidadeEntregue = 0;
 
       if (isConsolidatedSeller) {
         toast.error('Modo consolidado é apenas para visualização. Use uma conta específica para girar a roleta.');
@@ -250,7 +271,12 @@ export function useRoletaSpins() {
       if (!user?.id) {
         console.error('[useRoletaSpins] saveSpin: user not authenticated');
         toast.error('Erro ao salvar girada: usuário não autenticado.');
-        const fallback: RoletaSpinRecord = { ...record, id: `local_${Date.now()}` };
+        const fallback: RoletaSpinRecord = {
+          ...record,
+          id: `local_${Date.now()}`,
+          quantidadeTotal,
+          quantidadeEntregue,
+        };
         const updated = [fallback, ...spins].slice(0, 50);
         setSpins(updated);
         saveLocalSpins(updated);
@@ -277,6 +303,8 @@ export function useRoletaSpins() {
             data: record.data,
             hora: record.hora,
             status: record.status,
+            quantidade_total: quantidadeTotal,
+            quantidade_entregue: quantidadeEntregue,
             created_by: user.id,
             account_id: activeAccountId,
           })
@@ -302,6 +330,8 @@ export function useRoletaSpins() {
         const fallback: RoletaSpinRecord = {
           ...record,
           id: `${Date.now()}`,
+          quantidadeTotal,
+          quantidadeEntregue,
         };
         const updated = [fallback, ...spins].slice(0, 50);
         setSpins(updated);
@@ -314,6 +344,63 @@ export function useRoletaSpins() {
       }
     },
     [user, spins, activeAccountId, isConsolidatedSeller],
+  );
+
+  // --- Update spin (status / quantidade entregue) ---
+  // Quando quantidadeEntregue >= quantidadeTotal, status vai para 'pago' automaticamente.
+  // Quando quantidadeEntregue < quantidadeTotal e estava 'pago', volta para 'pendente'.
+  const updateSpin = useCallback(
+    async (
+      id: string,
+      patch: { status?: 'pendente' | 'pago'; quantidadeEntregue?: number },
+    ): Promise<boolean> => {
+      const current = spins.find(s => s.id === id);
+      if (!current) return false;
+
+      let nextEntregue = patch.quantidadeEntregue ?? current.quantidadeEntregue;
+      nextEntregue = Math.max(0, Math.min(current.quantidadeTotal, nextEntregue));
+
+      let nextStatus: 'pendente' | 'pago';
+      if (patch.status !== undefined) {
+        nextStatus = patch.status;
+        // Sincroniza contador com status quando o usuário força o toggle.
+        if (nextStatus === 'pago') nextEntregue = current.quantidadeTotal;
+        else if (nextStatus === 'pendente' && nextEntregue >= current.quantidadeTotal) nextEntregue = current.quantidadeTotal - 1 < 0 ? 0 : current.quantidadeTotal - 1;
+      } else {
+        // Deriva status pelo contador.
+        nextStatus = nextEntregue >= current.quantidadeTotal ? 'pago' : 'pendente';
+      }
+
+      // Optimistic update.
+      const optimistic: RoletaSpinRecord = { ...current, status: nextStatus, quantidadeEntregue: nextEntregue };
+      setSpins(prev => prev.map(s => s.id === id ? optimistic : s));
+
+      if (id.startsWith('local_') || id.length < 20) {
+        // Spin salvo apenas em localStorage — atualiza o cache local e termina.
+        saveLocalSpins(loadLocalSpins().map(s => s.id === id ? optimistic : s));
+        return true;
+      }
+
+      try {
+        const { error } = await (supabase.from as any)('roleta_spins')
+          .update({
+            status: nextStatus,
+            quantidade_entregue: nextEntregue,
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+        saveLocalSpins(loadLocalSpins().map(s => s.id === id ? optimistic : s));
+        return true;
+      } catch (err) {
+        console.error('[useRoletaSpins] updateSpin error:', err);
+        toast.error('Erro ao atualizar girada.');
+        // Reverte.
+        setSpins(prev => prev.map(s => s.id === id ? current : s));
+        return false;
+      }
+    },
+    [spins],
   );
 
   // --- Check rate limit (disabled — always allowed) ---
@@ -337,6 +424,7 @@ export function useRoletaSpins() {
     spins,
     loading,
     saveSpin,
+    updateSpin,
     checkRateLimit,
     getSpinsUsedToday,
     refresh: fetchSpins,

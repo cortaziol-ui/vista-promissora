@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper, Pencil } from 'lucide-react';
+import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper, Pencil, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PrizeOption {
@@ -136,7 +136,8 @@ export default function RoletaPage() {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const { isSeller, isManager, isAdmin } = useAuth();
-  const { spins, loading: spinsLoading, saveSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
+  const { spins, loading: spinsLoading, saveSpin, updateSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
+  const canEditSpin = isAdmin || isManager;
 
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
@@ -487,7 +488,51 @@ export default function RoletaPage() {
     };
   }, []);
 
-  const recentSpins = spins.slice(0, 10);
+  // --- Filtro de data para "Últimas Giradas" ---
+  type DateFilter = '7d' | '14d' | '30d' | 'all' | 'custom';
+  const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
+  const [customFrom, setCustomFrom] = useState<string>(''); // YYYY-MM-DD
+  const [customTo, setCustomTo] = useState<string>('');
+
+  // Converte "DD/MM/YYYY" do spin para Date local (00:00).
+  const parseSpinDate = (data: string): Date | null => {
+    const m = data.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+  };
+
+  const HISTORY_LIMIT = 50;
+
+  const filteredSpins = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let from: Date | null = null;
+    let to: Date | null = null;
+
+    if (dateFilter === '7d' || dateFilter === '14d' || dateFilter === '30d') {
+      const days = dateFilter === '7d' ? 7 : dateFilter === '14d' ? 14 : 30;
+      from = new Date(today);
+      from.setDate(from.getDate() - (days - 1));
+    } else if (dateFilter === 'custom') {
+      if (customFrom) from = new Date(`${customFrom}T00:00:00`);
+      if (customTo) {
+        to = new Date(`${customTo}T00:00:00`);
+        to.setHours(23, 59, 59, 999);
+      }
+    }
+
+    return spins.filter(s => {
+      const d = parseSpinDate(s.data);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }, [spins, dateFilter, customFrom, customTo]);
+
+  const recentSpins = filteredSpins.slice(0, HISTORY_LIMIT);
+  const hiddenCount = filteredSpins.length - recentSpins.length;
 
   if (loading || spinsLoading) {
     return (
@@ -631,17 +676,72 @@ export default function RoletaPage() {
           </div>
 
           {/* History — hidden for sellers */}
-          {!isSeller && !isManager && <div className="glass-card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <History className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold text-foreground">Últimas Giradas</h3>
+          {!isSeller && <div className="glass-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">Últimas Giradas</h3>
+                <span className="text-xs text-muted-foreground">({filteredSpins.length})</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={dateFilter} onValueChange={v => setDateFilter(v as DateFilter)}>
+                  <SelectTrigger className="h-8 w-[160px] bg-secondary border-border/50 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                    <SelectItem value="14d">Últimos 14 dias</SelectItem>
+                    <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                    <SelectItem value="all">Todo o histórico</SelectItem>
+                    <SelectItem value="custom">Período personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+                {dateFilter === 'custom' && (
+                  <>
+                    <Input
+                      type="date"
+                      value={customFrom}
+                      max={customTo || undefined}
+                      onChange={e => setCustomFrom(e.target.value)}
+                      className="h-8 w-[150px] bg-secondary border-border/50 text-xs"
+                      title="Data inicial"
+                    />
+                    <span className="text-xs text-muted-foreground">até</span>
+                    <Input
+                      type="date"
+                      value={customTo}
+                      min={customFrom || undefined}
+                      onChange={e => setCustomTo(e.target.value)}
+                      className="h-8 w-[150px] bg-secondary border-border/50 text-xs"
+                      title="Data final"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        const today = new Date().toISOString().slice(0, 10);
+                        setCustomFrom(today);
+                        setCustomTo(today);
+                      }}
+                      title="Filtrar somente hoje"
+                    >
+                      Hoje
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             {recentSpins.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma girada ainda. Vamos girar essa sorte! 🍀</p>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {spins.length === 0 ? 'Nenhuma girada ainda. Vamos girar essa sorte! 🍀' : 'Nenhuma girada no período selecionado.'}
+              </p>
             ) : (
               <div className="space-y-2">
                 {recentSpins.map(s => {
                   const motive = MOTIVES.find(m => m.id === s.motivo);
+                  const isPack = s.quantidadeTotal > 1;
+                  const isPago = s.status === 'pago';
                   return (
                     <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50 text-sm">
                       <div className="flex items-center gap-2">
@@ -653,13 +753,51 @@ export default function RoletaPage() {
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-foreground">{s.premio}</span>
                         <span className="text-xs text-muted-foreground">{s.data} {s.hora}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'pago' ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'}`}>
-                          {s.status === 'pago' ? '✅ Pago' : '⏳ Pendente'}
-                        </span>
+                        {isPack && (
+                          <div className="flex items-center gap-1 bg-background/60 rounded-md px-1 py-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={!canEditSpin || s.quantidadeEntregue <= 0}
+                              onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue - 1 })}
+                              title="Remover uma unidade entregue"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="text-xs font-mono tabular-nums min-w-[32px] text-center">
+                              {s.quantidadeEntregue}/{s.quantidadeTotal}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={!canEditSpin || s.quantidadeEntregue >= s.quantidadeTotal}
+                              onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue + 1 })}
+                              title="Marcar mais uma unidade entregue"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          disabled={!canEditSpin || isPack}
+                          onClick={() => updateSpin(s.id, { status: isPago ? 'pendente' : 'pago' })}
+                          className={`text-xs px-2 py-0.5 rounded-full transition ${isPago ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'} ${canEditSpin && !isPack ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}
+                          title={isPack ? 'Atualize pelo contador' : (canEditSpin ? 'Clique para alternar status' : '')}
+                        >
+                          {isPago ? '✅ Pago' : '⏳ Pendente'}
+                        </button>
                       </div>
                     </div>
                   );
                 })}
+                {hiddenCount > 0 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    Mostrando {recentSpins.length} de {filteredSpins.length} giradas. Refine o período para ver as demais.
+                  </p>
+                )}
               </div>
             )}
           </div>}
