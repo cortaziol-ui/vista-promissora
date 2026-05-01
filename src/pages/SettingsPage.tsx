@@ -319,8 +319,6 @@ export default function SettingsPage() {
     setNewUser({ name: '', email: '', monthlyGoal: 10, aniversario: '', foto: '' });
   };
 
-  const somaMetasIndividuais = vendedores.reduce((s, v) => s + (vendorGoals.get(v.id) ?? (editingService === 'GERAL' ? v.meta : 0)), 0);
-
   if (!isAdmin && !isManager) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -376,32 +374,38 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground mb-2">
               Meta Comercial — {serviceTypeLabel(editingService)} (nº de vendas)
             </p>
-            {editingMetaEmpresa ? (
-              <div className="flex items-center gap-3">
-                <Input type="number" value={metaEmpresaDraft} onChange={e => setMetaEmpresaDraft(Number(e.target.value))} className="bg-secondary border-border/50 w-32" autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveMetaEmpresa()} />
-                <span className="text-muted-foreground text-sm">vendas</span>
-                <Button size="sm" variant="ghost" onClick={handleSaveMetaEmpresa}><Check className="w-4 h-4 text-green-500" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingMetaEmpresa(false)}><X className="w-4 h-4 text-red-400" /></Button>
-              </div>
+            {editingService === 'GERAL' ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <p className="text-2xl font-bold text-foreground">{generalSum} vendas</p>
+                </div>
+                {(limpaNomeGoals.metaEmpresaVendas > 0 || ratingGoals.metaEmpresaVendas > 0) && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Limpa Nome: <span className="font-semibold text-foreground">{limpaNomeGoals.metaEmpresaVendas}</span> · Rating: <span className="font-semibold text-foreground">{ratingGoals.metaEmpresaVendas}</span>
+                  </p>
+                )}
+              </>
             ) : (
-              <div className="flex items-center gap-3">
-                <p className="text-2xl font-bold text-foreground">{metaEmpresaVendas} vendas</p>
-                <Button size="sm" variant="ghost" onClick={() => { setMetaEmpresaDraft(metaEmpresaVendas); setEditingMetaEmpresa(true); }}><Pencil className="w-4 h-4" /></Button>
-              </div>
-            )}
-            {editingService !== 'GERAL' && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Soma Limpa Nome + Rating = <span className="font-semibold text-foreground">{generalSum} vendas</span> (Geral)
-              </p>
-            )}
-            {editingService === 'GERAL' && (limpaNomeGoals.metaEmpresaVendas > 0 || ratingGoals.metaEmpresaVendas > 0) && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Limpa Nome: <span className="font-semibold text-foreground">{limpaNomeGoals.metaEmpresaVendas}</span> · Rating: <span className="font-semibold text-foreground">{ratingGoals.metaEmpresaVendas}</span> · Soma: <span className="font-semibold text-foreground">{generalSum}</span>
-              </p>
+              <>
+                {editingMetaEmpresa ? (
+                  <div className="flex items-center gap-3">
+                    <Input type="number" value={metaEmpresaDraft} onChange={e => setMetaEmpresaDraft(Number(e.target.value))} className="bg-secondary border-border/50 w-32" autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveMetaEmpresa()} />
+                    <span className="text-muted-foreground text-sm">vendas</span>
+                    <Button size="sm" variant="ghost" onClick={handleSaveMetaEmpresa}><Check className="w-4 h-4 text-green-500" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingMetaEmpresa(false)}><X className="w-4 h-4 text-red-400" /></Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <p className="text-2xl font-bold text-foreground">{metaEmpresaVendas} vendas</p>
+                    <Button size="sm" variant="ghost" onClick={() => { setMetaEmpresaDraft(metaEmpresaVendas); setEditingMetaEmpresa(true); }}><Pencil className="w-4 h-4" /></Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Soma Limpa Nome + Rating = <span className="font-semibold text-foreground">{generalSum} vendas</span> (Geral)
+                </p>
+              </>
             )}
           </div>
-
-          <p className="text-xs text-muted-foreground">Soma das metas individuais ({serviceTypeLabel(editingService)}): {somaMetasIndividuais} vendas</p>
         </div>
       )}
 
