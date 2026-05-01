@@ -55,6 +55,7 @@ export interface Vendedor {
   avatar: string;
   aniversario?: string;
   foto?: string;
+  inactiveFrom?: string;
 }
 
 export interface VendedorStats {
@@ -244,6 +245,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
               avatar: v.avatar,
               aniversario: v.aniversario || undefined,
               foto: v.foto || undefined,
+              inactiveFrom: v.inactive_from || undefined,
             })));
           }
 
@@ -283,6 +285,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
               avatar: v.avatar,
               aniversario: v.aniversario || undefined,
               foto: v.foto || undefined,
+              inactiveFrom: v.inactive_from || undefined,
             })));
           }
 
@@ -392,7 +395,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     } as any).select().single();
     if (data && !error) {
       const d = data as any;
-      const newV: Vendedor = { id: d.id, nome: d.nome, cargo: d.cargo, meta: Number(d.meta), avatar: d.avatar, aniversario: d.aniversario, foto: d.foto };
+      const newV: Vendedor = { id: d.id, nome: d.nome, cargo: d.cargo, meta: Number(d.meta), avatar: d.avatar, aniversario: d.aniversario, foto: d.foto, inactiveFrom: d.inactive_from || undefined };
       setVendedores(prev => [...prev, newV]);
       return newV;
     }
@@ -419,6 +422,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     if (partial.avatar !== undefined) dbPartial.avatar = partial.avatar;
     if (partial.aniversario !== undefined) dbPartial.aniversario = partial.aniversario;
     if (partial.foto !== undefined) dbPartial.foto = partial.foto;
+    if (partial.inactiveFrom !== undefined) dbPartial.inactive_from = partial.inactiveFrom || null;
     await supabase.from('vendedores').update(dbPartial as any).eq('id', id);
   }, []);
 

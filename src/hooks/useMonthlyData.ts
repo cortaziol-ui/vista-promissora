@@ -3,6 +3,7 @@ import { useSalesData, type Cliente, type VendedorStats } from '@/contexts/Sales
 import { parseMonthFromData, countWeekdays } from '@/lib/dateUtils';
 import { useMonthlyGoals } from '@/hooks/useMonthlyGoals';
 import { type ServiceType, salesCount as svcSalesCount, isClienteInService } from '@/lib/serviceTypes';
+import { isVendorActiveInMonth } from '@/lib/vendorActive';
 
 export interface MonthlyData {
   filteredClientes: Cliente[];
@@ -75,7 +76,7 @@ export function useMonthlyData(month: string, serviceType: ServiceType = 'GERAL'
     const weekdaysInMonth = countWeekdays(selYear, selMonthStr, 1, lastDayOfMonth);
     const isCurrentMonth = selYear === now.getFullYear() && selMonthStr === (now.getMonth() + 1);
 
-    return vendedores.map(v => {
+    return vendedores.filter(v => isVendorActiveInMonth(v, month)).map(v => {
       const cv = filteredClientes.filter(c => c.vendedor === v.nome);
       const fat = cv.reduce((s, c) => s + (c.entrada || 0), 0);
       const vendas = cv.reduce((s, c) => s + svcSalesCount(c, serviceType), 0);

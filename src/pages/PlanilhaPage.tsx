@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
+import { isVendorActiveToday } from '@/lib/vendorActive';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -578,7 +579,7 @@ export default function PlanilhaPage() {
             <Select value={bulkVendedor} onValueChange={setBulkVendedor}>
               <SelectTrigger className="w-[150px] h-9 bg-secondary border-border/50"><SelectValue placeholder="Vendedor" /></SelectTrigger>
               <SelectContent>
-                {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+                {vendedores.filter(isVendorActiveToday).map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={bulkSituacao} onValueChange={setBulkSituacao}>
@@ -731,7 +732,7 @@ export default function PlanilhaPage() {
                 <Select value={form.vendedor} onValueChange={v => updateFormField('vendedor', v)}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+                    {vendedores.filter(isVendorActiveToday).map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

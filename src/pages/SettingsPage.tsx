@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { type ServiceType, SERVICE_TYPE_OPTIONS, serviceTypeLabel } from '@/lib/serviceTypes';
+import { isVendorActiveToday } from '@/lib/vendorActive';
 
 const MESES = [
   { value: '01', label: 'Janeiro' },
@@ -489,6 +490,11 @@ export default function SettingsPage() {
                         }} />
                       </label>
                       <Input defaultValue={v.nome} onBlur={e => { if (e.target.value !== v.nome) updateVendedor(v.id, { nome: e.target.value }); }} className="bg-transparent border-transparent hover:border-border/50 focus:border-border/50 h-8 w-40 text-foreground font-medium px-1" />
+                      {!isVendorActiveToday(v) && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50" title={`Inativo desde ${v.inactiveFrom}`}>
+                          Inativo
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-2 text-muted-foreground">{v.cargo}</td>

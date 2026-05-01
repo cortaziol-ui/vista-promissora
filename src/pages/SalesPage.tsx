@@ -14,6 +14,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useCampaignLinks } from '@/hooks/useCampaignLinks';
 import { getLeadsByVendor } from '@/lib/vendorLeads';
+import { isVendorActiveInMonth } from '@/lib/vendorActive';
 import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3, Monitor, MonitorSmartphone } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VendorAvatar } from '@/components/VendorAvatar';
@@ -352,7 +353,10 @@ export default function SalesPage() {
   // Birthday: show all month (not just today)
   const aniversariantes = useMemo(() => {
     const mesHoje = String(new Date().getMonth() + 1).padStart(2, '0');
+    const yyyy = new Date().getFullYear();
+    const currentMonthKey = `${yyyy}-${mesHoje}`;
     return vendedores
+      .filter(v => isVendorActiveInMonth(v, currentMonthKey))
       .filter(v => {
         if (!v.aniversario) return false;
         let dia: string, mes: string;
@@ -433,7 +437,7 @@ export default function SalesPage() {
             <SelectTrigger className="w-[180px] bg-secondary border-border/50"><SelectValue placeholder="Todos vendedores" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos vendedores</SelectItem>
-              {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
+              {vendedores.filter(v => isVendorActiveInMonth(v, selectedMonth)).map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

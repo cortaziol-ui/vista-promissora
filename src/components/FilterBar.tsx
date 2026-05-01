@@ -3,6 +3,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useSalesData } from '@/contexts/SalesDataContext';
+import { isVendorActiveInMonth } from '@/lib/vendorActive';
 
 interface FilterBarProps {
   selectedYear: number;
@@ -19,6 +20,11 @@ const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 export function FilterBar({ selectedYear, selectedMonth, selectedSeller, onYearChange, onMonthChange, onSellerChange, showSellerFilter = true }: FilterBarProps) {
   const now = new Date();
   const { vendedores } = useSalesData();
+  const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+  const visibleVendedores = useMemo(
+    () => vendedores.filter(v => isVendorActiveInMonth(v, monthKey)),
+    [vendedores, monthKey],
+  );
 
   return (
     <div className="flex flex-wrap gap-3 items-center">
@@ -50,7 +56,7 @@ export function FilterBar({ selectedYear, selectedMonth, selectedSeller, onYearC
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos vendedores</SelectItem>
-            {vendedores.map((v) => (
+            {visibleVendedores.map((v) => (
               <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
             ))}
           </SelectContent>

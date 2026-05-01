@@ -5,6 +5,7 @@ import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { useRoletaSpins } from '@/hooks/useRoletaSpins';
+import { isVendorActiveToday } from '@/lib/vendorActive';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -640,7 +641,7 @@ export default function RoletaPage() {
                   <SelectValue placeholder="Escolha..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {vendedores.map(v => (
+                  {vendedores.filter(isVendorActiveToday).map(v => (
                     <SelectItem key={v.id} value={v.nome}>
                       {v.avatar} {v.nome}
                     </SelectItem>
