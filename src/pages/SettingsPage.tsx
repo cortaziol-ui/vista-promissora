@@ -60,8 +60,8 @@ export default function SettingsPage() {
 
   // Per-month goals (scoped to editingService)
   const {
-    metaEmpresaVendas, metaComercialVendas,
-    setMetaEmpresaVendas, setMetaComercialVendas,
+    metaEmpresaVendas,
+    setMetaEmpresaVendas,
     vendorGoals, setVendorGoal,
   } = useMonthlyGoals(monthYM, editingService);
   // Sibling goals for showing "Geral = LN + RT" hint without extra fetch round-trips
@@ -72,8 +72,6 @@ export default function SettingsPage() {
   // Inline editing state
   const [editingMetaEmpresa, setEditingMetaEmpresa] = useState(false);
   const [metaEmpresaDraft, setMetaEmpresaDraft] = useState(metaEmpresaVendas);
-  const [editingMetaComercial, setEditingMetaComercial] = useState(false);
-  const [metaComercialDraft, setMetaComercialDraft] = useState(metaComercialVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
   // User accounts — 5 fixed system accounts
@@ -130,10 +128,6 @@ export default function SettingsPage() {
     setMetaEmpresaDraft(metaEmpresaVendas);
     setEditingMetaEmpresa(false);
   }, [metaEmpresaVendas]);
-  useEffect(() => {
-    setMetaComercialDraft(metaComercialVendas);
-    setEditingMetaComercial(false);
-  }, [metaComercialVendas]);
 
   // Commission tiers state
   interface Tier { id: string; faixa_nome: string; pct_meta: number; premiacao: number; sort_order: number; }
@@ -293,14 +287,6 @@ export default function SettingsPage() {
     setEditingMetaEmpresa(false);
   };
 
-  const handleSaveMetaComercial = () => {
-    if (metaComercialDraft > 0) {
-      setMetaComercialVendas(metaComercialDraft);
-      toast({ title: 'Meta atualizada', description: `Meta comercial alterada para ${metaComercialDraft} vendas` });
-    }
-    setEditingMetaComercial(false);
-  };
-
   const handleStartEditVendor = (id: number) => {
     setEditingVendorId(id);
     const fallback = editingService === 'GERAL' ? (vendedores.find(v => v.id === id)?.meta ?? 0) : 0;
@@ -354,7 +340,7 @@ export default function SettingsPage() {
       {isAdmin && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Metas da Empresa</h2>
+            <h2 className="text-lg font-semibold text-foreground">Meta Comercial</h2>
             <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
               {SERVICE_TYPE_OPTIONS.map(opt => (
                 <button
@@ -389,10 +375,10 @@ export default function SettingsPage() {
             </Select>
           </div>
 
-          {/* Meta Empresa */}
+          {/* Meta Comercial editavel por servico */}
           <div className="mb-4">
             <p className="text-sm text-muted-foreground mb-2">
-              Meta da Empresa — {serviceTypeLabel(editingService)} (nº de vendas)
+              Meta Comercial — {serviceTypeLabel(editingService)} (nº de vendas)
             </p>
             {editingMetaEmpresa ? (
               <div className="flex items-center gap-3">
@@ -419,25 +405,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Meta Comercial */}
-          <div className="mb-4">
-            <p className="text-sm text-muted-foreground mb-2">Meta Comercial (nº de vendas)</p>
-            {editingMetaComercial ? (
-              <div className="flex items-center gap-3">
-                <Input type="number" value={metaComercialDraft} onChange={e => setMetaComercialDraft(Number(e.target.value))} className="bg-secondary border-border/50 w-32" autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveMetaComercial()} />
-                <span className="text-muted-foreground text-sm">vendas</span>
-                <Button size="sm" variant="ghost" onClick={handleSaveMetaComercial}><Check className="w-4 h-4 text-green-500" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingMetaComercial(false)}><X className="w-4 h-4 text-red-400" /></Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <p className="text-2xl font-bold text-foreground">{metaComercialVendas} vendas</p>
-                <Button size="sm" variant="ghost" onClick={() => { setMetaComercialDraft(metaComercialVendas); setEditingMetaComercial(true); }}><Pencil className="w-4 h-4" /></Button>
-              </div>
-            )}
-          </div>
-
-          <p className="text-xs text-muted-foreground">Soma das metas individuais: {somaMetasIndividuais} vendas</p>
+          <p className="text-xs text-muted-foreground">Soma das metas individuais ({serviceTypeLabel(editingService)}): {somaMetasIndividuais} vendas</p>
         </div>
       )}
 
