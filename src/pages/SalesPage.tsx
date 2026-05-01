@@ -17,6 +17,7 @@ import { getLeadsByVendor } from '@/lib/vendorLeads';
 import { DollarSign, Target, ShoppingCart, TrendingUp, CheckCircle2, XCircle, CalendarDays, BarChart3, Monitor, MonitorSmartphone } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VendorAvatar } from '@/components/VendorAvatar';
+import { type ServiceType, SERVICE_TYPE_OPTIONS, SERVICE_FILTER_STORAGE_KEY, salesCount as svcSalesCount } from '@/lib/serviceTypes';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
@@ -25,6 +26,10 @@ export default function SalesPage() {
   const { activeAccountId } = useTenant();
   const { clientes, vendedores } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [serviceFilter, setServiceFilter] = useState<ServiceType>(() => {
+    const v = localStorage.getItem(SERVICE_FILTER_STORAGE_KEY) as ServiceType | null;
+    return v === 'LIMPA_NOME' || v === 'RATING' ? v : 'GERAL';
+  });
   const {
     filteredClientes,
     vendedorStats,
@@ -32,7 +37,7 @@ export default function SalesPage() {
     pctMeta,
     projecao,
     vendorGoals: monthlyVendorGoals,
-  } = useMonthlyData(selectedMonth);
+  } = useMonthlyData(selectedMonth, serviceFilter);
 
   const availableMonths = useAvailableMonths(clientes);
   const [filterVendedor, setFilterVendedor] = useState('all');
@@ -45,6 +50,11 @@ export default function SalesPage() {
   const handleViewMode = (mode: 'desktop' | 'vertical') => {
     setViewMode(mode);
     localStorage.setItem('salesViewMode', mode);
+  };
+
+  const handleServiceFilter = (s: ServiceType) => {
+    setServiceFilter(s);
+    localStorage.setItem(SERVICE_FILTER_STORAGE_KEY, s);
   };
 
   const { activeAccount } = useAccountContext();
@@ -111,10 +121,9 @@ export default function SalesPage() {
 
   // Local computed values based on vendedor filter
   const localFaturamento = useMemo(() => localClientes.reduce((s, c) => s + (c.entrada || 0), 0), [localClientes]);
-  // LIMPA NOME + RATING counts as 2 sales (same rule as useMonthlyData)
   const localTotalVendas = useMemo(
-    () => localClientes.reduce((s, c) => s + (c.servico === 'LIMPA NOME + RATING' ? 2 : 1), 0),
-    [localClientes],
+    () => localClientes.reduce((s, c) => s + svcSalesCount(c, serviceFilter), 0),
+    [localClientes, serviceFilter],
   );
   const localTicketMedio = localTotalVendas > 0 ? localFaturamento / localTotalVendas : 0;
   const localPctMeta = filterVendedor === 'all'
@@ -378,6 +387,17 @@ export default function SalesPage() {
           {!isVertical && <p className="text-muted-foreground text-xs">Analise detalhada de performance — {monthLabel(selectedMonth)}</p>}
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+            {SERVICE_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => handleServiceFilter(opt.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${serviceFilter === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
             <button
               onClick={() => handleViewMode('desktop')}
@@ -724,9 +744,10 @@ export default function SalesPage() {
                   vendedorNome={stat.vendedor.nome}
                   vendedorId={stat.vendedor.id}
                   vendas={stat.vendas}
-                  meta={monthlyVendorGoals.get(stat.vendedor.id) ?? stat.vendedor.meta}
+                  meta={monthlyVendorGoals.get(stat.vendedor.id) ?? (serviceFilter === 'GERAL' ? stat.vendedor.meta : 0)}
                   month={selectedMonth}
                   size={isVertical ? 'compact' : 'default'}
+                  serviceType={serviceFilter}
                 />
               </div>
             ))}

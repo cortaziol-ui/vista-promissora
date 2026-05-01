@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSalesData } from '@/contexts/SalesDataContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { type ServiceType, monthlyGoalsKey } from '@/lib/serviceTypes';
 
 interface MonthlyGoals {
   metaEmpresaVendas: number;
@@ -16,7 +17,7 @@ interface MonthlyGoals {
   setVendorGoal: (vendedorId: number, value: number) => Promise<void>;
 }
 
-export function useMonthlyGoals(month: string): MonthlyGoals {
+export function useMonthlyGoals(month: string, serviceType: ServiceType = 'GERAL'): MonthlyGoals {
   const { activeAccountId, accounts } = useTenant();
   const { user } = useAuth();
   const {
@@ -29,8 +30,9 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
   const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
   const accountIds = accounts.map(a => a.id);
   const accountIdsKey = accountIds.join(',');
+  const empresaKey = monthlyGoalsKey(serviceType);
 
-  const [metaEmpresaVendas, setMetaEmpresaState] = useState(globalMetaEmpresa);
+  const [metaEmpresaVendas, setMetaEmpresaState] = useState(serviceType === 'GERAL' ? globalMetaEmpresa : 0);
   const [metaComercialVendas, setMetaComercialState] = useState(globalMetaComercial);
   const [metaMensalGlobal, setMetaMensalState] = useState(globalMetaMensal);
   const [vendorGoals, setVendorGoals] = useState<Map<number, number>>(new Map());
@@ -43,13 +45,15 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
     async function fetch() {
       setLoading(true);
 
-      // Build query scope: single account or consolidated (all user accounts)
       const scope = isConsolidatedSeller
         ? { col: 'account_id', op: 'in' as const, val: accountIds }
         : { col: 'account_id', op: 'eq' as const, val: activeAccountId };
 
       const baseCompanyQuery = (supabase.from as any)('monthly_goals').select('*').eq('month', month);
-      const baseVendorQuery = (supabase.from as any)('vendor_monthly_goals').select('*').eq('month', month);
+      const baseVendorQuery = (supabase.from as any)('vendor_monthly_goals')
+        .select('*')
+        .eq('month', month)
+        .eq('service_type', serviceType);
 
       const companyQuery = scope.op === 'in'
         ? baseCompanyQuery.in(scope.col, scope.val)
@@ -63,25 +67,22 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
       if (cancelled) return;
 
       // Apply company goals
-      let empresa = globalMetaEmpresa;
+      let empresa = serviceType === 'GERAL' ? globalMetaEmpresa : 0;
       let comercial = globalMetaComercial;
       let mensal = globalMetaMensal;
 
       if (companyGoals && companyGoals.length > 0) {
         if (isConsolidatedSeller) {
-          // Sum overrides per account; if an account has no override for a key, fall back to the global default for that account.
-          // Simpler approach: sum whatever monthly_goals rows exist; missing rows just contribute the global default.
           const overridesByAccount = new Map<string, { empresa?: number; comercial?: number; mensal?: number }>();
           for (const row of companyGoals as any[]) {
             const o = overridesByAccount.get(row.account_id) || {};
-            if (row.key === 'meta_empresa_vendas') o.empresa = Number(row.value);
+            if (row.key === empresaKey) o.empresa = Number(row.value);
             if (row.key === 'meta_comercial_vendas') o.comercial = Number(row.value);
             if (row.key === 'meta_mensal') o.mensal = Number(row.value);
             overridesByAccount.set(row.account_id, o);
           }
-          // For each account, take override or fallback to a per-account share of the global aggregate.
-          // Since globalMetaEmpresa already represents the consolidated default sum, distribute per account.
-          const perAccountEmpresa = globalMetaEmpresa / Math.max(1, accountIds.length);
+          const baseEmpresa = serviceType === 'GERAL' ? globalMetaEmpresa : 0;
+          const perAccountEmpresa = baseEmpresa / Math.max(1, accountIds.length);
           const perAccountComercial = globalMetaComercial / Math.max(1, accountIds.length);
           const perAccountMensal = globalMetaMensal / Math.max(1, accountIds.length);
           let sumEmp = 0, sumCom = 0, sumMen = 0;
@@ -96,7 +97,7 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
           mensal = sumMen;
         } else {
           for (const row of companyGoals) {
-            if (row.key === 'meta_empresa_vendas') empresa = Number(row.value);
+            if (row.key === empresaKey) empresa = Number(row.value);
             if (row.key === 'meta_comercial_vendas') comercial = Number(row.value);
             if (row.key === 'meta_mensal') mensal = Number(row.value);
           }
@@ -107,9 +108,9 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
       setMetaComercialState(comercial);
       setMetaMensalState(mensal);
 
-      // Apply vendor goals (fallback to vendedores.meta)
+      // Apply vendor goals (fallback to vendedores.meta apenas para Geral)
       const map = new Map<number, number>();
-      vendedores.forEach(v => map.set(v.id, v.meta));
+      vendedores.forEach(v => map.set(v.id, serviceType === 'GERAL' ? v.meta : 0));
       if (vGoals) {
         for (const row of vGoals) {
           map.set(row.vendedor_id, Number(row.meta));
@@ -121,14 +122,14 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
 
     fetch();
     return () => { cancelled = true; };
-  }, [month, activeAccountId, globalMetaEmpresa, globalMetaComercial, globalMetaMensal, vendedores, isConsolidatedSeller, accountIdsKey]);
+  }, [month, activeAccountId, globalMetaEmpresa, globalMetaComercial, globalMetaMensal, vendedores, isConsolidatedSeller, accountIdsKey, serviceType, empresaKey]);
 
   const setMetaEmpresaVendas = useCallback(async (value: number) => {
-    if (!activeAccountId) return; // No-op in consolidated mode (no single account to write to)
+    if (!activeAccountId) return;
     setMetaEmpresaState(value);
     await (supabase.from as any)('monthly_goals')
-      .upsert({ month, key: 'meta_empresa_vendas', value, account_id: activeAccountId }, { onConflict: 'account_id,month,key' });
-  }, [month, activeAccountId]);
+      .upsert({ month, key: empresaKey, value, account_id: activeAccountId }, { onConflict: 'account_id,month,key' });
+  }, [month, activeAccountId, empresaKey]);
 
   const setMetaComercialVendas = useCallback(async (value: number) => {
     if (!activeAccountId) return;
@@ -152,8 +153,11 @@ export function useMonthlyGoals(month: string): MonthlyGoals {
       return next;
     });
     await (supabase.from as any)('vendor_monthly_goals')
-      .upsert({ month, vendedor_id: vendedorId, meta: value, account_id: activeAccountId }, { onConflict: 'account_id,month,vendedor_id' });
-  }, [month, activeAccountId]);
+      .upsert(
+        { month, vendedor_id: vendedorId, meta: value, account_id: activeAccountId, service_type: serviceType },
+        { onConflict: 'account_id,month,vendedor_id,service_type' }
+      );
+  }, [month, activeAccountId, serviceType]);
 
   return {
     metaEmpresaVendas,

@@ -1,6 +1,7 @@
 import { Trophy, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCommissionTiers } from '@/hooks/useCommissionTiers';
+import { type ServiceType } from '@/lib/serviceTypes';
 
 interface CommissionSummaryProps {
   vendedorNome: string;
@@ -8,6 +9,7 @@ interface CommissionSummaryProps {
   vendas: number;
   meta: number;
   month: string;
+  serviceType?: ServiceType;
 }
 
 export function CommissionSummary({
@@ -16,9 +18,10 @@ export function CommissionSummary({
   vendas,
   meta,
   month,
+  serviceType = 'GERAL',
 }: CommissionSummaryProps) {
   const { tiers, currentTier, totalPremiacao, nextTier, vendasParaProxima, loading } =
-    useCommissionTiers({ vendedorId, month, vendas, meta });
+    useCommissionTiers({ vendedorId, month, vendas, meta, serviceType });
 
   if (loading) {
     return (

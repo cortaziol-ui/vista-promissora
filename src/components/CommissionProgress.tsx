@@ -1,5 +1,6 @@
 import { Check, Lock } from 'lucide-react';
 import { useCommissionTiers } from '@/hooks/useCommissionTiers';
+import { type ServiceType } from '@/lib/serviceTypes';
 
 interface CommissionProgressProps {
   vendedorNome: string;
@@ -8,6 +9,7 @@ interface CommissionProgressProps {
   meta: number;
   month: string;
   size?: 'default' | 'large';
+  serviceType?: ServiceType;
 }
 
 export function CommissionProgress({
@@ -17,6 +19,7 @@ export function CommissionProgress({
   meta,
   month,
   size = 'default',
+  serviceType = 'GERAL',
 }: CommissionProgressProps) {
   const isLarge = size === 'large';
   const { tiers, currentTier, loading } = useCommissionTiers({
@@ -24,6 +27,7 @@ export function CommissionProgress({
     month,
     vendas,
     meta,
+    serviceType,
   });
 
   if (loading) {

@@ -2,11 +2,7 @@ import { useMemo } from 'react';
 import { useSalesData, type Cliente, type VendedorStats } from '@/contexts/SalesDataContext';
 import { parseMonthFromData, countWeekdays } from '@/lib/dateUtils';
 import { useMonthlyGoals } from '@/hooks/useMonthlyGoals';
-
-/** "LIMPA NOME + RATING" counts as 2 sales, everything else as 1 */
-function salesCount(c: Cliente): number {
-  return c.servico === 'LIMPA NOME + RATING' ? 2 : 1;
-}
+import { type ServiceType, salesCount as svcSalesCount, isClienteInService } from '@/lib/serviceTypes';
 
 export interface MonthlyData {
   filteredClientes: Cliente[];
@@ -23,21 +19,25 @@ export interface MonthlyData {
   vendorGoals: Map<number, number>;
 }
 
-export function useMonthlyData(month: string): MonthlyData {
+export function useMonthlyData(month: string, serviceType: ServiceType = 'GERAL'): MonthlyData {
   const { clientes, vendedores } = useSalesData();
-  const { metaEmpresaVendas, metaComercialVendas, vendorGoals } = useMonthlyGoals(month);
+  const { metaEmpresaVendas, metaComercialVendas, vendorGoals } = useMonthlyGoals(month, serviceType);
 
   const filteredClientes = useMemo(() => {
     return clientes.filter(c => {
       const m = parseMonthFromData(c.data);
       if (m !== month) return false;
       if (c.situacao === 'CANCELAMENTO') return false;
+      if (!isClienteInService(c, serviceType)) return false;
       return true;
     });
-  }, [clientes, month]);
+  }, [clientes, month, serviceType]);
 
   const faturamento = useMemo(() => filteredClientes.reduce((s, c) => s + (c.entrada || 0), 0), [filteredClientes]);
-  const totalVendas = useMemo(() => filteredClientes.reduce((s, c) => s + salesCount(c), 0), [filteredClientes]);
+  const totalVendas = useMemo(
+    () => filteredClientes.reduce((s, c) => s + svcSalesCount(c, serviceType), 0),
+    [filteredClientes, serviceType],
+  );
   const ticketMedio = useMemo(() => totalVendas > 0 ? faturamento / totalVendas : 0, [faturamento, totalVendas]);
   const pctMeta = useMemo(() => metaEmpresaVendas > 0 ? (totalVendas / metaEmpresaVendas) * 100 : 0, [totalVendas, metaEmpresaVendas]);
 
@@ -78,7 +78,7 @@ export function useMonthlyData(month: string): MonthlyData {
     return vendedores.map(v => {
       const cv = filteredClientes.filter(c => c.vendedor === v.nome);
       const fat = cv.reduce((s, c) => s + (c.entrada || 0), 0);
-      const vendas = cv.reduce((s, c) => s + salesCount(c), 0);
+      const vendas = cv.reduce((s, c) => s + svcSalesCount(c, serviceType), 0);
       const ticket = vendas > 0 ? fat / vendas : 0;
 
       const vendorMeta = vendorGoals.get(v.id) ?? v.meta;
@@ -105,19 +105,19 @@ export function useMonthlyData(month: string): MonthlyData {
 
       return { vendedor: v, faturamento: fat, vendas, ticketMedio: ticket, pctMeta: pct, faltam, projecaoVendas, dentroProjecao };
     }).sort((a, b) => b.vendas - a.vendas);
-  }, [filteredClientes, vendedores, month, vendorGoals]);
+  }, [filteredClientes, vendedores, month, vendorGoals, serviceType]);
 
   const dailyEvolution = useMemo(() => {
     const byDay: Record<string, { vendas: number; dataFull: string }> = {};
     filteredClientes.forEach(c => {
       const day = c.data?.split('/')[0] || '00';
       if (!byDay[day]) byDay[day] = { vendas: 0, dataFull: c.data };
-      byDay[day].vendas += salesCount(c);
+      byDay[day].vendas += svcSalesCount(c, serviceType);
     });
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([dia, d]) => ({ dia, dataFull: d.dataFull, vendas: d.vendas }));
-  }, [filteredClientes]);
+  }, [filteredClientes, serviceType]);
 
   const ticketPorDia = useMemo(() => {
     const byDay: Record<string, { total: number; count: number }> = {};

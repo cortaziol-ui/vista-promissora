@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { type ServiceType } from '@/lib/serviceTypes';
 
 export interface CommissionTier {
   id: number;
@@ -23,6 +24,7 @@ interface UseCommissionTiersParams {
   month: string;
   vendas: number;
   meta: number;
+  serviceType?: ServiceType;
 }
 
 interface UseCommissionTiersResult {
@@ -39,6 +41,7 @@ export function useCommissionTiers({
   month,
   vendas,
   meta,
+  serviceType = 'GERAL',
 }: UseCommissionTiersParams): UseCommissionTiersResult {
   const { activeAccountId, accounts } = useTenant();
   const { user } = useAuth();
@@ -71,11 +74,11 @@ export function useCommissionTiers({
 
         // First try vendedor-specific tiers
         if (vendedorId !== null && scopedAccountId) {
-          const { data: specific } = await supabase
-            .from('commission_tiers')
+          const { data: specific } = await (supabase.from as any)('commission_tiers')
             .select('*')
             .eq('account_id', scopedAccountId)
             .eq('month', month)
+            .eq('service_type', serviceType)
             .eq('vendedor_id', vendedorId)
             .order('sort_order', { ascending: true });
 
@@ -93,11 +96,11 @@ export function useCommissionTiers({
           if (!cancelled) setRawTiers([]);
           return;
         }
-        const { data: global } = await supabase
-          .from('commission_tiers')
+        const { data: global } = await (supabase.from as any)('commission_tiers')
           .select('*')
           .eq('account_id', fallbackAccountId)
           .eq('month', month)
+          .eq('service_type', serviceType)
           .is('vendedor_id', null)
           .order('sort_order', { ascending: true });
 
@@ -117,7 +120,7 @@ export function useCommissionTiers({
 
     fetchTiers();
     return () => { cancelled = true; };
-  }, [vendedorId, month, activeAccountId, isConsolidatedSeller, accountIdsKey]);
+  }, [vendedorId, month, activeAccountId, isConsolidatedSeller, accountIdsKey, serviceType]);
 
   const enriched = useMemo(() => {
     return rawTiers.map((tier) => {

@@ -20,6 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { type ServiceType, SERVICE_TYPE_OPTIONS, serviceTypeLabel } from '@/lib/serviceTypes';
 
 const MESES = [
   { value: '01', label: 'Janeiro' },
@@ -54,12 +55,19 @@ export default function SettingsPage() {
   const year = new Date().getFullYear();
   const monthYM = `${year}-${selectedMonth}`;
 
-  // Per-month goals
+  // Service-type selector (shared by metas, vendor goals, tiers)
+  const [editingService, setEditingService] = useState<ServiceType>('GERAL');
+
+  // Per-month goals (scoped to editingService)
   const {
     metaEmpresaVendas, metaComercialVendas,
     setMetaEmpresaVendas, setMetaComercialVendas,
     vendorGoals, setVendorGoal,
-  } = useMonthlyGoals(monthYM);
+  } = useMonthlyGoals(monthYM, editingService);
+  // Sibling goals for showing "Geral = LN + RT" hint without extra fetch round-trips
+  const limpaNomeGoals = useMonthlyGoals(monthYM, 'LIMPA_NOME');
+  const ratingGoals = useMonthlyGoals(monthYM, 'RATING');
+  const generalSum = limpaNomeGoals.metaEmpresaVendas + ratingGoals.metaEmpresaVendas;
 
   // Inline editing state
   const [editingMetaEmpresa, setEditingMetaEmpresa] = useState(false);
@@ -133,15 +141,15 @@ export default function SettingsPage() {
 
   const fetchTiers = useCallback(async () => {
     if (!activeAccountId) return;
-    const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+    const { data } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).eq('service_type', editingService).is('vendedor_id', null).order('sort_order');
     if (data && data.length > 0) {
       setTiers(data as Tier[]);
       return;
     }
-    // No tiers for this month — copy from previous month (same account)
+    // No tiers for this month — copy from previous month (same account + service_type)
     const prevDate = new Date(year, Number(selectedMonth) - 2, 1);
     const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-    const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', prevYM).is('vendedor_id', null).order('sort_order');
+    const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', prevYM).eq('service_type', editingService).is('vendedor_id', null).order('sort_order');
     if (prevData && prevData.length > 0) {
       const inserts = prevData.map((t: any) => ({
         month: monthYM,
@@ -151,13 +159,14 @@ export default function SettingsPage() {
         premiacao: t.premiacao,
         sort_order: t.sort_order,
         account_id: activeAccountId,
+        service_type: editingService,
       }));
       await (supabase.from as any)('commission_tiers').insert(inserts);
-      const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+      const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).eq('service_type', editingService).is('vendedor_id', null).order('sort_order');
       if (newData) setTiers(newData as Tier[]);
       return;
     }
-    // Account has no tiers in any month — seed 10 defaults so admin can edit
+    // Account has no tiers in any month for this service_type — seed 10 defaults so admin can edit
     const DEFAULT_TIERS = [
       { faixa_nome: 'Mínima',   pct_meta: 70,  premiacao: 100, sort_order: 1 },
       { faixa_nome: 'Meta',     pct_meta: 100, premiacao: 200, sort_order: 2 },
@@ -174,12 +183,13 @@ export default function SettingsPage() {
       month: monthYM,
       vendedor_id: null,
       account_id: activeAccountId,
+      service_type: editingService,
       ...t,
     }));
     await (supabase.from as any)('commission_tiers').insert(seedInserts);
-    const { data: seededData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+    const { data: seededData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).eq('service_type', editingService).is('vendedor_id', null).order('sort_order');
     setTiers((seededData as Tier[]) ?? []);
-  }, [monthYM, year, selectedMonth, activeAccountId]);
+  }, [monthYM, year, selectedMonth, activeAccountId, editingService]);
 
   useEffect(() => { fetchTiers(); }, [fetchTiers]);
 
@@ -293,7 +303,8 @@ export default function SettingsPage() {
 
   const handleStartEditVendor = (id: number) => {
     setEditingVendorId(id);
-    setVendorMetaDraft(vendorGoals.get(id) ?? vendedores.find(v => v.id === id)?.meta ?? 0);
+    const fallback = editingService === 'GERAL' ? (vendedores.find(v => v.id === id)?.meta ?? 0) : 0;
+    setVendorMetaDraft(vendorGoals.get(id) ?? fallback);
   };
 
   const handleSaveVendorMeta = (id: number, nome: string) => {
@@ -326,7 +337,7 @@ export default function SettingsPage() {
     setNewUser({ name: '', email: '', monthlyGoal: 10, aniversario: '', foto: '' });
   };
 
-  const somaMetasIndividuais = vendedores.reduce((s, v) => s + (vendorGoals.get(v.id) ?? v.meta), 0);
+  const somaMetasIndividuais = vendedores.reduce((s, v) => s + (vendorGoals.get(v.id) ?? (editingService === 'GERAL' ? v.meta : 0)), 0);
 
   if (!isAdmin && !isManager) {
     return (
@@ -342,7 +353,25 @@ export default function SettingsPage() {
 
       {isAdmin && (
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Metas da Empresa</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Metas da Empresa</h2>
+            <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+              {SERVICE_TYPE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEditingService(opt.value)}
+                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${editingService === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Editando metas, faixas de premiação e metas individuais para: <span className="font-semibold text-foreground">{serviceTypeLabel(editingService)}</span>.
+            {editingService === 'GERAL' && ' (Geral é a soma das vendas de Limpa Nome e Rating, incluindo combo contado em ambos.)'}
+          </p>
 
           {/* Month selector */}
           <div className="flex items-center gap-3 mb-6">
@@ -362,7 +391,9 @@ export default function SettingsPage() {
 
           {/* Meta Empresa */}
           <div className="mb-4">
-            <p className="text-sm text-muted-foreground mb-2">Meta da Empresa (nº de vendas)</p>
+            <p className="text-sm text-muted-foreground mb-2">
+              Meta da Empresa — {serviceTypeLabel(editingService)} (nº de vendas)
+            </p>
             {editingMetaEmpresa ? (
               <div className="flex items-center gap-3">
                 <Input type="number" value={metaEmpresaDraft} onChange={e => setMetaEmpresaDraft(Number(e.target.value))} className="bg-secondary border-border/50 w-32" autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveMetaEmpresa()} />
@@ -375,6 +406,16 @@ export default function SettingsPage() {
                 <p className="text-2xl font-bold text-foreground">{metaEmpresaVendas} vendas</p>
                 <Button size="sm" variant="ghost" onClick={() => { setMetaEmpresaDraft(metaEmpresaVendas); setEditingMetaEmpresa(true); }}><Pencil className="w-4 h-4" /></Button>
               </div>
+            )}
+            {editingService !== 'GERAL' && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Soma Limpa Nome + Rating = <span className="font-semibold text-foreground">{generalSum} vendas</span> (Geral)
+              </p>
+            )}
+            {editingService === 'GERAL' && (limpaNomeGoals.metaEmpresaVendas > 0 || ratingGoals.metaEmpresaVendas > 0) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Limpa Nome: <span className="font-semibold text-foreground">{limpaNomeGoals.metaEmpresaVendas}</span> · Rating: <span className="font-semibold text-foreground">{ratingGoals.metaEmpresaVendas}</span> · Soma: <span className="font-semibold text-foreground">{generalSum}</span>
+              </p>
             )}
           </div>
 
@@ -460,7 +501,7 @@ export default function SettingsPage() {
               <tr className="text-muted-foreground border-b border-border/50">
                 <th className="text-left py-3 px-2">Nome</th>
                 <th className="text-left py-3 px-2">Cargo</th>
-                <th className="text-right py-3 px-2">Meta ({MESES.find(m => m.value === selectedMonth)?.label?.slice(0, 3)})</th>
+                <th className="text-right py-3 px-2">Meta {serviceTypeLabel(editingService)} ({MESES.find(m => m.value === selectedMonth)?.label?.slice(0, 3)})</th>
                 <th className="text-center py-3 px-2">Aniversário</th>
                 <th className="text-center py-3 px-2">Ações</th>
               </tr>
@@ -492,7 +533,7 @@ export default function SettingsPage() {
                         <Button size="sm" variant="ghost" onClick={() => setEditingVendorId(null)}><X className="w-3.5 h-3.5 text-red-400" /></Button>
                       </div>
                     ) : (
-                      <span className="text-foreground">{vendorGoals.get(v.id) ?? v.meta} vendas</span>
+                      <span className="text-foreground">{vendorGoals.get(v.id) ?? (editingService === 'GERAL' ? v.meta : 0)} vendas</span>
                     )}
                   </td>
                   <td className="py-3 px-2 text-center">
@@ -518,11 +559,17 @@ export default function SettingsPage() {
       {/* Commission Tiers */}
       {isAdmin && tiers.length > 0 && (
         <div className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-foreground">Premiações por Nível</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              <h2 className="text-lg font-semibold text-foreground">
+                Premiações por Nível — {serviceTypeLabel(editingService)}
+              </h2>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground mb-4">Edite o valor da premiação para cada faixa de meta atingida. As % são fixas.</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Edite o valor da premiação para cada faixa de meta atingida no serviço de <span className="font-semibold text-foreground">{serviceTypeLabel(editingService)}</span>. As % são fixas. Para alterar o serviço, use o seletor no topo da seção "Metas da Empresa".
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {tiers.map(t => (
               <div key={t.id} className="p-3 rounded-lg bg-secondary/30 border border-border/30 text-center">
