@@ -138,7 +138,7 @@ export default function SettingsPage() {
       setTiers(data as Tier[]);
       return;
     }
-    // No tiers for this month — copy from previous month
+    // No tiers for this month — copy from previous month (same account)
     const prevDate = new Date(year, Number(selectedMonth) - 2, 1);
     const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
     const { data: prevData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', prevYM).is('vendedor_id', null).order('sort_order');
@@ -153,12 +153,32 @@ export default function SettingsPage() {
         account_id: activeAccountId,
       }));
       await (supabase.from as any)('commission_tiers').insert(inserts);
-      // Re-fetch after insert
       const { data: newData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
       if (newData) setTiers(newData as Tier[]);
-    } else {
-      setTiers([]);
+      return;
     }
+    // Account has no tiers in any month — seed 10 defaults so admin can edit
+    const DEFAULT_TIERS = [
+      { faixa_nome: 'Mínima',   pct_meta: 70,  premiacao: 100, sort_order: 1 },
+      { faixa_nome: 'Meta',     pct_meta: 100, premiacao: 200, sort_order: 2 },
+      { faixa_nome: 'Super',    pct_meta: 130, premiacao: 100, sort_order: 3 },
+      { faixa_nome: 'Super+',   pct_meta: 150, premiacao: 150, sort_order: 4 },
+      { faixa_nome: 'Elite',    pct_meta: 170, premiacao: 100, sort_order: 5 },
+      { faixa_nome: 'Elite+',   pct_meta: 200, premiacao: 150, sort_order: 6 },
+      { faixa_nome: 'Lenda',    pct_meta: 230, premiacao: 100, sort_order: 7 },
+      { faixa_nome: 'Lenda+',   pct_meta: 250, premiacao: 150, sort_order: 8 },
+      { faixa_nome: 'Máximo',   pct_meta: 270, premiacao: 100, sort_order: 9 },
+      { faixa_nome: 'Absoluto', pct_meta: 300, premiacao: 150, sort_order: 10 },
+    ];
+    const seedInserts = DEFAULT_TIERS.map(t => ({
+      month: monthYM,
+      vendedor_id: null,
+      account_id: activeAccountId,
+      ...t,
+    }));
+    await (supabase.from as any)('commission_tiers').insert(seedInserts);
+    const { data: seededData } = await (supabase.from as any)('commission_tiers').select('*').eq('account_id', activeAccountId).eq('month', monthYM).is('vendedor_id', null).order('sort_order');
+    setTiers((seededData as Tier[]) ?? []);
   }, [monthYM, year, selectedMonth, activeAccountId]);
 
   useEffect(() => { fetchTiers(); }, [fetchTiers]);
