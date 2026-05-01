@@ -11,12 +11,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Pencil, Trash2, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound } from 'lucide-react';
+import { Pencil, Power, PowerOff, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound } from 'lucide-react';
 import { VendorAvatar } from '@/components/VendorAvatar';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -43,7 +47,7 @@ export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
   const {
     vendedores,
-    addVendedor, updateVendedor, deleteVendedor,
+    addVendedor, updateVendedor,
   } = useSalesData();
   const { activeAccount } = useAccountContext();
   const { toast } = useToast();
@@ -75,6 +79,7 @@ export default function SettingsPage() {
   const [metaEmpresaDraft, setMetaEmpresaDraft] = useState(metaEmpresaVendas);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
+  const [pendingToggle, setPendingToggle] = useState<{ id: number; nome: string; toInactive: boolean } | null>(null);
   // User accounts — 5 fixed system accounts
   const SYSTEM_ACCOUNTS = [
     { email: 'caio@outcom.com', label: 'Caio (Dono)', role: 'admin', icon: '👑' },
@@ -554,8 +559,15 @@ export default function SettingsPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleStartEditVendor(v.id)}><Pencil className="w-3.5 h-3.5" /></Button>
                       )}
                       {isAdmin && (
-                        <Button variant="ghost" size="sm" onClick={async () => { const ok = await deleteVendedor(v.id); if (ok) { toast({ title: 'Excluído', description: `${v.nome} foi removido.` }); } else { toast({ title: 'Erro', description: `${v.nome} tem clientes vinculados.`, variant: 'destructive' }); } }}>
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={isVendorActiveToday(v) ? `Inativar ${v.nome}` : `Reativar ${v.nome}`}
+                          onClick={() => setPendingToggle({ id: v.id, nome: v.nome, toInactive: isVendorActiveToday(v) })}
+                        >
+                          {isVendorActiveToday(v)
+                            ? <PowerOff className="w-3.5 h-3.5 text-muted-foreground" />
+                            : <Power className="w-3.5 h-3.5 text-emerald-500" />}
                         </Button>
                       )}
                     </div>
@@ -759,6 +771,40 @@ export default function SettingsPage() {
       )}
 
       {isAdmin && <MetaAdsIntegration />}
+
+      <AlertDialog open={pendingToggle !== null} onOpenChange={(o) => { if (!o) setPendingToggle(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingToggle?.toInactive ? `Inativar ${pendingToggle?.nome}?` : `Reativar ${pendingToggle?.nome}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingToggle?.toInactive
+                ? 'A partir de hoje o vendedor some dos rankings, splits, dropdowns de seleção e banner de aniversariantes. Vendas, comissões e giros de roleta de meses anteriores ficam preservados. Você pode reativar a qualquer momento.'
+                : 'O vendedor volta a aparecer em todos os rankings, dropdowns e cálculos a partir de hoje.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!pendingToggle) return;
+                const today = new Date().toISOString().slice(0, 10);
+                await updateVendedor(pendingToggle.id, {
+                  inactiveFrom: pendingToggle.toInactive ? today : null,
+                } as any);
+                toast({
+                  title: pendingToggle.toInactive ? 'Vendedor inativado' : 'Vendedor reativado',
+                  description: `${pendingToggle.nome} ${pendingToggle.toInactive ? `inativo desde ${today}` : 'voltou a estar ativo'}.`,
+                });
+                setPendingToggle(null);
+              }}
+            >
+              {pendingToggle?.toInactive ? 'Inativar' : 'Reativar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -422,7 +422,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     if (partial.avatar !== undefined) dbPartial.avatar = partial.avatar;
     if (partial.aniversario !== undefined) dbPartial.aniversario = partial.aniversario;
     if (partial.foto !== undefined) dbPartial.foto = partial.foto;
-    if (partial.inactiveFrom !== undefined) dbPartial.inactive_from = partial.inactiveFrom || null;
+    if ('inactiveFrom' in partial) dbPartial.inactive_from = partial.inactiveFrom || null;
     await supabase.from('vendedores').update(dbPartial as any).eq('id', id);
   }, []);
 
