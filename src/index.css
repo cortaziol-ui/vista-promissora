@@ -126,6 +126,7 @@
   .glass-card {
     @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl;
   }
+
   .kpi-glow-revenue {
     box-shadow: 0 0 30px -5px hsl(var(--kpi-revenue) / 0.15);
   }

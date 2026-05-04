@@ -24,6 +24,8 @@ import FichasRespostasPage from "./pages/FichasRespostasPage";
 import DocumentosPage from "./pages/DocumentosPage";
 import RatingDocumentsPage from "./pages/RatingDocumentsPage";
 import PainelControlePage from "./pages/PainelControlePage";
+import ListasParceirosPage from "./pages/ListasParceirosPage";
+import ListaPublicaPage from "./pages/ListaPublicaPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -128,12 +130,16 @@ function AppRoutes() {
       <Route path="/fichas" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><FichasRespostasPage /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><DocumentosPage /></ProtectedRoute>} />
       <Route path="/documentos/rating" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><RatingDocumentsPage /></ProtectedRoute>} />
+      <Route path="/listas-parceiros" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><ListasParceirosPage /></ProtectedRoute>} />
 
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
       {/* Rota pública — formulário de ficha rating */}
       <Route path="/ficha-rating" element={<FichaRatingPage />} />
       <Route path="/ficha-rating/:slug" element={<FichaRatingPage />} />
+
+      {/* Rota pública — visualização de lista de parceiros via slug */}
+      <Route path="/lista/:slug" element={<ListaPublicaPage />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
