@@ -25,22 +25,6 @@ const STATUS_ORGAO_PILL: Record<StatusOrgao, { bg: string; color: string; border
   protocolo: { bg: '#f1f5f9', color: '#334155', border: '#cbd5e1', dot: '#64748b' },
 };
 
-function formatDateBR(d: string | null): string {
-  if (!d) return '';
-  const [y, m, day] = d.split('-');
-  if (!y || !m || !day) return d;
-  return `${day}/${m}/${y}`;
-}
-
-function formatLinha(rotulo: string, data: string | null, hora: string | null): { label: string; value: string } | null {
-  const d = formatDateBR(data);
-  const h = (hora || '').trim();
-  if (!d && !h) return null;
-  if (d && h) return { label: rotulo, value: `${d} às ${h}` };
-  if (d) return { label: rotulo, value: d };
-  return { label: rotulo, value: h };
-}
-
 function formatUltimaAtualizacao(iso: string | null | undefined): string {
   if (!iso) return 'Sem registro';
   try {
@@ -65,13 +49,6 @@ function StatusPill({ pill, label }: { pill: { bg: string; color: string; border
 
 function OrgaoCard({ orgao }: { orgao: ListaOrgao }) {
   const pill = STATUS_ORGAO_PILL[orgao.status];
-  const linhas = [
-    formatLinha('Último protocolo', orgao.protocolo_data, orgao.protocolo_hora),
-    formatLinha('Recepcionado', orgao.recepcionado_data, orgao.recepcionado_hora),
-    formatLinha('Baixas iniciadas', orgao.iniciadas_data, orgao.iniciadas_hora),
-    formatLinha('Baixas concluídas', orgao.concluidas_data, orgao.concluidas_hora),
-  ].filter(Boolean) as { label: string; value: string }[];
-
   const descricao = orgao.descricao?.trim() || DESCRICAO_DEFAULT_POR_STATUS[orgao.status];
 
   return (
@@ -86,17 +63,6 @@ function OrgaoCard({ orgao }: { orgao: ListaOrgao }) {
       <p className="text-[13px] leading-relaxed whitespace-pre-line" style={{ color: '#374151' }}>
         {descricao}
       </p>
-
-      {linhas.length > 0 && (
-        <div className="flex flex-col gap-1 pt-2 border-t" style={{ borderColor: '#e5e7eb' }}>
-          {linhas.map((l, i) => (
-            <div key={i} className="flex items-baseline justify-between gap-3 text-[12px]">
-              <span style={{ color: '#6b7280' }}>{l.label}</span>
-              <span className="font-medium tabular-nums" style={{ color: '#111827' }}>{l.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

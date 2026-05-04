@@ -38,22 +38,6 @@ const STATUS_GERAL_BADGE: Record<StatusGeral, string> = {
   reprotocolo: 'bg-amber-500/15 text-amber-200 border-amber-400/40',
 };
 
-function formatDateBR(d: string | null): string {
-  if (!d) return '';
-  const [y, m, day] = d.split('-');
-  if (!y || !m || !day) return d;
-  return `${day}/${m}/${y}`;
-}
-
-function formatLinha(rotulo: string, data: string | null, hora: string | null): { label: string; value: string } | null {
-  const d = formatDateBR(data);
-  const h = (hora || '').trim();
-  if (!d && !h) return null;
-  if (d && h) return { label: rotulo, value: `${d} às ${h}` };
-  if (d) return { label: rotulo, value: d };
-  return { label: rotulo, value: h };
-}
-
 function formatUltimaAtualizacao(iso: string | null | undefined): string {
   if (!iso) return 'Sem registro';
   try {
@@ -65,13 +49,6 @@ function formatUltimaAtualizacao(iso: string | null | undefined): string {
 }
 
 function OrgaoViewCard({ orgao }: { orgao: ListaOrgao }) {
-  const linhas = [
-    formatLinha('Último protocolo enviado', orgao.protocolo_data, orgao.protocolo_hora),
-    formatLinha('Recepcionado', orgao.recepcionado_data, orgao.recepcionado_hora),
-    formatLinha('Baixas iniciadas', orgao.iniciadas_data, orgao.iniciadas_hora),
-    formatLinha('Baixas concluídas', orgao.concluidas_data, orgao.concluidas_hora),
-  ].filter(Boolean) as { label: string; value: string }[];
-
   const descricao = orgao.descricao?.trim() || DESCRICAO_DEFAULT_POR_STATUS[orgao.status];
 
   return (
@@ -92,17 +69,6 @@ function OrgaoViewCard({ orgao }: { orgao: ListaOrgao }) {
       </div>
 
       <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{descricao}</p>
-
-      {linhas.length > 0 && (
-        <div className="flex flex-col gap-1.5 pt-3 border-t border-border/40">
-          {linhas.map((l, i) => (
-            <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="text-muted-foreground">{l.label}</span>
-              <span className="font-medium text-foreground tabular-nums">{l.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
