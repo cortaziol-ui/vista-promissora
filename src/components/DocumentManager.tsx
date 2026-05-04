@@ -451,21 +451,34 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   let filteredFolders = folders.filter(f => !search || f.name.toLowerCase().includes(q));
   const filteredFiles = files.filter(f => !search || f.name.toLowerCase().includes(q));
 
-  // Na raiz: ordena pastas pela data da venda (mais antiga = #1, sem data = no fim)
+  // Na raiz: filtra pastas pelo mês/ano selecionado (via data da venda do cliente)
+  // e ordena da venda mais antiga pra mais nova. Pastas sem data correspondente
+  // ficam ocultas — só aparecem no mês em que a venda foi feita.
   if (path.length === 0) {
-    const toTs = (d: string | undefined) => {
-      if (!d) return Number.POSITIVE_INFINITY;
+    const parseDate = (d: string | undefined): { ts: number; y: number; m: number } | null => {
+      if (!d) return null;
       const [dd, mm, yyyy] = d.split('/');
-      const t = new Date(Number(yyyy), Number(mm) - 1, Number(dd)).getTime();
-      return isNaN(t) ? Number.POSITIVE_INFINITY : t;
+      const y = Number(yyyy);
+      const m = Number(mm) - 1;
+      const day = Number(dd);
+      const ts = new Date(y, m, day).getTime();
+      if (isNaN(ts)) return null;
+      return { ts, y, m };
     };
-    filteredFolders = [...filteredFolders].sort((a, b) => {
-      const da = clienteDataByName[normalizeForMatch(a.name)];
-      const db = clienteDataByName[normalizeForMatch(b.name)];
-      const diff = toTs(da) - toTs(db);
-      if (diff !== 0) return diff;
-      return a.name.localeCompare(b.name);
-    });
+    filteredFolders = filteredFolders
+      .filter(f => {
+        const parsed = parseDate(clienteDataByName[normalizeForMatch(f.name)]);
+        if (!parsed) return false;
+        return parsed.y === year && parsed.m === month;
+      })
+      .sort((a, b) => {
+        const da = parseDate(clienteDataByName[normalizeForMatch(a.name)]);
+        const db = parseDate(clienteDataByName[normalizeForMatch(b.name)]);
+        const ta = da?.ts ?? Number.POSITIVE_INFINITY;
+        const tb = db?.ts ?? Number.POSITIVE_INFINITY;
+        if (ta !== tb) return ta - tb;
+        return a.name.localeCompare(b.name);
+      });
   }
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
