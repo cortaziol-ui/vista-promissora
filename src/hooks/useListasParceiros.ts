@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 
@@ -85,19 +85,35 @@ export function tituloDefaultProximaSexta(base = new Date()): { titulo: string; 
   };
 }
 
+type ListaPatch = Partial<Pick<ListaParceiros, 'titulo' | 'status_geral' | 'observacoes' | 'data_lista'>>;
+type OrgaoPatch = Partial<Omit<ListaOrgao, 'id' | 'lista_id' | 'nome' | 'ordem'>>;
+
 interface UseListasResult {
   listas: ListaParceiros[];
   loading: boolean;
   createLista: (input?: { titulo?: string; data?: string }) => Promise<ListaParceiros | null>;
-  updateLista: (id: string, patch: Partial<Pick<ListaParceiros, 'titulo' | 'status_geral' | 'observacoes' | 'data_lista'>>) => Promise<boolean>;
+  updateLista: (id: string, patch: ListaPatch) => Promise<boolean>;
   deleteLista: (id: string) => Promise<boolean>;
-  updateOrgao: (orgaoId: string, patch: Partial<Omit<ListaOrgao, 'id' | 'lista_id' | 'nome' | 'ordem'>>) => Promise<boolean>;
+  updateOrgao: (orgaoId: string, patch: OrgaoPatch) => Promise<boolean>;
+  /** Atualiza lista + N órgãos em paralelo. Optimistic + rollback. */
+  saveListaBatch: (
+    listaId: string,
+    listaPatch: ListaPatch | null,
+    orgaosPatches: Record<string, OrgaoPatch>,
+  ) => Promise<boolean>;
+  /** Marca uma lista como "em edição" — durante esse período o realtime ignora updates dela (não sobrescreve drafts do usuário). */
+  setEditingListaId: (id: string | null) => void;
 }
 
 export function useListasParceiros(): UseListasResult {
   const { activeAccountId } = useTenant();
   const [listas, setListas] = useState<ListaParceiros[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ref pra realtime saber se uma lista está sendo editada localmente (evita refetch que sobrescreveria draft).
+  const editingListaIdRef = useRef<string | null>(null);
+  const setEditingListaId = useCallback((id: string | null) => {
+    editingListaIdRef.current = id;
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!activeAccountId) {
@@ -150,13 +166,18 @@ export function useListasParceiros(): UseListasResult {
     fetchAll();
   }, [fetchAll]);
 
-  // Realtime: refaz fetch ao mudar lista ou órgão
+  // Realtime: refaz fetch ao mudar lista ou órgão.
+  // Ignora se usuário está editando localmente — refetch sobrescreveria drafts.
   useEffect(() => {
     if (!activeAccountId) return;
+    const onChange = () => {
+      if (editingListaIdRef.current) return;
+      fetchAll();
+    };
     const channel = supabase
       .channel(`listas_parceiros_${activeAccountId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listas_parceiros', filter: `account_id=eq.${activeAccountId}` }, () => fetchAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listas_parceiros_orgaos' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listas_parceiros', filter: `account_id=eq.${activeAccountId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listas_parceiros_orgaos' }, onChange)
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -186,17 +207,33 @@ export function useListasParceiros(): UseListasResult {
       nome,
       ordem: idx,
     }));
-    const { error: errOrgaos } = await supabase.from('listas_parceiros_orgaos').insert(orgaosPayload);
+    const { data: novosOrgaos, error: errOrgaos } = await supabase
+      .from('listas_parceiros_orgaos')
+      .insert(orgaosPayload)
+      .select();
     if (errOrgaos) {
       console.error('[useListasParceiros] insert orgaos error:', errOrgaos);
     }
 
-    await fetchAll();
-    return null;
-  }, [activeAccountId, fetchAll]);
+    // Optimistic: insere a nova lista no topo do state imediatamente
+    const listaCompleta: ListaParceiros = {
+      ...(novaLista as Omit<ListaParceiros, 'orgaos'>),
+      orgaos: (novosOrgaos ?? []) as ListaOrgao[],
+    };
+    setListas((prev) => [listaCompleta, ...prev]);
+    return listaCompleta;
+  }, [activeAccountId]);
 
   const updateLista = useCallback(async (id: string, patch: Partial<Pick<ListaParceiros, 'titulo' | 'status_geral' | 'observacoes' | 'data_lista'>>): Promise<boolean> => {
     if (!activeAccountId) return false;
+    // Optimistic update: aplica no state imediatamente
+    const nowIso = new Date().toISOString();
+    let snapshot: ListaParceiros[] = [];
+    setListas((prev) => {
+      snapshot = prev;
+      return prev.map((l) => (l.id === id ? { ...l, ...patch, ultima_atualizacao: nowIso } : l));
+    });
+
     const { error } = await supabase
       .from('listas_parceiros')
       .update(patch)
@@ -204,6 +241,7 @@ export function useListasParceiros(): UseListasResult {
       .eq('account_id', activeAccountId);
     if (error) {
       console.error('[useListasParceiros] updateLista error:', error);
+      setListas(snapshot); // rollback
       return false;
     }
     return true;
@@ -211,6 +249,11 @@ export function useListasParceiros(): UseListasResult {
 
   const deleteLista = useCallback(async (id: string): Promise<boolean> => {
     if (!activeAccountId) return false;
+    let snapshot: ListaParceiros[] = [];
+    setListas((prev) => {
+      snapshot = prev;
+      return prev.filter((l) => l.id !== id);
+    });
     const { error } = await supabase
       .from('listas_parceiros')
       .delete()
@@ -218,22 +261,106 @@ export function useListasParceiros(): UseListasResult {
       .eq('account_id', activeAccountId);
     if (error) {
       console.error('[useListasParceiros] deleteLista error:', error);
+      setListas(snapshot); // rollback
       return false;
     }
     return true;
   }, [activeAccountId]);
 
   const updateOrgao = useCallback(async (orgaoId: string, patch: Partial<Omit<ListaOrgao, 'id' | 'lista_id' | 'nome' | 'ordem'>>): Promise<boolean> => {
+    // Optimistic update no órgão + ultima_atualizacao da lista pai
+    const nowIso = new Date().toISOString();
+    let snapshot: ListaParceiros[] = [];
+    setListas((prev) => {
+      snapshot = prev;
+      return prev.map((l) => {
+        const idx = l.orgaos.findIndex((o) => o.id === orgaoId);
+        if (idx === -1) return l;
+        const novosOrgaos = [...l.orgaos];
+        novosOrgaos[idx] = { ...novosOrgaos[idx], ...patch };
+        return { ...l, orgaos: novosOrgaos, ultima_atualizacao: nowIso };
+      });
+    });
+
     const { error } = await supabase
       .from('listas_parceiros_orgaos')
       .update(patch)
       .eq('id', orgaoId);
     if (error) {
       console.error('[useListasParceiros] updateOrgao error:', error);
+      setListas(snapshot); // rollback
       return false;
     }
     return true;
   }, []);
 
-  return { listas, loading, createLista, updateLista, deleteLista, updateOrgao };
+  const saveListaBatch = useCallback(async (
+    listaId: string,
+    listaPatch: ListaPatch | null,
+    orgaosPatches: Record<string, OrgaoPatch>,
+  ): Promise<boolean> => {
+    if (!activeAccountId) return false;
+
+    // Optimistic merge no state local (1 só re-render)
+    const nowIso = new Date().toISOString();
+    let snapshot: ListaParceiros[] = [];
+    setListas((prev) => {
+      snapshot = prev;
+      return prev.map((l) => {
+        if (l.id !== listaId) return l;
+        const novosOrgaos = l.orgaos.map((o) => {
+          const patch = orgaosPatches[o.id];
+          return patch ? { ...o, ...patch } : o;
+        });
+        return {
+          ...l,
+          ...(listaPatch ?? {}),
+          orgaos: novosOrgaos,
+          ultima_atualizacao: nowIso,
+        };
+      });
+    });
+
+    // Dispara updates em paralelo. PostgrestBuilder é thenable; envolvo em Promise.resolve pra normalizar.
+    const promises: Promise<{ error: unknown }>[] = [];
+    if (listaPatch && Object.keys(listaPatch).length > 0) {
+      promises.push(
+        Promise.resolve(
+          supabase
+            .from('listas_parceiros')
+            .update(listaPatch)
+            .eq('id', listaId)
+            .eq('account_id', activeAccountId),
+        ).then((res) => ({ error: res.error as unknown })),
+      );
+    }
+    for (const [orgaoId, patch] of Object.entries(orgaosPatches)) {
+      if (Object.keys(patch).length === 0) continue;
+      promises.push(
+        Promise.resolve(
+          supabase.from('listas_parceiros_orgaos').update(patch).eq('id', orgaoId),
+        ).then((res) => ({ error: res.error as unknown })),
+      );
+    }
+
+    const results = await Promise.all(promises);
+    const firstError = results.find((r) => r.error)?.error;
+    if (firstError) {
+      console.error('[useListasParceiros] saveListaBatch error:', firstError);
+      setListas(snapshot); // rollback
+      return false;
+    }
+    return true;
+  }, [activeAccountId]);
+
+  return {
+    listas,
+    loading,
+    createLista,
+    updateLista,
+    deleteLista,
+    updateOrgao,
+    saveListaBatch,
+    setEditingListaId,
+  };
 }

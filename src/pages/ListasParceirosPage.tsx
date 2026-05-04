@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Link2, Trash2, Copy, Check, Pencil, X, Calendar, Inbox } from 'lucide-react';
+import { Plus, Link2, Trash2, Copy, Check, Pencil, X, Calendar, Inbox, Save, Loader2 } from 'lucide-react';
 import {
   useListasParceiros,
   ListaParceiros,
+  ListaOrgao,
   StatusGeral,
   STATUS_GERAL_LABEL,
 } from '@/hooks/useListasParceiros';
@@ -31,6 +32,12 @@ const FILTROS: { value: Filtro; label: string; dotClass?: string }[] = [
   { value: 'reprotocolo', label: 'Reprotocolo', dotClass: 'bg-amber-400' },
 ];
 
+// Apenas o Caio (dono da Outcom) pode editar listas. Demais usuários autenticados só visualizam.
+const EMAIL_EDITOR = 'caio@outcom.com';
+
+type ListaPatch = Partial<Pick<ListaParceiros, 'titulo' | 'status_geral'>>;
+type OrgaoPatch = Partial<Omit<ListaOrgao, 'id' | 'lista_id' | 'nome' | 'ordem'>>;
+
 function formatUltima(iso: string): string {
   try {
     const d = new Date(iso);
@@ -40,13 +47,10 @@ function formatUltima(iso: string): string {
   }
 }
 
-// Apenas o Caio (dono da Outcom) pode editar listas. Demais usuários autenticados só visualizam.
-const EMAIL_EDITOR = 'caio@outcom.com';
-
 export default function ListasParceirosPage() {
   const { user } = useAuth();
   const canEdit = user?.email?.toLowerCase() === EMAIL_EDITOR;
-  const { listas, loading, createLista, updateLista, deleteLista, updateOrgao } = useListasParceiros();
+  const { listas, loading, createLista, updateLista, deleteLista, saveListaBatch, setEditingListaId } = useListasParceiros();
 
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
@@ -55,6 +59,13 @@ export default function ListasParceirosPage() {
   const [linkCopiadoId, setLinkCopiadoId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // ===== Modo edição em lote =====
+  // editingId === selecionadaId quando está editando a lista atual.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftLista, setDraftLista] = useState<ListaPatch>({});
+  const [draftOrgaos, setDraftOrgaos] = useState<Record<string, OrgaoPatch>>({});
+  const [saving, setSaving] = useState(false);
 
   const filtradas = useMemo(() => {
     if (filtro === 'todos') return listas;
@@ -75,6 +86,94 @@ export default function ListasParceirosPage() {
     () => listas.find((l) => l.id === selecionadaId) || null,
     [listas, selecionadaId],
   );
+
+  // Em modo edit, mescla a lista atual com o draft pra a view exibir já com mudanças pendentes
+  const listaParaView: ListaParceiros | null = useMemo(() => {
+    if (!selecionada) return null;
+    if (editingId !== selecionada.id) return selecionada;
+    return {
+      ...selecionada,
+      ...draftLista,
+      orgaos: selecionada.orgaos.map((o) => {
+        const patch = draftOrgaos[o.id];
+        return patch ? { ...o, ...patch } : o;
+      }),
+    };
+  }, [selecionada, editingId, draftLista, draftOrgaos]);
+
+  const totalChanges = useMemo(() => {
+    const listaChanges = Object.keys(draftLista).length > 0 ? 1 : 0;
+    const orgaoChanges = Object.values(draftOrgaos).filter((p) => Object.keys(p).length > 0).length;
+    return listaChanges + orgaoChanges;
+  }, [draftLista, draftOrgaos]);
+
+  const isEditingNow = editingId !== null && editingId === selecionadaId;
+
+  // Sinaliza ao hook qual lista está em edição (pra realtime ignorar)
+  useEffect(() => {
+    setEditingListaId(editingId);
+    return () => setEditingListaId(null);
+  }, [editingId, setEditingListaId]);
+
+  const confirmDescartarSeAlteracoes = (): boolean => {
+    if (totalChanges === 0) return true;
+    return window.confirm('Descartar alterações não salvas?');
+  };
+
+  const handleStartEdit = () => {
+    if (!selecionada) return;
+    setEditingId(selecionada.id);
+    setDraftLista({});
+    setDraftOrgaos({});
+  };
+
+  const handleCancelEdit = () => {
+    if (!confirmDescartarSeAlteracoes()) return;
+    setEditingId(null);
+    setDraftLista({});
+    setDraftOrgaos({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    const ok = await saveListaBatch(
+      editingId,
+      Object.keys(draftLista).length > 0 ? draftLista : null,
+      draftOrgaos,
+    );
+    setSaving(false);
+    if (ok) {
+      toast.success(`Lista atualizada (${totalChanges} ${totalChanges === 1 ? 'alteração' : 'alterações'})`);
+      setEditingId(null);
+      setDraftLista({});
+      setDraftOrgaos({});
+    } else {
+      toast.error('Erro ao salvar alterações. Tente novamente.');
+    }
+  };
+
+  const handleChangeLista = (patch: ListaPatch) => {
+    setDraftLista((prev) => ({ ...prev, ...patch }));
+  };
+
+  const handleChangeOrgao = (orgaoId: string, patch: Partial<ListaOrgao>) => {
+    setDraftOrgaos((prev) => ({
+      ...prev,
+      [orgaoId]: { ...(prev[orgaoId] ?? {}), ...patch },
+    }));
+  };
+
+  // Trocar de lista durante edição: confirma descarte
+  const handleSelectLista = (id: string) => {
+    if (isEditingNow && id !== selecionadaId) {
+      if (!confirmDescartarSeAlteracoes()) return;
+      setEditingId(null);
+      setDraftLista({});
+      setDraftOrgaos({});
+    }
+    setSelecionadaId(id);
+  };
 
   const handleCreate = async () => {
     setCreating(true);
@@ -118,6 +217,11 @@ export default function ListasParceirosPage() {
       toast.success('Lista removida');
       setConfirmDelete(null);
       if (selecionadaId === id) setSelecionadaId(null);
+      if (editingId === id) {
+        setEditingId(null);
+        setDraftLista({});
+        setDraftOrgaos({});
+      }
     } else {
       toast.error('Erro ao remover lista');
     }
@@ -133,7 +237,7 @@ export default function ListasParceirosPage() {
             Acompanhe o andamento das listas semanais por órgão. Gere link compartilhável para enviar aos clientes daquela leva.
           </p>
         </div>
-        {canEdit && (
+        {canEdit && !isEditingNow && (
           <button
             onClick={handleCreate}
             disabled={creating}
@@ -200,7 +304,7 @@ export default function ListasParceirosPage() {
                     key={lista.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => setSelecionadaId(lista.id)}
+                    onClick={() => handleSelectLista(lista.id)}
                     className={`group rounded-xl border p-3.5 cursor-pointer transition-all ${
                       isSel
                         ? 'border-primary/50 bg-primary/8 shadow-md shadow-primary/10'
@@ -243,7 +347,7 @@ export default function ListasParceirosPage() {
                         {formatUltima(lista.ultima_atualizacao)}
                       </span>
                     </div>
-                    {canEdit && (
+                    {canEdit && !isEditingNow && (
                       <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
@@ -301,29 +405,75 @@ export default function ListasParceirosPage() {
         {/* COLUNA DIREITA */}
         <section className="min-w-0">
           {selecionada && canEdit && (
-            <div className="mb-4 flex items-center justify-end gap-2">
-              <button
-                onClick={() => handleCopiarLink(selecionada)}
-                className="inline-flex items-center gap-2 rounded-xl border border-border/50 bg-secondary/40 px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary transition-colors"
-              >
-                {linkCopiadoId === selecionada.id ? (
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                {isEditingNow ? (
+                  <span className="inline-flex items-center gap-1.5 text-foreground font-medium">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    Modo edição —{' '}
+                    {totalChanges === 0
+                      ? 'sem alterações'
+                      : totalChanges === 1
+                        ? '1 alteração pendente'
+                        : `${totalChanges} alterações pendentes`}
+                  </span>
+                ) : (
+                  <span>Modo leitura · clique em "Editar lista" para fazer mudanças em lote</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {isEditingNow ? (
                   <>
-                    <Check className="h-4 w-4 text-emerald-400" /> Link copiado
+                    <button
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                      className="inline-flex items-center gap-2 rounded-xl border border-border/50 bg-secondary/40 px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={saving || totalChanges === 0}
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Salvar alterações
+                    </button>
                   </>
                 ) : (
                   <>
-                    <Copy className="h-4 w-4" /> Copiar link público
+                    <button
+                      onClick={() => handleCopiarLink(selecionada)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-border/50 bg-secondary/40 px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary transition-colors"
+                    >
+                      {linkCopiadoId === selecionada.id ? (
+                        <>
+                          <Check className="h-4 w-4 text-emerald-400" /> Link copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" /> Copiar link público
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleStartEdit}
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar lista
+                    </button>
                   </>
                 )}
-              </button>
+              </div>
             </div>
           )}
           <ListaParceirosView
-            lista={selecionada}
-            editable={canEdit}
-            onUpdateOrgao={(id, patch) => updateOrgao(id, patch)}
-            onChangeStatusGeral={(next) => selecionada && updateLista(selecionada.id, { status_geral: next })}
-            onEditTitulo={() => selecionada && handleEditTitulo(selecionada)}
+            lista={listaParaView}
+            mode={isEditingNow ? 'edit' : 'view'}
+            onChangeLista={handleChangeLista}
+            onChangeOrgao={handleChangeOrgao}
           />
         </section>
       </div>
