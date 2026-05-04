@@ -40,9 +40,12 @@ function formatUltima(iso: string): string {
   }
 }
 
+// Apenas o Caio (dono da Outcom) pode editar listas. Demais usuários autenticados só visualizam.
+const EMAIL_EDITOR = 'caio@outcom.com';
+
 export default function ListasParceirosPage() {
   const { user } = useAuth();
-  const canEdit = user?.role === 'admin' || user?.role === 'manager';
+  const canEdit = user?.email?.toLowerCase() === EMAIL_EDITOR;
   const { listas, loading, createLista, updateLista, deleteLista, updateOrgao } = useListasParceiros();
 
   const [filtro, setFiltro] = useState<Filtro>('todos');

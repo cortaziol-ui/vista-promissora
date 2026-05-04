@@ -31,7 +31,7 @@ const allNavItems: NavItem[] = [
   { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
   { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller', 'financeiro'] },
   { title: 'Fichas Rating', url: '/fichas', icon: FileText, roles: ['admin', 'manager', 'financeiro'] },
-  { title: 'Acompanhamento Processos Limpa Nome', url: '/listas-parceiros', icon: ListChecks, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
+  { title: 'Acompanhamento Processos Limpa Nome', url: '/listas-parceiros', icon: ListChecks, roles: ['admin', 'manager', 'seller', 'administrativo', 'financeiro'] },
 ];
 
 const adminItems: NavItem[] = [

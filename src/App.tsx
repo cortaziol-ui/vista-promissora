@@ -130,7 +130,7 @@ function AppRoutes() {
       <Route path="/fichas" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><FichasRespostasPage /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><DocumentosPage /></ProtectedRoute>} />
       <Route path="/documentos/rating" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><RatingDocumentsPage /></ProtectedRoute>} />
-      <Route path="/listas-parceiros" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><ListasParceirosPage /></ProtectedRoute>} />
+      <Route path="/listas-parceiros" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><ListasParceirosPage /></ProtectedRoute>} />
 
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
