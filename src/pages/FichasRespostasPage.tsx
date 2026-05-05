@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import { Search, ChevronLeft, ChevronRight, Eye, Loader2, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Eye, EyeOff, Copy, Check, Loader2, Trash2, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FichaRating {
@@ -291,7 +291,7 @@ export default function FichasRespostasPage() {
 
               <DetailSection title="Acesso Serasa">
                 <DetailRow label="Login" value={selected.login_serasa} />
-                <DetailRow label="Senha" value={selected.senha_serasa ? '••••••••' : '—'} />
+                <SenhaRow value={selected.senha_serasa} />
               </DetailSection>
 
               <DetailSection title="Bens e Patrimônio">
@@ -344,6 +344,54 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-xs text-foreground font-medium text-right">{value || '—'}</span>
+    </div>
+  );
+}
+
+function SenhaRow({ value }: { value?: string | null }) {
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast.success('Senha copiada');
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error('Não foi possível copiar');
+    }
+  };
+
+  return (
+    <div className="flex justify-between items-center py-1 gap-2">
+      <span className="text-xs text-muted-foreground">Senha</span>
+      {value ? (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-foreground font-medium font-mono select-all">
+            {shown ? value : '••••••••'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShown((v) => !v)}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+            title={shown ? 'Ocultar senha' : 'Mostrar senha'}
+          >
+            {shown ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+            title="Copiar senha"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      ) : (
+        <span className="text-xs text-foreground font-medium">—</span>
+      )}
     </div>
   );
 }
