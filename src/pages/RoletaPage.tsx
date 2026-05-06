@@ -175,8 +175,9 @@ export default function RoletaPage() {
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const lnData = useMonthlyData(getCurrentMonth(), 'LIMPA_NOME');
   const rtData = useMonthlyData(getCurrentMonth(), 'RATING');
-  const { isSeller, isManager, isAdmin } = useAuth();
-  const { activeAccountId } = useTenant();
+  const { isSeller, isManager, isAdmin, user } = useAuth();
+  const { activeAccountId, accounts } = useTenant();
+  const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
   const { spins, loading: spinsLoading, saveSpin, updateSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
   const canEditSpin = isAdmin || isManager;
 
@@ -286,16 +287,23 @@ export default function RoletaPage() {
   useEffect(() => {
     if (!pendingSpin) return;
     const { vendedor, motivo, motivoTitulo, premio, timestamp } = pendingSpin;
-    saveSpin({
-      vendedor,
-      motivo,
-      motivoTitulo,
-      premio,
-      data: timestamp.toLocaleDateString('pt-BR'),
-      hora: timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      status: 'pendente',
-    }).then(() => setPendingSpin(null));
-  }, [pendingSpin, saveSpin]);
+    // Em modo consolidated (vendasgeral), resolve account_id via vendedor selecionado.
+    // Caso contrário, o hook usa activeAccountId.
+    const vendorRecord = vendedores.find((v) => v.nome === vendedor);
+    const accountIdOverride = isConsolidatedSeller ? vendorRecord?.accountId : undefined;
+    saveSpin(
+      {
+        vendedor,
+        motivo,
+        motivoTitulo,
+        premio,
+        data: timestamp.toLocaleDateString('pt-BR'),
+        hora: timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        status: 'pendente',
+      },
+      accountIdOverride,
+    ).then(() => setPendingSpin(null));
+  }, [pendingSpin, saveSpin, vendedores, isConsolidatedSeller]);
 
   const currentMotive = useMemo(() => MOTIVES.find(m => m.id === selectedMotivo), [selectedMotivo]);
   const currentPrizes = useMemo(() => prizeMap[selectedMotivo] || prizeMap.volume_diario, [selectedMotivo, prizeMap]);

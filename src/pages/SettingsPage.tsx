@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Pencil, Power, PowerOff, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound } from 'lucide-react';
+import { Pencil, Power, PowerOff, UserPlus, Check, X, Calendar, Loader2, Link2, Wand2, AlertTriangle, CheckCircle2, Trophy, KeyRound, Trash2 } from 'lucide-react';
 import { VendorAvatar } from '@/components/VendorAvatar';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -47,7 +47,7 @@ export default function SettingsPage() {
   const { isAdmin, isManager } = useAuth();
   const {
     vendedores,
-    addVendedor, updateVendedor,
+    addVendedor, updateVendedor, deleteVendedorPermanently,
   } = useSalesData();
   const { activeAccount } = useAccountContext();
   const { toast } = useToast();
@@ -80,6 +80,7 @@ export default function SettingsPage() {
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [vendorMetaDraft, setVendorMetaDraft] = useState(0);
   const [pendingToggle, setPendingToggle] = useState<{ id: number; nome: string; toInactive: boolean } | null>(null);
+  const [pendingPermanentDelete, setPendingPermanentDelete] = useState<{ id: number; nome: string } | null>(null);
   // User accounts — 5 fixed system accounts
   const SYSTEM_ACCOUNTS = [
     { email: 'caio@outcom.com', label: 'Caio (Dono)', role: 'admin', icon: '👑' },
@@ -570,6 +571,17 @@ export default function SettingsPage() {
                             : <PowerOff className="w-3.5 h-3.5 text-muted-foreground" />}
                         </Button>
                       )}
+                      {/* Excluir permanente: só aparece em vendedor inativo. Histórico de vendas (clientes/roleta) preservado por nome. */}
+                      {isAdmin && !isVendorActiveToday(v) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={`Excluir permanentemente ${v.nome}`}
+                          onClick={() => setPendingPermanentDelete({ id: v.id, nome: v.nome })}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -801,6 +813,48 @@ export default function SettingsPage() {
               }}
             >
               {pendingToggle?.toInactive ? 'Inativar' : 'Reativar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Excluir permanente vendedor inativo */}
+      <AlertDialog
+        open={pendingPermanentDelete !== null}
+        onOpenChange={(o) => { if (!o) setPendingPermanentDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Excluir permanentemente {pendingPermanentDelete?.nome}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação remove o vendedor da lista de configurações. O histórico de vendas e roleta dele continua preservado (vinculado pelo nome). Metas mensais, comissões individuais, vínculos de campanha e leads do Kommo dele serão removidos junto. Não pode ser desfeito.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!pendingPermanentDelete) return;
+                const ok = await deleteVendedorPermanently(pendingPermanentDelete.id);
+                if (ok) {
+                  toast({
+                    title: 'Vendedor excluído',
+                    description: `${pendingPermanentDelete.nome} removido das configurações.`,
+                  });
+                } else {
+                  toast({
+                    title: 'Erro ao excluir',
+                    description: 'Não foi possível excluir. Tente novamente.',
+                    variant: 'destructive',
+                  });
+                }
+                setPendingPermanentDelete(null);
+              }}
+            >
+              Excluir permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

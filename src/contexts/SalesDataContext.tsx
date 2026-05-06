@@ -56,6 +56,7 @@ export interface Vendedor {
   aniversario?: string;
   foto?: string;
   inactiveFrom?: string;
+  accountId?: string;
 }
 
 export interface VendedorStats {
@@ -80,6 +81,8 @@ interface SalesDataContextType {
   addVendedor: (v: Omit<Vendedor, 'id'>) => Promise<Vendedor | null>;
   updateVendedor: (id: number, partial: Partial<Vendedor>) => void;
   deleteVendedor: (id: number) => Promise<boolean>;
+  /** Delete permanente: ignora a checagem de clientes ativos. Histórico de vendas (clientes.vendedor é TEXT) e roleta_spins não são afetados. FKs cascateiam metas/comissões/campanhas/kommo. */
+  deleteVendedorPermanently: (id: number) => Promise<boolean>;
   clientes: Cliente[];
   addCliente: (c: Omit<Cliente, 'id'>) => void;
   updateCliente: (id: number, c: Partial<Cliente>) => void;
@@ -246,6 +249,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
               aniversario: v.aniversario || undefined,
               foto: v.foto || undefined,
               inactiveFrom: v.inactive_from || undefined,
+              accountId: v.account_id,
             })));
           }
 
@@ -286,6 +290,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
               aniversario: v.aniversario || undefined,
               foto: v.foto || undefined,
               inactiveFrom: v.inactive_from || undefined,
+              accountId: v.account_id,
             })));
           }
 
@@ -413,6 +418,19 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
     return true;
   }, [vendedores, clientes]);
 
+  const deleteVendedorPermanently = useCallback(async (id: number): Promise<boolean> => {
+    // Optimistic remove
+    let snapshot: Vendedor[] = [];
+    setVendedores(prev => { snapshot = prev; return prev.filter(v => v.id !== id); });
+    const { error } = await supabase.from('vendedores').delete().eq('id', id);
+    if (error) {
+      console.error('[deleteVendedorPermanently] error:', error);
+      setVendedores(snapshot);
+      return false;
+    }
+    return true;
+  }, []);
+
   const updateVendedor = useCallback(async (id: number, partial: Partial<Vendedor>) => {
     setVendedores(prev => prev.map(v => v.id === id ? { ...v, ...partial } : v));
     const dbPartial: Record<string, any> = {};
@@ -538,7 +556,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
       metaMensalGlobal, setMetaMensalGlobal,
       metaEmpresaVendas, setMetaEmpresaVendas,
       metaComercialVendas, setMetaComercialVendas,
-      vendedores, addVendedor, updateVendedor, deleteVendedor,
+      vendedores, addVendedor, updateVendedor, deleteVendedor, deleteVendedorPermanently,
       clientes,
       addCliente, updateCliente, bulkUpdateClientes, deleteCliente,
       loading,

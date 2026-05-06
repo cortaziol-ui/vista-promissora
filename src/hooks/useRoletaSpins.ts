@@ -258,13 +258,23 @@ export function useRoletaSpins() {
   const saveSpin = useCallback(
     async (
       record: Omit<RoletaSpinRecord, 'id' | 'createdAt' | 'quantidadeTotal' | 'quantidadeEntregue'>,
+      /**
+       * Override do account_id. Necessário em modo consolidado (vendasgeral)
+       * onde não existe activeAccountId — o caller resolve via vendedor selecionado.
+       */
+      accountIdOverride?: string,
     ): Promise<RoletaSpinRecord | null> => {
       const now = new Date();
       const quantidadeTotal = parsePrizeQuantity(record.premio);
       const quantidadeEntregue = 0;
 
-      if (isConsolidatedSeller) {
-        toast.error('Modo consolidado é apenas para visualização. Use uma conta específica para girar a roleta.');
+      // Resolve account_id: override (consolidated) > activeAccountId (single account)
+      const targetAccountId = accountIdOverride ?? activeAccountId;
+
+      // Em modo consolidado, exige override (não tem activeAccountId)
+      if (isConsolidatedSeller && !accountIdOverride) {
+        console.error('[useRoletaSpins] saveSpin: consolidated mode requires accountIdOverride');
+        toast.error('Erro: não foi possível identificar a conta do vendedor.');
         return null;
       }
 
@@ -286,7 +296,7 @@ export function useRoletaSpins() {
         return fallback;
       }
 
-      if (!activeAccountId) {
+      if (!targetAccountId) {
         console.error('[useRoletaSpins] saveSpin: account not loaded yet');
         toast.error('Erro ao salvar girada: subconta ainda carregando. Tente novamente em instantes.');
         return null;
@@ -306,7 +316,7 @@ export function useRoletaSpins() {
             quantidade_total: quantidadeTotal,
             quantidade_entregue: quantidadeEntregue,
             created_by: user.id,
-            account_id: activeAccountId,
+            account_id: targetAccountId,
           })
           .select()
           .single();
