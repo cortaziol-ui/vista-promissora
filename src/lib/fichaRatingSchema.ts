@@ -21,6 +21,10 @@ export const fichaRatingSchema = z.object({
   data_expedicao: z.string().min(1, 'Obrigatório'),
   data_nascimento: z.string().min(1, 'Obrigatório'),
   estado_civil: z.string().min(1, 'Obrigatório'),
+  // Cônjuge — obrigatórios apenas quando estado_civil === 'Casado(a)' (ver superRefine no fim do schema)
+  conjuge_nome: z.string().optional(),
+  conjuge_cpf: z.string().optional(),
+  conjuge_rg: z.string().optional(),
   nome_pai: z.string().min(1, 'Obrigatório'),
   nome_mae: z.string().min(1, 'Obrigatório'),
 
@@ -83,6 +87,19 @@ export const fichaRatingSchema = z.object({
   possui_empresa: z.boolean().default(false),
   empresa_nome: z.string().optional(),
   empresa_cnpj: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Cônjuge obrigatório quando casado
+  if (data.estado_civil === 'Casado(a)') {
+    if (!data.conjuge_nome || data.conjuge_nome.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conjuge_nome'], message: 'Obrigatório' });
+    }
+    if (!data.conjuge_cpf || data.conjuge_cpf.trim().length < 11) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conjuge_cpf'], message: 'CPF inválido' });
+    }
+    if (!data.conjuge_rg || data.conjuge_rg.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conjuge_rg'], message: 'Obrigatório' });
+    }
+  }
 });
 
 export type FichaRatingData = z.infer<typeof fichaRatingSchema>;

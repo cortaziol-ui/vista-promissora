@@ -23,7 +23,9 @@ export default function FichaRatingPage() {
     resolver: zodResolver(fichaRatingSchema),
     defaultValues: {
       nome: '', cpf: '', rg: '', titulo_eleitor: '', data_expedicao: '', data_nascimento: '',
-      estado_civil: '', nome_pai: '', nome_mae: '',
+      estado_civil: '',
+      conjuge_nome: '', conjuge_cpf: '', conjuge_rg: '',
+      nome_pai: '', nome_mae: '',
       cep: '', endereco: '', numero: '', bairro: '', cidade: '', estado: '',
       tel_residencial: '', tel_celular: '', email: '',
       empresa: '', data_admissao: '', salario: undefined, renda_familiar: undefined, faturamento: undefined,
@@ -150,8 +152,32 @@ export default function FichaRatingPage() {
               <FormField label="Data de expedição" required error={errors.data_expedicao?.message}><FormInput type="date" {...register('data_expedicao')} hasError={!!errors.data_expedicao} /></FormField>
               <FormField label="Data de nascimento" required error={errors.data_nascimento?.message}><FormInput type="date" {...register('data_nascimento')} hasError={!!errors.data_nascimento} /></FormField>
               <FormField label="Estado civil" required error={errors.estado_civil?.message}>
-                <FormSelect value={watchAll.estado_civil || ''} onChange={v => setValue('estado_civil', v)} options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
+                <FormSelect value={watchAll.estado_civil || ''} onChange={v => {
+                  setValue('estado_civil', v);
+                  // Limpa campos do cônjuge quando o usuário troca pra qualquer estado civil != Casado(a)
+                  if (v !== 'Casado(a)') {
+                    setValue('conjuge_nome', '');
+                    setValue('conjuge_cpf', '');
+                    setValue('conjuge_rg', '');
+                  }
+                }} options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
               </FormField>
+              {/* Campos do cônjuge — só aparecem quando estado_civil = Casado(a) */}
+              {watchAll.estado_civil === 'Casado(a)' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <FormField label="Nome do cônjuge" required error={errors.conjuge_nome?.message}>
+                      <FormInput {...register('conjuge_nome')} hasError={!!errors.conjuge_nome} />
+                    </FormField>
+                  </div>
+                  <FormField label="CPF do cônjuge" required error={errors.conjuge_cpf?.message}>
+                    <FormInput {...register('conjuge_cpf')} hasError={!!errors.conjuge_cpf} />
+                  </FormField>
+                  <FormField label="RG do cônjuge" required error={errors.conjuge_rg?.message}>
+                    <FormInput {...register('conjuge_rg')} hasError={!!errors.conjuge_rg} />
+                  </FormField>
+                </>
+              )}
               <FormField label="Nome do pai" required error={errors.nome_pai?.message}><FormInput {...register('nome_pai')} hasError={!!errors.nome_pai} /></FormField>
               <FormField label="Nome da mãe" required error={errors.nome_mae?.message}><FormInput {...register('nome_mae')} hasError={!!errors.nome_mae} /></FormField>
             </div>

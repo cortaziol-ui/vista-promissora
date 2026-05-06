@@ -106,22 +106,24 @@ export function useRoletaSpins() {
   const accountIds = accounts.map(a => a.id);
 
   // --- Fetch spins from Supabase ---
+  // Caio pediu pra ver TODAS as giradas das contas vinculadas (cross-account),
+  // não só da conta ativa. RLS já garante que o user só lê do que tem acesso
+  // (account_insert_roleta_spins / account_read_roleta_spins via user_accounts).
+  // Por isso usamos sempre .in('account_id', accountIds) quando o user tem >0 contas.
   const fetchSpins = useCallback(async () => {
-    if (!activeAccountId && !isConsolidatedSeller) return [];
+    if (accountIds.length === 0) return [];
     try {
-      const baseQuery = (supabase.from as any)('roleta_spins').select('*');
-      const query = isConsolidatedSeller
-        ? baseQuery.in('account_id', accountIds)
-        : baseQuery.eq('account_id', activeAccountId);
-      const { data, error } = await query
+      const { data, error } = await (supabase.from as any)('roleta_spins')
+        .select('*')
+        .in('account_id', accountIds)
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
       const records = (data as DbRow[]).map(rowToRecord);
       setSpins(records);
-      // Sync to localStorage for fallback (only in single-account mode to avoid mixing scopes)
-      if (!isConsolidatedSeller) saveLocalSpins(records.slice(0, 50));
+      // Sync to localStorage for fallback (apenas em modo single-account pra não misturar escopos)
+      if (accountIds.length === 1 && !isConsolidatedSeller) saveLocalSpins(records.slice(0, 50));
       return records;
     } catch (err) {
       console.error('[useRoletaSpins] fetchSpins error, falling back to localStorage:', err);
@@ -131,7 +133,7 @@ export function useRoletaSpins() {
     } finally {
       setLoading(false);
     }
-  }, [activeAccountId, isConsolidatedSeller, accountIds.join(',')]);
+  }, [isConsolidatedSeller, accountIds.join(',')]);
 
   // --- Migrate localStorage data to Supabase (once) ---
   const migrateLocalStorage = useCallback(async (userId: string) => {
