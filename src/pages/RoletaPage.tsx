@@ -758,8 +758,8 @@ export default function RoletaPage() {
             </div>
           </div>
 
-          {/* History — hidden for sellers */}
-          {!isSeller && <div className="glass-card p-5">
+          {/* History — escondido para sellers, exceto vendasgeral (consolidated seller) que vê tudo em modo leitura */}
+          {(!isSeller || isConsolidatedSeller) && <div className="glass-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <History className="w-4 h-4 text-muted-foreground" />
@@ -838,40 +838,52 @@ export default function RoletaPage() {
                         <span className="text-xs text-muted-foreground">{s.data} {s.hora}</span>
                         {isPack && (
                           <div className="flex items-center gap-1 bg-background/60 rounded-md px-1 py-0.5">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              disabled={!canEditSpin || s.quantidadeEntregue <= 0}
-                              onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue - 1 })}
-                              title="Remover uma unidade entregue"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="text-xs font-mono tabular-nums min-w-[32px] text-center">
+                            {canEditSpin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                disabled={s.quantidadeEntregue <= 0}
+                                onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue - 1 })}
+                                title="Remover uma unidade entregue"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                            )}
+                            <span className="text-xs font-mono tabular-nums min-w-[32px] text-center px-1">
                               {s.quantidadeEntregue}/{s.quantidadeTotal}
                             </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              disabled={!canEditSpin || s.quantidadeEntregue >= s.quantidadeTotal}
-                              onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue + 1 })}
-                              title="Marcar mais uma unidade entregue"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
+                            {canEditSpin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                disabled={s.quantidadeEntregue >= s.quantidadeTotal}
+                                onClick={() => updateSpin(s.id, { quantidadeEntregue: s.quantidadeEntregue + 1 })}
+                                title="Marcar mais uma unidade entregue"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
                         )}
-                        <button
-                          type="button"
-                          disabled={!canEditSpin || isPack}
-                          onClick={() => updateSpin(s.id, { status: isPago ? 'pendente' : 'pago' })}
-                          className={`text-xs px-2 py-0.5 rounded-full transition ${isPago ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'} ${canEditSpin && !isPack ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}
-                          title={isPack ? 'Atualize pelo contador' : (canEditSpin ? 'Clique para alternar status' : '')}
-                        >
-                          {isPago ? '✅ Pago' : '⏳ Pendente'}
-                        </button>
+                        {canEditSpin ? (
+                          <button
+                            type="button"
+                            disabled={isPack}
+                            onClick={() => updateSpin(s.id, { status: isPago ? 'pendente' : 'pago' })}
+                            className={`text-xs px-2 py-0.5 rounded-full transition ${isPago ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'} ${!isPack ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}
+                            title={isPack ? 'Atualize pelo contador' : 'Clique para alternar status'}
+                          >
+                            {isPago ? '✅ Pago' : '⏳ Pendente'}
+                          </button>
+                        ) : (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${isPago ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'}`}
+                          >
+                            {isPago ? '✅ Pago' : '⏳ Pendente'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
