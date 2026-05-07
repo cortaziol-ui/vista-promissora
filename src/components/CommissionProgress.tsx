@@ -59,6 +59,19 @@ export function CommissionProgress({
 
   const barProgress = Math.max(0, Math.min(100, toPos(currentPct)));
 
+  // Quando tem muitos tiers (>10) os dots/labels apertam — encolhe pra evitar sobreposicao.
+  const isDense = tiers.length > 10;
+  const dotSize = isLarge
+    ? (isDense ? 'w-7 h-7' : 'w-9 h-9')
+    : (isDense ? 'w-5 h-5' : 'w-7 h-7');
+  const checkSize = isLarge
+    ? (isDense ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')
+    : (isDense ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5');
+  const lockSize = isLarge
+    ? (isDense ? 'w-3 h-3' : 'w-4 h-4')
+    : (isDense ? 'w-2.5 h-2.5' : 'w-3 h-3');
+  const labelMaxWidth = isDense ? '52px' : 'auto';
+
   return (
     <div className="w-full px-6">
       {/* Progress track */}
@@ -92,7 +105,7 @@ export function CommissionProgress({
             >
               <div
                 className={`
-                  ${isLarge ? 'w-9 h-9' : 'w-7 h-7'} rounded-full flex items-center justify-center
+                  ${dotSize} rounded-full flex items-center justify-center
                   transition-all duration-300 border-2
                   ${isUnlocked
                     ? 'bg-kpi-success text-white border-kpi-success shadow-[0_0_10px_hsl(var(--kpi-success)/0.5)]'
@@ -102,9 +115,9 @@ export function CommissionProgress({
                 `}
               >
                 {isUnlocked ? (
-                  <Check className={isLarge ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} />
+                  <Check className={checkSize} />
                 ) : (
-                  <Lock className={isLarge ? 'w-4 h-4' : 'w-3 h-3'} />
+                  <Lock className={lockSize} />
                 )}
               </div>
             </div>
@@ -120,25 +133,25 @@ export function CommissionProgress({
             <div
               key={tier.id}
               className="absolute -translate-x-1/2 text-center"
-              style={{ left: `${left}%` }}
+              style={{ left: `${left}%`, maxWidth: labelMaxWidth }}
             >
               <p
                 className={`${isLarge ? 'text-sm' : 'text-[11px]'} font-semibold leading-tight ${
-                  tier.unlocked ? 'text-kpi-success' : 'text-muted-foreground'
+                  tier.unlocked ? 'text-kpi-success' : 'text-foreground'
                 }`}
               >
                 {tier.pct_meta}%
               </p>
               <p
                 className={`${isLarge ? 'text-xs' : 'text-[10px]'} leading-tight ${
-                  tier.unlocked ? 'text-kpi-success/70' : 'text-muted-foreground/50'
+                  tier.unlocked ? 'text-kpi-success/80' : 'text-foreground/70'
                 }`}
               >
                 {tier.vendasNecessarias} vendas
               </p>
               <p
-                className={`${isLarge ? 'text-xs font-medium' : 'text-[10px]'} leading-tight ${
-                  tier.unlocked ? 'text-foreground/80' : 'text-muted-foreground/60'
+                className={`${isLarge ? 'text-xs font-medium' : 'text-[10px]'} font-medium leading-tight ${
+                  tier.unlocked ? 'text-foreground' : 'text-foreground/85'
                 }`}
               >
                 R${tier.premiacao}
