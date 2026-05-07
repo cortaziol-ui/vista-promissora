@@ -11,10 +11,11 @@ import { useAvailableMonths } from '@/hooks/useAvailableMonths';
 import { getCurrentMonth, monthLabel } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/contexts/AccountContext';
-import { fetchCampaignInsights, type MetaInsights } from '@/lib/metaAdsApi';
+import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { type ServiceType, SERVICE_TYPE_OPTIONS, SERVICE_FILTER_STORAGE_KEY, isCampaignInService } from '@/lib/serviceTypes';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
@@ -23,6 +24,10 @@ const fmt = (v: number) => `R$ ${(v / 1000).toFixed(1)}k`;
 export default function OverviewPage() {
   const { clientes } = useSalesData();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [serviceFilter, setServiceFilter] = useState<ServiceType>(() => {
+    const v = localStorage.getItem(SERVICE_FILTER_STORAGE_KEY) as ServiceType | null;
+    return v === 'LIMPA_NOME' || v === 'RATING' ? v : 'GERAL';
+  });
   const {
     faturamento,
     totalVendas,
@@ -33,16 +38,21 @@ export default function OverviewPage() {
     vendedorStats,
     dailyEvolution,
     vendorGoals: monthlyVendorGoals,
-  } = useMonthlyData(selectedMonth);
+  } = useMonthlyData(selectedMonth, serviceFilter);
 
   const availableMonths = useAvailableMonths(clientes);
   const { isSeller } = useAuth();
   const { activeAccount } = useAccountContext();
   const { activeAccountId } = useTenant();
 
+  const handleServiceFilter = (s: ServiceType) => {
+    setServiceFilter(s);
+    localStorage.setItem(SERVICE_FILTER_STORAGE_KEY, s);
+  };
+
   // Meta Ads state
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
+  const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [metaConnected, setMetaConnected] = useState(false);
 
   // Load Meta token
@@ -69,19 +79,41 @@ export default function OverviewPage() {
         const result = await fetchCampaignInsights(accessToken!, activeAccount!.ad_account_id, { since, until });
         if (!cancelled) {
           if (!result.error) {
-            setMetaInsights(result.insights);
+            setMetaCampaigns(result.campaigns);
           } else {
-            setMetaInsights(null);
+            setMetaCampaigns([]);
           }
         }
       } catch {
-        if (!cancelled) setMetaInsights(null);
+        if (!cancelled) setMetaCampaigns([]);
       }
     }
 
     sync();
     return () => { cancelled = true; };
   }, [selectedMonth, accessToken, activeAccount]);
+
+  // Insights agregados aplicando filtro de serviço (campanhas são filtradas pelo nome)
+  const metaInsights = useMemo<MetaInsights>(() => {
+    const filtered = metaCampaigns.filter(c => c.insights && isCampaignInService(c.name, serviceFilter));
+    let impressions = 0, clicks = 0, spend = 0, leads = 0;
+    filtered.forEach(c => {
+      const ins = c.insights!;
+      impressions += ins.impressions || 0;
+      clicks += ins.clicks || 0;
+      spend += ins.spend || 0;
+      leads += ins.leads || 0;
+    });
+    return {
+      impressions,
+      clicks,
+      spend,
+      cpc: clicks > 0 ? spend / clicks : 0,
+      ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+      leads,
+      conversions: 0,
+    };
+  }, [metaCampaigns, serviceFilter]);
 
   const sellerChart = useMemo(() =>
     vendedorStats.map(s => ({ name: s.vendedor.nome, value: s.vendas })),
@@ -112,17 +144,30 @@ export default function OverviewPage() {
           <h1 className="text-2xl font-bold text-foreground">Visão Geral de Performance</h1>
           <p className="text-muted-foreground text-sm">Acompanhe os resultados em tempo real — {monthLabel(selectedMonth)}</p>
         </div>
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-[160px] bg-secondary border-border/50">
-            <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Selecionar mês" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableMonths.map(m => (
-              <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+            {SERVICE_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => handleServiceFilter(opt.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${serviceFilter === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {opt.label}
+              </button>
             ))}
-          </SelectContent>
-        </Select>
+          </div>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[160px] bg-secondary border-border/50">
+              <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Selecionar mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMonths.map(m => (
+                <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Alerta de cobranças previstas para hoje */}

@@ -4,11 +4,12 @@ import { KpiCard } from '@/components/KpiCard';
 import { Users, DollarSign, MousePointerClick, Target, TrendingUp, TrendingDown, Megaphone, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Zap, Pause, Rocket } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { fetchCampaignInsights, type MetaInsights, type MetaCampaign } from '@/lib/metaAdsApi';
+import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
 import { useAccountContext } from '@/contexts/AccountContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { type ServiceType, SERVICE_TYPE_OPTIONS, SERVICE_FILTER_STORAGE_KEY, isCampaignInService } from '@/lib/serviceTypes';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
@@ -49,14 +50,22 @@ export default function MarketingPage() {
 
   const { activeAccount } = useAccountContext();
   const marketingMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const { totalVendas } = useMonthlyData(marketingMonth);
+  const [serviceFilter, setServiceFilter] = useState<ServiceType>(() => {
+    const v = localStorage.getItem(SERVICE_FILTER_STORAGE_KEY) as ServiceType | null;
+    return v === 'LIMPA_NOME' || v === 'RATING' ? v : 'GERAL';
+  });
+  const { totalVendas } = useMonthlyData(marketingMonth, serviceFilter);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [metaConnected, setMetaConnected] = useState(false);
-  const [metaInsights, setMetaInsights] = useState<MetaInsights | null>(null);
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [rankingMode, setRankingMode] = useState<'cost' | 'leads' | 'cpl'>('cost');
+
+  const handleServiceFilter = (s: ServiceType) => {
+    setServiceFilter(s);
+    localStorage.setItem(SERVICE_FILTER_STORAGE_KEY, s);
+  };
 
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -87,7 +96,6 @@ export default function MarketingPage() {
           if (result.error) {
             setSyncError(result.error);
           } else {
-            setMetaInsights(result.insights);
             setMetaCampaigns(result.campaigns);
           }
         }
@@ -117,7 +125,6 @@ export default function MarketingPage() {
       if (result.error) {
         setSyncError(result.error);
       } else {
-        setMetaInsights(result.insights);
         setMetaCampaigns(result.campaigns);
       }
     } catch {
@@ -126,20 +133,10 @@ export default function MarketingPage() {
     }
   }, [year, month, accessToken, activeAccount]);
 
-  const impressions = metaInsights?.impressions ?? 0;
-  const clicks = metaInsights?.clicks ?? 0;
-  const totalCost = metaInsights?.spend ?? 0;
-  const cpc = metaInsights?.cpc ?? 0;
-  const ctr = metaInsights?.ctr ?? 0;
-  const totalLeads = metaInsights?.leads ?? 0;
-  const cpl = totalLeads > 0 ? totalCost / totalLeads : 0;
-  // Conversão real = vendas da planilha / leads do Meta
-  const conversionRate = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
-
-  // Campaign data with vendor detection
+  // Campaign data with vendor detection — filtra por serviço (GERAL inclui tudo)
   const campaigns = useMemo<CampaignData[]>(() => {
     return metaCampaigns
-      .filter(c => c.insights && c.insights.spend > 0)
+      .filter(c => c.insights && c.insights.spend > 0 && isCampaignInService(c.name, serviceFilter))
       .map(c => {
         const ins = c.insights!;
         return {
@@ -149,7 +146,26 @@ export default function MarketingPage() {
           vendor: detectVendor(c.name),
         };
       });
-  }, [metaCampaigns]);
+  }, [metaCampaigns, serviceFilter]);
+
+  // KPIs derivados das campanhas já filtradas (não usa mais o agregado bruto da Meta)
+  const impressions = useMemo(() => metaCampaigns
+    .filter(c => c.insights && isCampaignInService(c.name, serviceFilter))
+    .reduce((s, c) => s + (c.insights?.impressions ?? 0), 0), [metaCampaigns, serviceFilter]);
+  const clicks = useMemo(() => metaCampaigns
+    .filter(c => c.insights && isCampaignInService(c.name, serviceFilter))
+    .reduce((s, c) => s + (c.insights?.clicks ?? 0), 0), [metaCampaigns, serviceFilter]);
+  const totalCost = useMemo(() => metaCampaigns
+    .filter(c => c.insights && isCampaignInService(c.name, serviceFilter))
+    .reduce((s, c) => s + (c.insights?.spend ?? 0), 0), [metaCampaigns, serviceFilter]);
+  const totalLeads = useMemo(() => metaCampaigns
+    .filter(c => c.insights && isCampaignInService(c.name, serviceFilter))
+    .reduce((s, c) => s + (c.insights?.leads ?? 0), 0), [metaCampaigns, serviceFilter]);
+  const cpc = clicks > 0 ? totalCost / clicks : 0;
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const cpl = totalLeads > 0 ? totalCost / totalLeads : 0;
+  // Conversão real = vendas da planilha / leads do Meta (ambos já filtrados pelo mesmo serviço)
+  const conversionRate = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
 
   // Averages for scoring
   const avgCtr = useMemo(() => {
@@ -246,7 +262,18 @@ export default function MarketingPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Marketing Analytics</h1>
           <p className="text-muted-foreground text-sm">Dashboard de decisão — {months[month]}/{year}</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+            {SERVICE_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => handleServiceFilter(opt.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${serviceFilter === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <Button onClick={syncMeta} disabled={syncing} variant="outline" size="sm" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Sincronizando...' : 'Atualizar'}
