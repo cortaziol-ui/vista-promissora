@@ -7,6 +7,9 @@
 export function parsePrizeQuantity(label: string): number {
   if (!label) return 1;
 
+  // Caixa fechada de Monster sem número explícito = pack de 6 latas.
+  if (/caixa\s+(de\s+)?monster/i.test(label)) return 6;
+
   // Remove trechos "R$ XX" ou "R$XX" para que o valor monetário não seja confundido com quantidade.
   const cleaned = label.replace(/R\$\s*\d+/gi, '');
 

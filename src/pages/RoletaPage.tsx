@@ -31,7 +31,7 @@ const PRIZES_VOLUME_DIARIO: PrizeOption[] = [
 
 const PRIZES_META_SEMANAL: PrizeOption[] = [
   { label: 'Pix de R$ 40', peso: 40, color: '#4CAF50' },
-  { label: 'Caixa de Monster', peso: 25, color: '#00BCD4' },
+  { label: 'Pack 6 Monster', peso: 25, color: '#00BCD4' },
   { label: 'Vale iFood R$ 50', peso: 10, color: '#FF5722' },
   { label: 'Pix de R$ 60', peso: 10, color: '#9C27B0' },
   { label: 'Saída 1h mais cedo', peso: 10, color: '#E91E63' },
