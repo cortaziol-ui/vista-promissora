@@ -199,14 +199,18 @@ export default function SettingsPage() {
       if (newData) setTiers(newData as Tier[]);
       return;
     }
-    // Account has no tiers in any month for this service_type — seed 6 defaults so admin can edit
+    // Account has no tiers in any month for this service_type — seed 8 defaults so admin can edit
+    // Niveis a cada 10% a partir da meta, conforme pedido do Caio (5 mai 2026):
+    // recompensar de forma mais granular pra reduzir distancia percebida entre faixas.
     const DEFAULT_TIERS = [
       { faixa_nome: 'Mínima', pct_meta: 70,  premiacao: 100, sort_order: 1 },
       { faixa_nome: 'Meta',   pct_meta: 100, premiacao: 200, sort_order: 2 },
-      { faixa_nome: 'Super',  pct_meta: 130, premiacao: 100, sort_order: 3 },
-      { faixa_nome: 'Super+', pct_meta: 150, premiacao: 150, sort_order: 4 },
-      { faixa_nome: 'Elite',  pct_meta: 170, premiacao: 100, sort_order: 5 },
-      { faixa_nome: 'Elite+', pct_meta: 200, premiacao: 150, sort_order: 6 },
+      { faixa_nome: '110%',   pct_meta: 110, premiacao: 50,  sort_order: 3 },
+      { faixa_nome: '120%',   pct_meta: 120, premiacao: 50,  sort_order: 4 },
+      { faixa_nome: '130%',   pct_meta: 130, premiacao: 50,  sort_order: 5 },
+      { faixa_nome: '140%',   pct_meta: 140, premiacao: 50,  sort_order: 6 },
+      { faixa_nome: '150%',   pct_meta: 150, premiacao: 50,  sort_order: 7 },
+      { faixa_nome: '160%',   pct_meta: 160, premiacao: 50,  sort_order: 8 },
     ];
     const seedInserts = DEFAULT_TIERS.map(t => ({
       month: monthYM,
