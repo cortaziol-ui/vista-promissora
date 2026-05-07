@@ -199,21 +199,21 @@ export default function SettingsPage() {
       if (newData) setTiers(newData as Tier[]);
       return;
     }
-    // Account has no tiers in any month for this service_type — seed 10 defaults so admin can edit
-    // Niveis a cada 10% (70 ate 160), conforme pedido do Caio (mai 2026):
-    // recompensar de forma mais granular pra reduzir distancia percebida entre faixas,
-    // mas teto em 160 pra nao poluir a timeline.
+    // Account has no tiers in any month for this service_type — seed 12 defaults so admin can edit
+    // Caio (mai 2026): 70, 100 (Meta) e dai a cada 10% ate 200. SEM 80 e SEM 90.
     const DEFAULT_TIERS = [
       { faixa_nome: 'Mínima', pct_meta: 70,  premiacao: 100, sort_order: 1 },
-      { faixa_nome: '80%',    pct_meta: 80,  premiacao: 50,  sort_order: 2 },
-      { faixa_nome: '90%',    pct_meta: 90,  premiacao: 50,  sort_order: 3 },
-      { faixa_nome: 'Meta',   pct_meta: 100, premiacao: 200, sort_order: 4 },
-      { faixa_nome: '110%',   pct_meta: 110, premiacao: 50,  sort_order: 5 },
-      { faixa_nome: '120%',   pct_meta: 120, premiacao: 50,  sort_order: 6 },
-      { faixa_nome: '130%',   pct_meta: 130, premiacao: 50,  sort_order: 7 },
-      { faixa_nome: '140%',   pct_meta: 140, premiacao: 50,  sort_order: 8 },
-      { faixa_nome: '150%',   pct_meta: 150, premiacao: 50,  sort_order: 9 },
-      { faixa_nome: '160%',   pct_meta: 160, premiacao: 50,  sort_order: 10 },
+      { faixa_nome: 'Meta',   pct_meta: 100, premiacao: 200, sort_order: 2 },
+      { faixa_nome: '110%',   pct_meta: 110, premiacao: 50,  sort_order: 3 },
+      { faixa_nome: '120%',   pct_meta: 120, premiacao: 50,  sort_order: 4 },
+      { faixa_nome: '130%',   pct_meta: 130, premiacao: 50,  sort_order: 5 },
+      { faixa_nome: '140%',   pct_meta: 140, premiacao: 50,  sort_order: 6 },
+      { faixa_nome: '150%',   pct_meta: 150, premiacao: 50,  sort_order: 7 },
+      { faixa_nome: '160%',   pct_meta: 160, premiacao: 50,  sort_order: 8 },
+      { faixa_nome: '170%',   pct_meta: 170, premiacao: 50,  sort_order: 9 },
+      { faixa_nome: '180%',   pct_meta: 180, premiacao: 50,  sort_order: 10 },
+      { faixa_nome: '190%',   pct_meta: 190, premiacao: 50,  sort_order: 11 },
+      { faixa_nome: '200%',   pct_meta: 200, premiacao: 50,  sort_order: 12 },
     ];
     const seedInserts = DEFAULT_TIERS.map(t => ({
       month: monthYM,
