@@ -46,15 +46,35 @@ export function CommissionProgress({
     );
   }
 
-  const minPct = Math.min(...tiers.map((t) => t.pct_meta));
-  const maxPct = Math.max(...tiers.map((t) => t.pct_meta));
-  const range = maxPct - minPct;
   const currentPct = meta > 0 ? (vendas / meta) * 100 : 0;
 
-  // Map a pct_meta value to position on the bar (0% to 100%)
+  // Posicao uniforme: cada tier ocupa 1/(n-1) da barra, independente do pct_meta.
+  // Isso evita gap visual quando tiers nao sao equidistantes (ex: 70 -> 100 -> 110 -> 120 ...).
+  // Indices sao calculados pela ordem do array (ja vem ordenado por sort_order do hook).
+  const lastIdx = Math.max(1, tiers.length - 1);
+  const tierPosByPct = new Map(tiers.map((t, i) => [t.pct_meta, (i / lastIdx) * 100]));
+
   const toPos = (pct: number) => {
-    if (range === 0) return 50;
-    return Math.max(0, Math.min(100, ((pct - minPct) / range) * 100));
+    if (tiers.length === 0) return 50;
+    if (tiers.length === 1) return 50;
+    // Se cair exatamente num tier, usa a posicao calculada.
+    const exact = tierPosByPct.get(pct);
+    if (exact !== undefined) return exact;
+    // Caso contrario, interpola linearmente entre os dois tiers vizinhos.
+    if (pct <= tiers[0].pct_meta) return 0;
+    if (pct >= tiers[tiers.length - 1].pct_meta) return 100;
+    for (let i = 0; i < tiers.length - 1; i++) {
+      const a = tiers[i];
+      const b = tiers[i + 1];
+      if (pct >= a.pct_meta && pct <= b.pct_meta) {
+        const segLen = b.pct_meta - a.pct_meta;
+        const localT = segLen === 0 ? 0 : (pct - a.pct_meta) / segLen;
+        const aPos = (i / lastIdx) * 100;
+        const bPos = ((i + 1) / lastIdx) * 100;
+        return aPos + (bPos - aPos) * localT;
+      }
+    }
+    return 100;
   };
 
   const barProgress = Math.max(0, Math.min(100, toPos(currentPct)));
