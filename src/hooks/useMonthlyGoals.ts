@@ -50,10 +50,13 @@ export function useMonthlyGoals(month: string, serviceType: ServiceType = 'GERAL
         : { col: 'account_id', op: 'eq' as const, val: activeAccountId };
 
       const baseCompanyQuery = (supabase.from as any)('monthly_goals').select('*').eq('month', month);
+      // Para GERAL, buscamos LN + RT + GERAL — se houver registro explicito em GERAL
+      // ele prevalece; caso contrario somamos LN + RT (Caio normalmente cadastra so por servico).
+      const vendorServiceFilter = serviceType === 'GERAL' ? ['LIMPA_NOME', 'RATING', 'GERAL'] : [serviceType];
       const baseVendorQuery = (supabase.from as any)('vendor_monthly_goals')
         .select('*')
         .eq('month', month)
-        .eq('service_type', serviceType);
+        .in('service_type', vendorServiceFilter);
 
       const companyQuery = scope.op === 'in'
         ? baseCompanyQuery.in(scope.col, scope.val)
@@ -108,12 +111,35 @@ export function useMonthlyGoals(month: string, serviceType: ServiceType = 'GERAL
       setMetaComercialState(comercial);
       setMetaMensalState(mensal);
 
-      // Apply vendor goals (fallback to vendedores.meta apenas para Geral)
+      // Apply vendor goals.
+      // - GERAL: prefere registro explicito em GERAL; senao soma LN + RT.
+      //   Se nao tiver nenhum dos tres, fallback pra vendedores.meta legacy.
+      // - LN ou RT: valor direto da linha. Sem fallback (zerado quando nao cadastrado).
       const map = new Map<number, number>();
       vendedores.forEach(v => map.set(v.id, serviceType === 'GERAL' ? v.meta : 0));
-      if (vGoals) {
-        for (const row of vGoals) {
-          map.set(row.vendedor_id, Number(row.meta));
+      if (vGoals && vGoals.length > 0) {
+        if (serviceType === 'GERAL') {
+          // Agrupa por vendedor: LN+RT vs GERAL explicito
+          const lnRtByVendor = new Map<number, number>();
+          const generalByVendor = new Map<number, number>();
+          for (const row of vGoals) {
+            const vid = row.vendedor_id;
+            const meta = Number(row.meta);
+            if (row.service_type === 'GERAL') {
+              generalByVendor.set(vid, meta);
+            } else {
+              lnRtByVendor.set(vid, (lnRtByVendor.get(vid) ?? 0) + meta);
+            }
+          }
+          // GERAL explicito ganha; senao usa LN+RT.
+          const allVendorIds = new Set<number>([...lnRtByVendor.keys(), ...generalByVendor.keys()]);
+          for (const vid of allVendorIds) {
+            map.set(vid, generalByVendor.get(vid) ?? lnRtByVendor.get(vid) ?? 0);
+          }
+        } else {
+          for (const row of vGoals) {
+            map.set(row.vendedor_id, Number(row.meta));
+          }
         }
       }
       setVendorGoals(map);
