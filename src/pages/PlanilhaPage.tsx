@@ -16,8 +16,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon, FileSpreadsheet, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import KanbanPosVenda from '@/components/KanbanPosVenda';
 import { useKanbanPhases, KanbanPhase } from '@/hooks/useKanbanPhases';
 
@@ -344,14 +348,46 @@ export default function PlanilhaPage() {
     if (deleteId !== null) { deleteCliente(deleteId); setDeleteId(null); }
   };
 
-  const exportCSV = () => {
+  const buildExportRows = () => {
     const headers = ['ID', 'Data', 'Nome', 'CPF', 'Email', 'Telefone', 'Serviço', 'Vendedor', 'Entrada', 'Parcela 1', 'Status P1', 'Parcela 2', 'Status P2', 'Parcela 3', 'Status P3', 'Situação', 'Valor Total'];
-    const rows = filtered.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.parcela3?.valor || 0, c.parcela3?.status || '', c.situacao, c.valorTotal].join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
+    const rows = filtered.map(c => [c.id, c.data, c.nome, c.cpf, c.email, c.telefone, c.servico, c.vendedor, c.entrada, c.parcela1.valor, c.parcela1.status, c.parcela2.valor, c.parcela2.status, c.parcela3?.valor || 0, c.parcela3?.status || '', c.situacao, c.valorTotal]);
+    return { headers, rows };
+  };
+
+  const exportCSV = () => {
+    const { headers, rows } = buildExportRows();
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'planilha_controle.csv'; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportXLSX = () => {
+    const { headers, rows } = buildExportRows();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [
+      { wch: 6 },   // ID
+      { wch: 12 },  // Data
+      { wch: 30 },  // Nome
+      { wch: 18 },  // CPF
+      { wch: 28 },  // Email
+      { wch: 16 },  // Telefone
+      { wch: 14 },  // Serviço
+      { wch: 18 },  // Vendedor
+      { wch: 12 },  // Entrada
+      { wch: 12 },  // Parcela 1
+      { wch: 14 },  // Status P1
+      { wch: 12 },  // Parcela 2
+      { wch: 14 },  // Status P2
+      { wch: 12 },  // Parcela 3
+      { wch: 14 },  // Status P3
+      { wch: 28 },  // Situação
+      { wch: 14 },  // Valor Total
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Planilha');
+    XLSX.writeFile(wb, 'planilha_controle.xlsx');
   };
 
   const updateFormField = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
@@ -405,7 +441,21 @@ export default function PlanilhaPage() {
             {bulkMode ? 'Cancelar' : 'Editar em Massa'}
           </Button>
           {!bulkMode && <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>}
-          <Button variant="outline" onClick={exportCSV} className="gap-2"><Download className="w-4 h-4" /> Exportar CSV</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="w-4 h-4" /> Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportXLSX} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="w-4 h-4" /> Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCSV} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4" /> CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
