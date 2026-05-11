@@ -11,7 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper, Pencil, Plus, Minus } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Gift, Zap, Target, Crown, History, Trophy, PartyPopper, Pencil, Plus, Minus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PrizeOption {
@@ -184,8 +188,10 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
   const { isSeller, isManager, isAdmin, user } = useAuth();
   const { activeAccountId, accounts } = useTenant();
   const isConsolidatedSeller = user?.role === 'seller' && accounts.length > 1 && !activeAccountId;
-  const { spins, loading: spinsLoading, saveSpin, updateSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
+  const { spins, loading: spinsLoading, saveSpin, updateSpin, deleteSpin, checkRateLimit, getSpinsUsedToday } = useRoletaSpins();
   const canEditSpin = isAdmin || isManager;
+  const canDeleteSpin = isAdmin || isManager;
+  const [deleteSpinId, setDeleteSpinId] = useState<string | null>(null);
 
   const [selectedVendedor, setSelectedVendedor] = useState('');
   const [selectedMotivo, setSelectedMotivo] = useState('');
@@ -953,7 +959,7 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
                   const isPack = s.quantidadeTotal > 1;
                   const isPago = s.status === 'pago';
                   return (
-                    <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50 text-sm">
+                    <div key={s.id} className="group flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50 text-sm hover:bg-secondary/70 transition-colors">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{s.vendedor}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: motive?.bgColor, color: motive?.color }}>
@@ -963,6 +969,17 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-foreground">{s.premio}</span>
                         <span className="text-xs text-muted-foreground">{s.data} {s.hora}</span>
+                        {canDeleteSpin && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteSpinId(s.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-destructive/10"
+                            title="Apagar girada"
+                            aria-label="Apagar girada"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {isPack && (
                           <div className="flex items-center gap-1 bg-background/60 rounded-md px-1 py-0.5">
                             {canEditSpin && (
@@ -1084,6 +1101,36 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmacao de exclusao de girada */}
+      <AlertDialog open={!!deleteSpinId} onOpenChange={open => !open && setDeleteSpinId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar esta girada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const s = spins.find(sp => sp.id === deleteSpinId);
+                if (!s) return 'Esta acao nao pode ser desfeita.';
+                return `${s.vendedor} — ${s.premio} (${s.data} ${s.hora}). Esta acao nao pode ser desfeita.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteSpinId) return;
+                const ok = await deleteSpin(deleteSpinId);
+                if (ok) toast.success('Girada apagada.');
+                setDeleteSpinId(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

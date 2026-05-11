@@ -415,6 +415,45 @@ export function useRoletaSpins() {
     [spins],
   );
 
+  // --- Delete spin (admin/manager) ---
+  const deleteSpin = useCallback(
+    async (id: string): Promise<boolean> => {
+      const current = spins.find(s => s.id === id);
+      if (!current) return false;
+
+      // Optimistic remove
+      setSpins(prev => prev.filter(s => s.id !== id));
+
+      if (id.startsWith('local_') || id.length < 20) {
+        // Spin so em localStorage
+        saveLocalSpins(loadLocalSpins().filter(s => s.id !== id));
+        return true;
+      }
+
+      try {
+        const { error } = await (supabase.from as any)('roleta_spins')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        saveLocalSpins(loadLocalSpins().filter(s => s.id !== id));
+        return true;
+      } catch (err) {
+        console.error('[useRoletaSpins] deleteSpin error:', err);
+        toast.error('Erro ao apagar girada.');
+        // Reverte
+        setSpins(prev => {
+          if (prev.some(s => s.id === id)) return prev;
+          return [...prev, current].sort((a, b) =>
+            (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+          );
+        });
+        return false;
+      }
+    },
+    [spins],
+  );
+
   // --- Check rate limit (disabled — always allowed) ---
   const checkRateLimit = useCallback(
     async (_vendedor: string, _motivo: string): Promise<{ allowed: boolean; hoursRemaining: number }> => {
@@ -437,6 +476,7 @@ export function useRoletaSpins() {
     loading,
     saveSpin,
     updateSpin,
+    deleteSpin,
     checkRateLimit,
     getSpinsUsedToday,
     refresh: fetchSpins,
