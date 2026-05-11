@@ -170,7 +170,13 @@ function weightedRandom(prizes: PrizeOption[]): PrizeOption {
   return prizes[prizes.length - 1];
 }
 
-export default function RoletaPage() {
+interface RoletaPageProps {
+  /** Quando true, desativa todas as validacoes de meta/limite. Apenas para
+   *  validacao visual da animacao em rota /roleta-test. NAO usar em prod. */
+  testMode?: boolean;
+}
+
+export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
   const { vendedores, clientes, loading } = useSalesData();
   const { vendedorStats } = useMonthlyData(getCurrentMonth());
   const lnData = useMonthlyData(getCurrentMonth(), 'LIMPA_NOME');
@@ -195,6 +201,78 @@ export default function RoletaPage() {
   const animFrameRef = useRef<number>(0);
   const [wheelAngle, setWheelAngle] = useState(0);
   const targetPrizeRef = useRef<PrizeOption | null>(null);
+
+  // --- Audio (Web Audio API, lazy init no primeiro clique) ---
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ensureAudio = useCallback(() => {
+    if (audioCtxRef.current) return audioCtxRef.current;
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioCtxRef.current = new Ctx();
+    } catch {
+      audioCtxRef.current = null;
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  // Tick curto (clack) — sutil, simula segmento batendo na seta
+  const playTick = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(900, t0);
+    osc.frequency.exponentialRampToValueAtTime(400, t0 + 0.03);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.06, t0 + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.035);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.04);
+  }, []);
+
+  // Win — arpejo C5–E5–G5–C6 com timbre sino-ish, ~700ms total
+  const playWin = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const start = t0 + i * 0.09;
+      // Fundamental
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, start);
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(0.14, start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+      o.connect(g).connect(ctx.destination);
+      o.start(start);
+      o.stop(start + 0.5);
+      // Harmonico (oitava acima) — da o brilho de sino
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(freq * 2, start);
+      g2.gain.setValueAtTime(0.0001, start);
+      g2.gain.exponentialRampToValueAtTime(0.05, start + 0.015);
+      g2.gain.exponentialRampToValueAtTime(0.0001, start + 0.4);
+      o2.connect(g2).connect(ctx.destination);
+      o2.start(start);
+      o2.stop(start + 0.45);
+    });
+  }, []);
+
+  // Cleanup AudioContext on unmount
+  useEffect(() => {
+    return () => {
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
+    };
+  }, []);
 
   // --- Custom prizes (persisted in company_settings) ---
   const [prizeMap, setPrizeMap] = useState<Record<string, PrizeOption[]>>(DEFAULT_PRIZE_MAP);
@@ -452,6 +530,9 @@ export default function RoletaPage() {
     if (!selectedVendedor) return 'Selecione um vendedor';
     if (!selectedMotivo) return 'Selecione um motivo';
 
+    // Modo teste: pula todas as travas de meta/volume (rota /roleta-test)
+    if (testMode) return null;
+
     const vendedor = vendedores.find(v => v.nome === selectedVendedor);
     if (!vendedor) return 'Vendedor não encontrado';
 
@@ -510,7 +591,7 @@ export default function RoletaPage() {
     if (selectedMotivo === 'meta_mensal_100_rating')      return validateMeta('Rating',     rtStat, 'mensal_100');
 
     return null;
-  }, [selectedVendedor, selectedMotivo, vendedores, lnData, rtData, availableSpins, getTodaySalesCount]);
+  }, [selectedVendedor, selectedMotivo, vendedores, lnData, rtData, availableSpins, getTodaySalesCount, testMode]);
 
   const handleSpin = useCallback(async () => {
     const error = await validateSpin();
@@ -520,36 +601,82 @@ export default function RoletaPage() {
     }
     setValidationError('');
 
+    // Libera AudioContext no gesture do usuario (autoplay policy)
+    const ctx = ensureAudio();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     const prizes = prizeMap[selectedMotivo] || prizeMap.volume_diario;
     const prize = weightedRandom(prizes);
     const motive = MOTIVES.find(m => m.id === selectedMotivo) ?? MOTIVES[0];
     targetPrizeRef.current = prize;
 
+    // wheelAngle esta em RADIANOS (drawWheel usa diretamente nas chamadas a ctx.arc).
+    // drawWheel desenha cada segmento a partir de (i * anglePerSegment + angle),
+    // sentido positivo do canvas = horario (CW). A seta esta no topo (12h), que
+    // corresponde ao angulo -PI/2 no canvas. Portanto o segmento `i` aponta para
+    // a seta quando o centro do segmento, apos a rotacao, fica em -PI/2:
+    //     i * anglePerSegment + anglePerSegment/2 + angle = -PI/2 (mod 2*PI)
+    //     => angle = -PI/2 - centroSegmento (mod 2*PI)
+    const TWO_PI = Math.PI * 2;
     const prizeIndex = prizes.indexOf(prize);
-    const segAngle = 360 / prizes.length;
-    const targetSegCenter = prizeIndex * segAngle + segAngle / 2;
-    const stopAngle = (360 - targetSegCenter - 90 + 360) % 360;
-    const fullSpins = 5 + Math.floor(Math.random() * 3);
-    const totalDeg = fullSpins * 360 + stopAngle;
+    const anglePerSegment = TWO_PI / prizes.length;
+    const segCenterRad = prizeIndex * anglePerSegment + anglePerSegment / 2;
+    // Angulo final desejado em [0, 2*PI)
+    const targetFinalMod = ((-Math.PI / 2 - segCenterRad) % TWO_PI + TWO_PI) % TWO_PI;
+
+    // Calcula delta a partir do startAngle atual pra evitar drift do wheelAngle
+    // residual de spins anteriores. Sentido de giro: positivo (CW visual).
+    const startAngle = wheelAngle;
+    const startMod = ((startAngle % TWO_PI) + TWO_PI) % TWO_PI;
+    let deltaToTarget = (targetFinalMod - startMod + TWO_PI) % TWO_PI;
+    if (deltaToTarget < Math.PI / 6) deltaToTarget += TWO_PI; // volta extra se quase no lugar
+    const fullSpins = 6 + Math.floor(Math.random() * 3); // 6-8 voltas
+    const totalRad = fullSpins * TWO_PI + deltaToTarget;
+    const finalAngle = startAngle + totalRad;
+    const overshootRad = (18 * Math.PI) / 180; // 18 graus de micro-overshoot
 
     setSpinning(true);
 
-    const startAngle = wheelAngle;
-    const duration = 5000;
+    const duration = 7000;
     const startTime = performance.now();
+    // Conta quantos segmentos ja foram "atravessados" pela seta — pra disparar
+    // tick sincronizado com a borda passando pelo pointer (no topo, -PI/2).
+    let lastTickSegment = Math.floor(startAngle / anglePerSegment);
 
     const animate = (time: number) => {
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Quartic ease-out for more dramatic deceleration
-      const eased = 1 - Math.pow(1 - progress, 4);
-      const currentAngle = startAngle + totalDeg * eased;
+      let currentAngle: number;
+      if (progress < 0.85) {
+        const p = progress / 0.85;
+        const eased = 1 - Math.pow(1 - p, 5); // easeOutQuint
+        currentAngle = startAngle + (totalRad + overshootRad) * eased;
+      } else {
+        const p = (progress - 0.85) / 0.15;
+        const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic do overshoot ate o final
+        currentAngle = finalAngle + overshootRad * (1 - eased);
+      }
       setWheelAngle(currentAngle);
+
+      // Tick a cada borda de segmento cruzando a seta.
+      // O ease-out garante que os ticks fiquem mais lentos no final
+      // (drama natural de roleta desacelerando).
+      const currentSegment = Math.floor(currentAngle / anglePerSegment);
+      if (currentSegment !== lastTickSegment) {
+        playTick();
+        lastTickSegment = currentSegment;
+      }
 
       if (progress < 1) {
         animFrameRef.current = requestAnimationFrame(animate);
       } else {
+        // Snap garantido pro angulo exato (evita micro-drift de float)
+        setWheelAngle(finalAngle);
         setSpinning(false);
+        // Pequeno delay pra dar respiro entre ultimo tick e o win
+        setTimeout(() => playWin(), 80);
         setResult({ prize, motive });
         setShowResult(true);
         setPendingSpin({
@@ -563,7 +690,7 @@ export default function RoletaPage() {
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, [selectedVendedor, selectedMotivo, wheelAngle, validateSpin]);
+  }, [selectedVendedor, selectedMotivo, wheelAngle, validateSpin, prizeMap, ensureAudio, playTick, playWin]);
 
   useEffect(() => {
     return () => {
