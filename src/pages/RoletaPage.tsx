@@ -208,6 +208,22 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
   const [wheelAngle, setWheelAngle] = useState(0);
   const targetPrizeRef = useRef<PrizeOption | null>(null);
 
+  // --- MP3 dramatico (motivos de meta) ---
+  // MP3 dura 10.37s. Animacao da roleta dura 11s pra dar drama extra — quando
+  // a roleta para no premio, o popup de Parabens abre imediatamente. O audio
+  // ja terminou ~0.6s antes, ficando um respiro de silencio antes do popup.
+  const META_SPIN_DURATION_MS = 11000;
+  const metaAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isMetaMotivo = useCallback((id: string) => id.startsWith('meta_'), []);
+  const ensureMetaAudio = useCallback(() => {
+    if (metaAudioRef.current) return metaAudioRef.current;
+    const a = new Audio('/sons/meta-spin.mp3');
+    a.preload = 'auto';
+    a.volume = 0.68; // -20% pra nao mascarar o win sintetico no fim
+    metaAudioRef.current = a;
+    return a;
+  }, []);
+
   // --- Audio (Web Audio API, lazy init no primeiro clique) ---
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ensureAudio = useCallback(() => {
@@ -272,11 +288,16 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
     });
   }, []);
 
-  // Cleanup AudioContext on unmount
+  // Cleanup AudioContext + audio element on unmount
   useEffect(() => {
     return () => {
       audioCtxRef.current?.close().catch(() => {});
       audioCtxRef.current = null;
+      if (metaAudioRef.current) {
+        metaAudioRef.current.pause();
+        metaAudioRef.current.src = '';
+        metaAudioRef.current = null;
+      }
     };
   }, []);
 
@@ -613,6 +634,20 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
       ctx.resume().catch(() => {});
     }
 
+    // Motivos de meta: usa MP3 dramatico no lugar dos ticks sinteticos.
+    // Animacao tambem dura mais (sincronizada com fim do audio).
+    const useMetaAudio = isMetaMotivo(selectedMotivo);
+    let metaAudio: HTMLAudioElement | null = null;
+    if (useMetaAudio) {
+      metaAudio = ensureMetaAudio();
+      try {
+        metaAudio.currentTime = 0;
+        void metaAudio.play();
+      } catch {
+        // se falhar, segue sem audio (silencioso)
+      }
+    }
+
     const prizes = prizeMap[selectedMotivo] || prizeMap.volume_diario;
     const prize = weightedRandom(prizes);
     const motive = MOTIVES.find(m => m.id === selectedMotivo) ?? MOTIVES[0];
@@ -645,34 +680,70 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
 
     setSpinning(true);
 
-    const duration = 7000;
+    const duration = useMetaAudio ? META_SPIN_DURATION_MS : 7000;
     const startTime = performance.now();
     // Conta quantos segmentos ja foram "atravessados" pela seta — pra disparar
     // tick sincronizado com a borda passando pelo pointer (no topo, -PI/2).
     let lastTickSegment = Math.floor(startAngle / anglePerSegment);
 
+    // Faseamento da animacao:
+    // - 0% a 94%: easeOutQuint principal (move ate finalAngle + overshoot)
+    // - 94% a 100%: bounce-back curto pro angulo final exato
+    // O popup abre quando o movimento ja esta visualmente quase parado
+    // (POPUP_TRIGGER < MAIN_PHASE_END). Easing easeOutQuint desacelera tao
+    // rapido que apos 80% da animacao o movimento e sub-perceptivel — a seta
+    // ja parece no premio. Popup dispara aqui pra eliminar o "limbo" visual.
+    const MAIN_PHASE_END = 0.94;
+    const POPUP_TRIGGER = 0.80;
+    let popupTriggered = false;
+
+    const triggerEnd = () => {
+      if (popupTriggered) return;
+      popupTriggered = true;
+      setSpinning(false);
+      setTimeout(() => playWin(), 80);
+      setResult({ prize, motive });
+      setShowResult(true);
+      setPendingSpin({
+        vendedor: selectedVendedor,
+        motivo: selectedMotivo,
+        motivoTitulo: motive.titulo,
+        premio: prize.label,
+        timestamp: new Date(),
+      });
+    };
+
     const animate = (time: number) => {
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
       let currentAngle: number;
-      if (progress < 0.85) {
-        const p = progress / 0.85;
+      if (progress < MAIN_PHASE_END) {
+        const p = progress / MAIN_PHASE_END;
         const eased = 1 - Math.pow(1 - p, 5); // easeOutQuint
         currentAngle = startAngle + (totalRad + overshootRad) * eased;
       } else {
-        const p = (progress - 0.85) / 0.15;
-        const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic do overshoot ate o final
+        // Bounce-back rapido do overshoot ate o final exato
+        const p = (progress - MAIN_PHASE_END) / (1 - MAIN_PHASE_END);
+        const eased = 1 - Math.pow(1 - p, 3);
         currentAngle = finalAngle + overshootRad * (1 - eased);
       }
       setWheelAngle(currentAngle);
 
-      // Tick a cada borda de segmento cruzando a seta.
-      // O ease-out garante que os ticks fiquem mais lentos no final
-      // (drama natural de roleta desacelerando).
-      const currentSegment = Math.floor(currentAngle / anglePerSegment);
-      if (currentSegment !== lastTickSegment) {
-        playTick();
-        lastTickSegment = currentSegment;
+      // Dispara popup quando o movimento ja esta praticamente parado visualmente
+      // (80% da easing curve). Animacao continua silenciosa por baixo ate 100%.
+      if (progress >= POPUP_TRIGGER) {
+        triggerEnd();
+      }
+
+      // Tick sintetico a cada borda de segmento cruzando a seta — apenas pros
+      // motivos comuns (por_venda, volume_diario). Nos motivos de meta o MP3
+      // ja cumpre o papel sonoro do giro, entao silencia ticks pra nao poluir.
+      if (!useMetaAudio) {
+        const currentSegment = Math.floor(currentAngle / anglePerSegment);
+        if (currentSegment !== lastTickSegment) {
+          playTick();
+          lastTickSegment = currentSegment;
+        }
       }
 
       if (progress < 1) {
@@ -680,23 +751,13 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
       } else {
         // Snap garantido pro angulo exato (evita micro-drift de float)
         setWheelAngle(finalAngle);
-        setSpinning(false);
-        // Pequeno delay pra dar respiro entre ultimo tick e o win
-        setTimeout(() => playWin(), 80);
-        setResult({ prize, motive });
-        setShowResult(true);
-        setPendingSpin({
-          vendedor: selectedVendedor,
-          motivo: selectedMotivo,
-          motivoTitulo: motive.titulo,
-          premio: prize.label,
-          timestamp: new Date(),
-        });
+        // Se por algum motivo o popup nao foi disparado, garante o disparo
+        triggerEnd();
       }
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, [selectedVendedor, selectedMotivo, wheelAngle, validateSpin, prizeMap, ensureAudio, playTick, playWin]);
+  }, [selectedVendedor, selectedMotivo, wheelAngle, validateSpin, prizeMap, ensureAudio, ensureMetaAudio, isMetaMotivo, playTick, playWin]);
 
   useEffect(() => {
     return () => {
