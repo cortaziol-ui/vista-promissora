@@ -3,7 +3,7 @@ title: "Progresso — Outcom Dashboard 2"
 projeto: "outcom-dashboard"
 tipo: progresso
 criado: 2026-05-01
-updated: 2026-05-01
+updated: 2026-05-15
 tags:
   - progresso
   - outcom
@@ -15,7 +15,34 @@ tags:
 > Stack: React + TS + Vite + Supabase + Tailwind/shadcn
 > Multi-tenant: SIM (account_id em todas as tabelas)
 
-**Ultima atualizacao:** 2026-05-01
+**Ultima atualizacao:** 2026-05-15
+
+---
+
+## Filtro de Servico em Marketing (sessao 2026-05-07)
+
+> **Pedido do Caio:** separar metricas de marketing por servico (Limpa Nome vs Rating). Investimento, leads, CAC, conversao etc. vinham agregados (geral) sem distincao.
+
+### Frontend
+- [x] `src/lib/serviceTypes.ts`: helpers `detectCampaignService(name)` e `isCampaignInService(name, serviceType)`
+  - Heuristica por nome de campanha: procura "RATING" / "LIMPA NOME" / "LIMPA-NOME" / "LIMPANOME" / token isolado `\bLN\b` / `\bRT\b`
+- [x] `OverviewPage.tsx`: segmented filter Geral/Limpa Nome/Rating no header
+  - `useMonthlyData(selectedMonth, serviceFilter)` ja recebe servico
+  - Substituido `metaInsights` (state) por `metaCampaigns` (state) + `metaInsights` derivado em `useMemo` filtrando por servico
+  - KPIs: Investimento, Leads, CAC (Spend/Vendas), Conversao (Vendas/Leads), Impressoes, CPL — todos respeitam servico
+- [x] `MarketingPage.tsx`: segmented filter Geral/Limpa Nome/Rating no header
+  - Removido state `metaInsights`; KPIs (impressoes, cliques, CTR, leads, conversao, investimento, CPC, CPL, CAC) recalculados em `useMemo` a partir de `metaCampaigns` filtradas
+  - `campaigns`, `ranking`, `vendorData` e tabela "Campanhas — Decisao Rapida" ja recebem o array filtrado
+- [x] Filtro persiste em `localStorage` com a mesma chave da SalesPage (`SERVICE_FILTER_STORAGE_KEY`) — selecao sincronizada entre paginas
+- [x] **Filtro funciona retroativo:** como tudo deriva de `(mes selecionado, serviceFilter)`, qualquer mes passado tambem respeita o recorte
+
+### Validacao
+- [x] `npx tsc --noEmit` sem erros
+- [x] `npm run build` passou (warning de @import de fonte ja existia, nao relacionado)
+- [x] Commit + push para producao Lovable (commit `74af037`)
+- [ ] Testar em prod com Caio: confirmar nomenclatura das campanhas no Meta bate com a heuristica (Limpa Nome / Rating no nome)
+
+---
 
 ---
 
@@ -73,6 +100,7 @@ _Sem blockers ativos._
 
 | Data | Sessao | O que foi feito | Proximos passos |
 |------|--------|----------------|-----------------|
+| 2026-05-15 | Planilha pra vendedor (read-only) + PDF + auditoria marketing | (1) Urgencia do Caio via WhatsApp: vendedores precisavam acessar Planilha de Controle pra consultar, sem editar nada. Role `seller` adicionada em `/planilha` (sidebar + App.tsx). `PlanilhaPage` detecta `isSeller -> readOnly`: esconde "Novo Cliente" e "Editar em Massa", substitui Pencil/Trash por Eye na coluna de acoes, modal abre em modo somente-leitura (`pointer-events: none`, sem botao Salvar, titulo "Detalhes do Cliente"). `KanbanPosVenda` recebe prop `readOnly` via `isSeller`: `useDraggable({ disabled: true })`, botao "marcar feito" some (mantem so o icone verde estatico quando contato esta feito), botao Settings de configurar fase some, `handleDragEnd` faz early-return. RLS no banco ja bloqueia (`account_manage_clientes` nao inclui seller, `kanban_phases` admin-only) — nao precisou migration. (2) Bonus pedido: export PDF via `window.print` de HTML formatado (A4 landscape, header navy Outcom, 17 colunas, valores monetarios alinhados a direita). (3) Commit pendente que estava no working tree: painel de auditoria de classificacao por campanha em MarketingPage (mostra como `detectCampaignService` classificou cada campanha como LIMPA NOME / RATING / GERAL, filtro "apenas nao classificadas"). Commits `21eb177` (auditoria marketing) + `a934761` (read-only seller + PDF) pushed pra main. | Caio testar em prod (vendedor das duas contas): item "Planilha de Controle" aparece na sidebar; abre sem botoes de edicao; modal abre como leitura; kanban nao arrasta; menu Exportar > PDF abre print dialog. |
 | 2026-05-01 | Roleta: status e contador | Migration + helper parsePrizeQuantity + updateSpin no hook + UI inline (toggle status / contador unidades) com permissao admin+manager. Replicado no snapshot. Migration aplicada em prod via `supabase db push`. CLI Supabase configurado com access token persistente. | Testar no navegador com user manager real |
 | 2026-05-01 | Roleta: filtro de data | Filtro de periodo na secao "Ultimas Giradas": presets 7d/14d/30d/tudo + periodo personalizado (de/ate) + atalho "Hoje". Default: 7d. Limite de 50 itens com aviso quando o filtro retornar mais. Replicado no snapshot. | Testar no navegador |
 | 2026-05-01 | vendedores.inactive_from (desativacao preservando historico) | Nova coluna `vendedores.inactive_from DATE`. Quando setada, vendedor some de dropdowns de selecao a partir de hoje e some de rankings/splits LN/RT a partir do mes da data; vendas/comissoes/spins anteriores continuam intactos. Migration `20260501400000_vendedores_inactive_from.sql` cria coluna + UPDATE inativando Lucas (Cunha) em 2026-05-01. Helpers `isVendorActiveToday` / `isVendorActiveInMonth` em `src/lib/vendorActive.ts`. Aplicado em FilterBar, SalesPage (dropdown + aniversariantes), PlanilhaPage (form novo cliente + bulk vendedor), RoletaPage (selecao pra girar), useMonthlyData (vendedorStats), SettingsPage (badge visual "Inativo"). Build OK, typecheck OK, commit local `993e5b9` (push pra main bloqueado). Migration nao foi aplicada (push direto bloqueado tambem). | Push manual pra main + `supabase db push --linked` ou colar SQL no Editor. |
