@@ -28,7 +28,7 @@ const allNavItems: NavItem[] = [
   { title: 'Marketing', url: '/marketing', icon: Megaphone, roles: ['admin', 'manager', 'financeiro'] },
   { title: 'Satisfação', url: '/satisfacao', icon: SmilePlus, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, roles: ['admin', 'financeiro'] },
-  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'administrativo', 'financeiro'] },
+  { title: 'Planilha de Controle', url: '/planilha', icon: ClipboardList, roles: ['admin', 'manager', 'seller', 'administrativo', 'financeiro'] },
   { title: 'Roleta Premiada', url: '/roleta', icon: Gift, roles: ['admin', 'manager', 'seller', 'financeiro'] },
   { title: 'Fichas Rating', url: '/fichas', icon: FileText, roles: ['admin', 'manager', 'financeiro'] },
   { title: 'Acompanhamento Processos Limpa Nome', url: '/listas-parceiros', icon: ListChecks, roles: ['admin', 'manager', 'seller', 'administrativo', 'financeiro'] },

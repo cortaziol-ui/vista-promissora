@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { isVendorActiveToday } from '@/lib/vendorActive';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, Download, Search, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, CheckSquare, X, LayoutGrid, Table as TableIcon, FileSpreadsheet, FileText, Eye, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import KanbanPosVenda from '@/components/KanbanPosVenda';
@@ -146,6 +147,12 @@ function makeEmptyCliente(selectedMonth: string, phases: KanbanPhase[] | null): 
 export default function PlanilhaPage() {
   const { clientes, vendedores, addCliente, updateCliente, bulkUpdateClientes, deleteCliente } = useSalesData();
   const { phases: kanbanPhases } = useKanbanPhases();
+  const { isSeller } = useAuth();
+  // Vendedor (seller) tem acesso somente-leitura: vê tudo na planilha e no kanban,
+  // mas não cria, edita, exclui, edita em massa, marca contato como feito nem move
+  // cards entre fases. RLS no banco também bloqueia (account_manage_clientes não
+  // inclui role seller).
+  const readOnly = isSeller;
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [search, setSearch] = useState('');
   const [filterVendedor, setFilterVendedor] = useState('all');
@@ -363,6 +370,70 @@ export default function PlanilhaPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPDF = () => {
+    const { headers, rows } = buildExportRows();
+    const esc = (v: unknown) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const fmtMoney = (v: unknown) => {
+      if (typeof v === 'number') return fmtCurrency(v);
+      return esc(v);
+    };
+    const moneyCols = new Set([8, 9, 11, 13, 16]); // entrada, p1, p2, p3, total
+
+    const html = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Planilha de Controle — ${esc(monthDisplay)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #111; margin: 24px; }
+  h1 { margin: 0 0 4px 0; font-size: 18px; }
+  .meta { color: #555; font-size: 11px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; table-layout: fixed; }
+  thead { background: #0a3d6b; color: #fff; }
+  th, td { border: 1px solid #d0d0d0; padding: 4px 5px; text-align: left; vertical-align: top; word-wrap: break-word; }
+  th { font-weight: 600; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  tr:nth-child(even) td { background: #f6f8fb; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .footer { margin-top: 12px; font-size: 9px; color: #777; }
+  @page { size: A4 landscape; margin: 10mm; }
+  @media print {
+    body { margin: 0; }
+    table { font-size: 8.5px; }
+  }
+</style>
+</head>
+<body>
+  <h1>Planilha de Controle — Outcom</h1>
+  <div class="meta">Mês: ${esc(monthDisplay)} · ${rows.length} registro(s) · Gerado em ${esc(new Date().toLocaleString('pt-BR'))}</div>
+  <table>
+    <thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${rows.map(r => `<tr>${r.map((cell, idx) => {
+        const isMoney = moneyCols.has(idx);
+        return `<td${isMoney ? ' class="num"' : ''}>${isMoney ? fmtMoney(cell) : esc(cell)}</td>`;
+      }).join('')}</tr>`).join('\n')}
+    </tbody>
+  </table>
+  <div class="footer">Outcom Limpa Nome · Documento interno</div>
+  <script>window.addEventListener('load', () => { setTimeout(() => { window.focus(); window.print(); }, 200); });</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    if (!win) {
+      toast.error('Habilite popups para exportar PDF');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  };
+
   const exportXLSX = () => {
     const { headers, rows } = buildExportRows();
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -436,11 +507,13 @@ export default function PlanilhaPage() {
               </Button>
             </div>
           )}
-          <Button variant={bulkMode ? 'destructive' : 'outline'} onClick={toggleBulkMode} className="gap-2">
-            {bulkMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
-            {bulkMode ? 'Cancelar' : 'Editar em Massa'}
-          </Button>
-          {!bulkMode && <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>}
+          {!readOnly && (
+            <Button variant={bulkMode ? 'destructive' : 'outline'} onClick={toggleBulkMode} className="gap-2">
+              {bulkMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+              {bulkMode ? 'Cancelar' : 'Editar em Massa'}
+            </Button>
+          )}
+          {!readOnly && !bulkMode && <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -448,6 +521,9 @@ export default function PlanilhaPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportPDF} className="gap-2 cursor-pointer">
+                <FileDown className="w-4 h-4" /> PDF
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={exportXLSX} className="gap-2 cursor-pointer">
                 <FileSpreadsheet className="w-4 h-4" /> Excel (.xlsx)
               </DropdownMenuItem>
@@ -589,8 +665,14 @@ export default function PlanilhaPage() {
                   <td className="py-3 px-3 text-right font-semibold text-foreground">{fmtCurrency(c.valorTotal)}</td>
                   <td className="py-3 px-3 text-center">
                     <div className="flex gap-1 justify-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="w-3 h-3" /></Button>
+                      {readOnly ? (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)} title="Ver detalhes"><Eye className="w-3 h-3" /></Button>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="w-3 h-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="w-3 h-3" /></Button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -697,10 +779,10 @@ export default function PlanilhaPage() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
-            <DialogTitle>{editingId !== null ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
-            <DialogDescription>Preencha os dados do cliente abaixo.</DialogDescription>
+            <DialogTitle>{readOnly ? 'Detalhes do Cliente' : (editingId !== null ? 'Editar Cliente' : 'Novo Cliente')}</DialogTitle>
+            <DialogDescription>{readOnly ? 'Modo somente leitura.' : 'Preencha os dados do cliente abaixo.'}</DialogDescription>
           </DialogHeader>
-          <form autoComplete="off" className="overflow-y-auto flex-1 pr-1" onSubmit={e => e.preventDefault()}>
+          <form autoComplete="off" className={`overflow-y-auto flex-1 pr-1 ${readOnly ? 'pointer-events-none opacity-95 select-text' : ''}`} onSubmit={e => e.preventDefault()}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
                 <Label>Data</Label>
@@ -1094,8 +1176,8 @@ export default function PlanilhaPage() {
             </div>
           </form>
           <DialogFooter className="shrink-0 border-t border-border/30 pt-4">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave}>Salvar</Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
+            {!readOnly && <Button onClick={handleSave}>Salvar</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

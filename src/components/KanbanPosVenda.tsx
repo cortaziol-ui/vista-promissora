@@ -159,16 +159,19 @@ function ClienteCard({
   onMarkFeito,
   column,
   templates,
+  readOnly,
 }: {
   cliente: Cliente;
   onEdit: () => void;
   onMarkFeito: () => void;
   column: number;
   templates: Record<number, string>;
+  readOnly?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(cliente.id),
     data: { cliente, column },
+    disabled: readOnly,
   });
 
   const style: React.CSSProperties = {
@@ -220,7 +223,7 @@ function ClienteCard({
       style={style}
       className={`rounded-lg bg-card border ${isDragging ? 'border-primary shadow-2xl' : 'border-border/50'} p-3 cursor-pointer hover:border-primary/50 hover:bg-card/80 transition-colors`}
       onClick={onEdit}
-      title="Clique para editar, arraste para mover"
+      title={readOnly ? 'Clique para ver detalhes' : 'Clique para editar, arraste para mover'}
       {...attributes}
       {...listeners}
     >
@@ -242,19 +245,26 @@ function ClienteCard({
       )}
 
       <div className="flex items-center gap-1 mt-2" onMouseDown={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={
-            contatoAtual?.status === 'feito'
-              ? 'h-7 w-7 p-0 bg-emerald-500/20 text-emerald-400 hover:bg-amber-500/20 hover:text-amber-400'
-              : 'h-7 w-7 p-0 hover:bg-emerald-500/20 hover:text-emerald-400'
-          }
-          onClick={(e) => { e.stopPropagation(); onMarkFeito(); }}
-          title={contatoAtual?.status === 'feito' ? 'Clique para desmarcar (voltar a pendente)' : 'Marcar como feito'}
-        >
-          <Check className="w-3.5 h-3.5" />
-        </Button>
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={
+              contatoAtual?.status === 'feito'
+                ? 'h-7 w-7 p-0 bg-emerald-500/20 text-emerald-400 hover:bg-amber-500/20 hover:text-amber-400'
+                : 'h-7 w-7 p-0 hover:bg-emerald-500/20 hover:text-emerald-400'
+            }
+            onClick={(e) => { e.stopPropagation(); onMarkFeito(); }}
+            title={contatoAtual?.status === 'feito' ? 'Clique para desmarcar (voltar a pendente)' : 'Marcar como feito'}
+          >
+            <Check className="w-3.5 h-3.5" />
+          </Button>
+        )}
+        {readOnly && contatoAtual?.status === 'feito' && (
+          <span className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-emerald-500/15 text-emerald-400" title="Contato realizado">
+            <Check className="w-3.5 h-3.5" />
+          </span>
+        )}
         {wppUrl && (
           <a
             href={wppUrl}
@@ -280,6 +290,7 @@ function Coluna({
   onMarkFeito,
   onEditTemplate,
   templates,
+  readOnly,
 }: {
   phase: KanbanPhase;
   clientes: Cliente[];
@@ -287,6 +298,7 @@ function Coluna({
   onMarkFeito: (c: Cliente, n: number) => void;
   onEditTemplate: (phase: KanbanPhase) => void;
   templates: Record<number, string>;
+  readOnly?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${phase.phase_n}` });
 
@@ -302,15 +314,17 @@ function Coluna({
               {phase.ordem}
             </span>
             <p className="text-sm font-semibold text-foreground line-clamp-2" title={phase.titulo}>{phase.titulo}</p>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0 shrink-0 hover:bg-primary/20 hover:text-primary"
-              onClick={() => onEditTemplate(phase)}
-              title="Editar título e mensagem da fase"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </Button>
+            {!readOnly && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 shrink-0 hover:bg-primary/20 hover:text-primary"
+                onClick={() => onEditTemplate(phase)}
+                title="Editar título e mensagem da fase"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </Button>
+            )}
           </div>
           <Badge variant="secondary" className="text-xs shrink-0">{clientes.length}</Badge>
         </div>
@@ -330,6 +344,7 @@ function Coluna({
               onEdit={() => onEditCliente(c)}
               onMarkFeito={() => onMarkFeito(c, phase.phase_n)}
               templates={templates}
+              readOnly={readOnly}
             />
           ))
         )}
@@ -341,7 +356,10 @@ function Coluna({
 /* ─── Main Kanban ─── */
 export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente, onMarkContatoFeito }: KanbanProps) {
   const { activeAccountId } = useTenant();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSeller } = useAuth();
+  // Vendedor (seller) só visualiza: não arrasta cards, não marca contato feito,
+  // não abre o dialog de configurar fase. RLS no banco também bloqueia escrita.
+  const readOnly = isSeller;
   const { phases, loading: loadingPhases, addPhase, updatePhase, deletePhase, reorderPhases } = useKanbanPhases();
 
   const [templates, setTemplates] = useState<Record<number, string>>({});
@@ -495,6 +513,7 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
   }, [clientes, orderedPhases]);
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (readOnly) return;
     const { active, over } = event;
     if (!over) return;
     const overId = String(over.id);
@@ -550,6 +569,7 @@ export default function KanbanPosVenda({ clientes, onEditCliente, onMoveCliente,
               onMarkFeito={onMarkContatoFeito}
               onEditTemplate={openEditTemplate}
               templates={templates}
+              readOnly={readOnly}
             />
           ))}
         </div>

@@ -122,7 +122,7 @@ function AppRoutes() {
       <Route path="/painel" element={<ProtectedRoute roles={['admin']}><PainelControlePage /></ProtectedRoute>} />
       <Route path="/marketing" element={<ProtectedRoute roles={['admin', 'manager', 'financeiro']}><MarketingPage /></ProtectedRoute>} />
       <Route path="/satisfacao" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><SatisfactionPage /></ProtectedRoute>} />
-      <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><PlanilhaPage /></ProtectedRoute>} />
+      <Route path="/planilha" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><PlanilhaPage /></ProtectedRoute>} />
       <Route path="/financeiro" element={<ProtectedRoute roles={['admin', 'financeiro']}><FinancialPage /></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute roles={['admin']}><SettingsPage /></ProtectedRoute>} />
       <Route path="/vendas" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><SalesPage /></ProtectedRoute>} />
