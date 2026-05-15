@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { KpiCard } from '@/components/KpiCard';
-import { Users, DollarSign, MousePointerClick, Target, TrendingUp, TrendingDown, Megaphone, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Zap, Pause, Rocket } from 'lucide-react';
+import { Users, DollarSign, MousePointerClick, Target, TrendingUp, TrendingDown, Megaphone, AlertCircle, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Zap, Pause, Rocket, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { fetchCampaignInsights, type MetaCampaign } from '@/lib/metaAdsApi';
@@ -9,7 +9,7 @@ import { useAccountContext } from '@/contexts/AccountContext';
 import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
-import { type ServiceType, SERVICE_TYPE_OPTIONS, SERVICE_FILTER_STORAGE_KEY, isCampaignInService } from '@/lib/serviceTypes';
+import { type ServiceType, SERVICE_TYPE_OPTIONS, SERVICE_FILTER_STORAGE_KEY, isCampaignInService, detectCampaignService } from '@/lib/serviceTypes';
 
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
@@ -61,6 +61,8 @@ export default function MarketingPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [rankingMode, setRankingMode] = useState<'cost' | 'leads' | 'cpl'>('cost');
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditOnlyUnclassified, setAuditOnlyUnclassified] = useState(false);
 
   const handleServiceFilter = (s: ServiceType) => {
     setServiceFilter(s);
@@ -236,6 +238,61 @@ export default function MarketingPage() {
       .filter(c => c.leads > 0 && c.status === 'ACTIVE')
       .sort((a, b) => b.leads - a.leads);
   }, [campaigns]);
+
+  // === AUDITORIA: classificacao de TODAS as campanhas do mes (independe do filtro do header) ===
+  const auditData = useMemo(() => {
+    const items = metaCampaigns.map(c => {
+      const detected = detectCampaignService(c.name);
+      const spend = c.insights?.spend ?? 0;
+      const leads = c.insights?.leads ?? 0;
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        detected, // 'LIMPA_NOME' | 'RATING' | null
+        spend,
+        leads,
+      };
+    });
+
+    const totals = {
+      ln: { count: 0, spend: 0, leads: 0 },
+      rt: { count: 0, spend: 0, leads: 0 },
+      none: { count: 0, spend: 0, leads: 0 },
+    };
+    items.forEach(it => {
+      const bucket = it.detected === 'LIMPA_NOME' ? totals.ln
+        : it.detected === 'RATING' ? totals.rt
+        : totals.none;
+      bucket.count += 1;
+      bucket.spend += it.spend;
+      bucket.leads += it.leads;
+    });
+
+    const total = {
+      count: totals.ln.count + totals.rt.count + totals.none.count,
+      spend: totals.ln.spend + totals.rt.spend + totals.none.spend,
+      leads: totals.ln.leads + totals.rt.leads + totals.none.leads,
+    };
+    const rawTotal = {
+      count: metaCampaigns.length,
+      spend: metaCampaigns.reduce((s, c) => s + (c.insights?.spend ?? 0), 0),
+      leads: metaCampaigns.reduce((s, c) => s + (c.insights?.leads ?? 0), 0),
+    };
+    // Sanity: cada campanha cai em exatamente um bucket. Conferimos com tolerancia minima pra float (R$0,01).
+    const ok = total.count === rawTotal.count
+      && Math.abs(total.spend - rawTotal.spend) < 0.01
+      && total.leads === rawTotal.leads;
+
+    return { items, totals, total, rawTotal, ok };
+  }, [metaCampaigns]);
+
+  const auditItemsView = useMemo(() => {
+    const list = auditOnlyUnclassified
+      ? auditData.items.filter(it => it.detected === null)
+      : auditData.items;
+    return [...list].sort((a, b) => b.spend - a.spend);
+  }, [auditData.items, auditOnlyUnclassified]);
 
   if (!metaConnected) {
     return (
@@ -445,6 +502,143 @@ export default function MarketingPage() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">Nenhuma campanha com leads no período.</p>
+        )}
+      </div>
+
+      {/* Auditoria de Classificacao — vista expandivel pra validar a heuristica de detectCampaignService */}
+      <div className="glass-card border border-border/30 p-6">
+        <button
+          onClick={() => setAuditOpen(o => !o)}
+          className="w-full flex items-center justify-between gap-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            {auditOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+            <h3 className="text-base font-semibold text-foreground">Auditoria de Classificação</h3>
+            <span className="text-xs text-muted-foreground">— confira como cada campanha foi classificada</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {auditData.totals.none.count > 0 && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                {auditData.totals.none.count} não classificada{auditData.totals.none.count > 1 ? 's' : ''}
+              </span>
+            )}
+            {auditData.ok ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">
+                <CheckCircle2 className="w-3 h-3" /> OK
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
+                <AlertCircle className="w-3 h-3" /> Divergência
+              </span>
+            )}
+          </div>
+        </button>
+
+        {auditOpen && (
+          <div className="mt-4 space-y-4">
+            {/* Toggle: mostrar so nao-classificadas */}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={auditOnlyUnclassified}
+                  onChange={e => setAuditOnlyUnclassified(e.target.checked)}
+                  className="rounded border-border"
+                />
+                Mostrar só não-classificadas
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {auditItemsView.length} de {auditData.items.length} campanha{auditData.items.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Tabela de campanhas */}
+            {auditItemsView.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground border-b border-border/50">
+                      <th className="text-left py-2.5 px-2 uppercase tracking-wide text-xs">Campanha</th>
+                      <th className="text-center py-2.5 px-2 uppercase tracking-wide text-xs">Detectado</th>
+                      <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">Investido</th>
+                      <th className="text-right py-2.5 px-2 uppercase tracking-wide text-xs">Leads</th>
+                      <th className="text-center py-2.5 px-2 uppercase tracking-wide text-xs">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditItemsView.map((it, i) => {
+                      const badgeClass = it.detected === 'LIMPA_NOME'
+                        ? 'bg-green-500/20 text-green-400'
+                        : it.detected === 'RATING'
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-amber-500/20 text-amber-400';
+                      const badgeLabel = it.detected === 'LIMPA_NOME' ? 'Limpa Nome'
+                        : it.detected === 'RATING' ? 'Rating'
+                        : 'Não classificada';
+                      return (
+                        <tr key={it.id} className={`border-b border-border/20 hover:bg-primary/5 transition-colors ${i % 2 !== 0 ? 'bg-secondary/15' : ''}`}>
+                          <td className="py-2.5 px-2 max-w-[400px]">
+                            <p className="text-xs font-medium text-foreground truncate" title={it.name}>{it.name}</p>
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
+                              {badgeLabel}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-muted-foreground">{fmtFull(it.spend)}</td>
+                          <td className="py-2.5 px-2 text-right font-semibold text-foreground">{it.leads}</td>
+                          <td className="py-2.5 px-2 text-center text-[10px] text-muted-foreground uppercase">{it.status}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                {auditOnlyUnclassified ? 'Nenhuma campanha não classificada — tudo certo!' : 'Sem campanhas no período.'}
+              </p>
+            )}
+
+            {/* Totalizador */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-border/30">
+              <div className="rounded-lg p-3 bg-green-500/5 border border-green-500/20">
+                <p className="text-[10px] uppercase tracking-wide text-green-400 font-semibold mb-1">Limpa Nome</p>
+                <p className="text-xs text-foreground">{auditData.totals.ln.count} campanha{auditData.totals.ln.count !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{fmtFull(auditData.totals.ln.spend)} · {auditData.totals.ln.leads} leads</p>
+              </div>
+              <div className="rounded-lg p-3 bg-blue-500/5 border border-blue-500/20">
+                <p className="text-[10px] uppercase tracking-wide text-blue-400 font-semibold mb-1">Rating</p>
+                <p className="text-xs text-foreground">{auditData.totals.rt.count} campanha{auditData.totals.rt.count !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{fmtFull(auditData.totals.rt.spend)} · {auditData.totals.rt.leads} leads</p>
+              </div>
+              <div className="rounded-lg p-3 bg-amber-500/5 border border-amber-500/20">
+                <p className="text-[10px] uppercase tracking-wide text-amber-400 font-semibold mb-1">Não classificadas</p>
+                <p className="text-xs text-foreground">{auditData.totals.none.count} campanha{auditData.totals.none.count !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{fmtFull(auditData.totals.none.spend)} · {auditData.totals.none.leads} leads</p>
+              </div>
+              <div className="rounded-lg p-3 bg-secondary/30 border border-border/30">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Total (Geral)</p>
+                <p className="text-xs text-foreground">{auditData.total.count} campanha{auditData.total.count !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{fmtFull(auditData.total.spend)} · {auditData.total.leads} leads</p>
+              </div>
+            </div>
+
+            {/* Conferencia matematica */}
+            <div className={`rounded-lg p-3 text-xs ${auditData.ok ? 'bg-green-500/5 border border-green-500/20 text-green-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'}`}>
+              {auditData.ok ? (
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Conferência OK: LN + Rating + Não-classificadas = Total bruto da Meta ({auditData.rawTotal.count} campanhas, {fmtFull(auditData.rawTotal.spend)}, {auditData.rawTotal.leads} leads).
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Divergência detectada — soma classificada ({auditData.total.count} / {fmtFull(auditData.total.spend)} / {auditData.total.leads}) ≠ total bruto ({auditData.rawTotal.count} / {fmtFull(auditData.rawTotal.spend)} / {auditData.rawTotal.leads}).
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
