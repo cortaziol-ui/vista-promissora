@@ -130,16 +130,22 @@ function ensureContatos(existing: Contato[] | undefined, dataCliente: string, ph
   return merged;
 }
 
+const VALORES_DEFAULT_POR_SERVICO: Record<string, { entrada: number; parcela: number }> = {
+  'LIMPA NOME': { entrada: 249, parcela: 250 },
+  'RATING': { entrada: 500, parcela: 500 },
+};
+
 function makeEmptyCliente(selectedMonth: string, phases: KanbanPhase[] | null): Omit<Cliente, 'id'> {
   const today = new Date().toLocaleDateString('pt-BR');
+  const { entrada, parcela } = VALORES_DEFAULT_POR_SERVICO['LIMPA NOME'];
   return {
     data: today,
     nome: '', cpf: '', nascimento: '', email: '', telefone: '',
-    servico: 'LIMPA NOME', vendedor: '', entrada: 179,
-    parcela1: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 30) },
-    parcela2: { valor: 250, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 60) },
+    servico: 'LIMPA NOME', vendedor: '', entrada,
+    parcela1: { valor: parcela, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 30) },
+    parcela2: { valor: parcela, status: 'AGUARDANDO', dataPrevista: addDaysBR(today, 60) },
     situacao: 'À ENVIAR',
-    valorTotal: 679,
+    valorTotal: entrada + parcela * 2,
     contatos: buildDefaultContatos(today, phases),
   };
 }
@@ -843,7 +849,20 @@ export default function PlanilhaPage() {
               </div>
               <div className="space-y-2">
                 <Label>Serviço</Label>
-                <Select value={form.servico} onValueChange={v => updateFormField('servico', v)}>
+                <Select value={form.servico} onValueChange={v => {
+                  const defaults = VALORES_DEFAULT_POR_SERVICO[v];
+                  if (editingId === null && defaults) {
+                    setForm(prev => ({
+                      ...prev,
+                      servico: v as Cliente['servico'],
+                      entrada: defaults.entrada,
+                      parcela1: { ...prev.parcela1, valor: defaults.parcela },
+                      parcela2: { ...prev.parcela2, valor: defaults.parcela },
+                    }));
+                  } else {
+                    updateFormField('servico', v);
+                  }
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LIMPA NOME">Limpa Nome</SelectItem>
