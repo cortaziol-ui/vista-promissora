@@ -17,6 +17,8 @@ interface FichaRating {
   nome: string;
   cpf: string;
   rg: string;
+  titulo_eleitor: string;
+  data_expedicao: string;
   data_nascimento: string;
   estado_civil: string;
   conjuge_nome?: string;
@@ -249,6 +251,8 @@ export default function FichasRespostasPage() {
                 <DetailRow label="Nome" value={selected.nome} />
                 <DetailRow label="CPF" value={selected.cpf} />
                 <DetailRow label="RG" value={selected.rg} />
+                <DetailRow label="Título de Eleitor" value={selected.titulo_eleitor} />
+                <DetailRow label="Data de Expedição" value={selected.data_expedicao} />
                 <DetailRow label="Data de Nascimento" value={selected.data_nascimento} />
                 <DetailRow label="Estado Civil" value={selected.estado_civil} />
                 {selected.estado_civil === 'Casado(a)' && (
