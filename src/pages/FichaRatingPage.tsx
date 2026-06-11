@@ -1,10 +1,10 @@
-import { useState, useCallback, forwardRef } from 'react';
+import { useState, useCallback, useEffect, forwardRef, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { fichaRatingSchema, type FichaRatingData } from '@/lib/fichaRatingSchema';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 // Slug → account_id mapping
 const SLUG_TO_ACCOUNT: Record<string, string> = {
@@ -13,11 +13,24 @@ const SLUG_TO_ACCOUNT: Record<string, string> = {
 };
 const DEFAULT_ACCOUNT_ID = 'a0000000-0000-0000-0000-000000000001';
 
+const DRAFT_KEY = 'ficha_rating_draft_v1';
+const SUBMIT_QUEUE_KEY = 'ficha_rating_submit_queue_v1';
+
+type SubmitError = {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  payloadSize?: number;
+};
+
 export default function FichaRatingPage() {
   const { slug } = useParams<{ slug?: string }>();
   const [searchParams] = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<SubmitError | null>(null);
+  const lastPayloadRef = useRef<Record<string, unknown> | null>(null);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FichaRatingData>({
     resolver: zodResolver(fichaRatingSchema),
@@ -68,22 +81,172 @@ export default function FichaRatingPage() {
   const addReferencia = () => setValue('referencias', [...referencias, { nome: '', celular: '', grau: '' }]);
   const removeReferencia = (i: number) => setValue('referencias', referencias.filter((_, idx) => idx !== i));
 
+  // Auto-save de draft a cada mudança (sem senha)
+  useEffect(() => {
+    try {
+      const { senha_serasa: _omit, ...safeDraft } = watchAll as Record<string, unknown>;
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(safeDraft));
+    } catch { /* localStorage cheio ou bloqueado — ignora */ }
+  }, [watchAll]);
+
+  // Restaura draft no mount (uma vez)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as Record<string, unknown>;
+      Object.entries(draft).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          setValue(k as keyof FichaRatingData, v as never, { shouldDirty: false });
+        }
+      });
+    } catch { /* draft corrompido — ignora */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buildPayload = (data: FichaRatingData, accountId: string) => {
+    // Coerção defensiva: garante que valores numericos sao Number finito, strings sao trimadas
+    const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const strOrNull = (v: unknown) => {
+      if (typeof v !== 'string') return v ?? null;
+      const t = v.trim();
+      return t.length > 0 ? t : null;
+    };
+
+    return {
+      slug: 'geral',
+      account_id: accountId,
+      nome: strOrNull(data.nome),
+      cpf: strOrNull(data.cpf),
+      rg: strOrNull(data.rg),
+      titulo_eleitor: strOrNull(data.titulo_eleitor),
+      data_expedicao: strOrNull(data.data_expedicao),
+      data_nascimento: strOrNull(data.data_nascimento),
+      estado_civil: strOrNull(data.estado_civil),
+      conjuge_nome: strOrNull(data.conjuge_nome),
+      conjuge_cpf: strOrNull(data.conjuge_cpf),
+      conjuge_rg: strOrNull(data.conjuge_rg),
+      nome_pai: strOrNull(data.nome_pai),
+      nome_mae: strOrNull(data.nome_mae),
+      cep: strOrNull(data.cep),
+      endereco: strOrNull(data.endereco),
+      numero: strOrNull(data.numero),
+      bairro: strOrNull(data.bairro),
+      cidade: strOrNull(data.cidade),
+      estado: strOrNull(data.estado),
+      tel_residencial: strOrNull(data.tel_residencial),
+      tel_celular: strOrNull(data.tel_celular),
+      email: strOrNull(data.email),
+      empresa: strOrNull(data.empresa),
+      data_admissao: strOrNull(data.data_admissao),
+      salario: numOrNull(data.salario),
+      renda_familiar: numOrNull(data.renda_familiar),
+      faturamento: numOrNull(data.faturamento),
+      bancos: Array.isArray(data.bancos) ? data.bancos : [],
+      referencias: Array.isArray(data.referencias) ? data.referencias : [],
+      login_serasa: strOrNull(data.login_serasa),
+      senha_serasa: strOrNull(data.senha_serasa),
+      possui_imovel1: !!data.possui_imovel1,
+      imovel1_tipo: strOrNull(data.imovel1_tipo),
+      imovel1_localizacao: strOrNull(data.imovel1_localizacao),
+      imovel1_bairro: strOrNull(data.imovel1_bairro),
+      imovel1_cidade: strOrNull(data.imovel1_cidade),
+      imovel1_uf: strOrNull(data.imovel1_uf),
+      imovel1_valor: numOrNull(data.imovel1_valor),
+      possui_imovel2: !!data.possui_imovel2,
+      imovel2_tipo: strOrNull(data.imovel2_tipo),
+      imovel2_localizacao: strOrNull(data.imovel2_localizacao),
+      imovel2_bairro: strOrNull(data.imovel2_bairro),
+      imovel2_cidade: strOrNull(data.imovel2_cidade),
+      imovel2_uf: strOrNull(data.imovel2_uf),
+      imovel2_valor: numOrNull(data.imovel2_valor),
+      possui_veiculo: !!data.possui_veiculo,
+      veiculo_valor: numOrNull(data.veiculo_valor),
+      veiculo_ano: strOrNull(data.veiculo_ano),
+      veiculo_placa: strOrNull(data.veiculo_placa),
+      veiculo_estado: strOrNull(data.veiculo_estado),
+      possui_empresa: !!data.possui_empresa,
+      empresa_nome: strOrNull(data.empresa_nome),
+      empresa_cnpj: strOrNull(data.empresa_cnpj),
+    } as Record<string, unknown>;
+  };
+
+  const logFailure = async (accountId: string, err: SubmitError, payloadSnapshot: Record<string, unknown>) => {
+    // Best-effort: registra em form_errors pra Caio investigar. Nunca quebra a UI se falhar.
+    try {
+      await supabase.from('form_errors' as any).insert({
+        account_id: accountId,
+        form_name: 'ficha_rating',
+        error_code: err.code ?? null,
+        error_message: err.message,
+        error_details: err.details ?? null,
+        error_hint: err.hint ?? null,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        url: typeof window !== 'undefined' ? window.location.href : null,
+        // Payload sem campos sensiveis (senha)
+        payload_preview: {
+          nome: payloadSnapshot.nome,
+          cpf: payloadSnapshot.cpf,
+          email: payloadSnapshot.email,
+          slug: payloadSnapshot.slug,
+        },
+      } as any);
+    } catch { /* logger nao pode quebrar o fluxo */ }
+  };
+
+  const submitPayload = async (payload: Record<string, unknown>, accountId: string) => {
+    const { error } = await supabase.from('fichas_rating' as any).insert(payload as any);
+    if (error) {
+      const submitErr: SubmitError = {
+        message: error.message || 'Erro desconhecido',
+        code: (error as { code?: string }).code,
+        details: (error as { details?: string }).details,
+        hint: (error as { hint?: string }).hint,
+        payloadSize: JSON.stringify(payload).length,
+      };
+      console.error('[ficha-rating] supabase error', submitErr, payload);
+      void logFailure(accountId, submitErr, payload);
+      throw submitErr;
+    }
+  };
+
   const onSubmit = async (data: FichaRatingData) => {
     setSubmitting(true);
-    // Resolve account_id: slug param > query param > default
+    setSubmitError(null);
     const accountId = (slug && SLUG_TO_ACCOUNT[slug]) || searchParams.get('account') || DEFAULT_ACCOUNT_ID;
+    const payload = buildPayload(data, accountId);
+    lastPayloadRef.current = payload;
     try {
-      const { error } = await supabase.from('fichas_rating' as any).insert({
-        slug: 'geral',
-        account_id: accountId,
-        ...data,
-      } as any);
-
-      if (error) throw error;
+      await submitPayload(payload, accountId);
+      // Sucesso: limpa draft local
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
       setSubmitted(true);
     } catch (err) {
-      console.error('Erro ao enviar ficha:', err);
-      alert('Erro ao enviar ficha. Tente novamente.');
+      setSubmitError(err as SubmitError);
+      // Mantém o draft pra cliente nao perder dados — fila offline
+      try {
+        const queueRaw = localStorage.getItem(SUBMIT_QUEUE_KEY);
+        const queue = queueRaw ? (JSON.parse(queueRaw) as unknown[]) : [];
+        queue.push({ payload, attemptedAt: new Date().toISOString() });
+        localStorage.setItem(SUBMIT_QUEUE_KEY, JSON.stringify(queue));
+      } catch { /* noop */ }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!lastPayloadRef.current) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    const accountId = (slug && SLUG_TO_ACCOUNT[slug]) || searchParams.get('account') || DEFAULT_ACCOUNT_ID;
+    try {
+      await submitPayload(lastPayloadRef.current, accountId);
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
+      try { localStorage.removeItem(SUBMIT_QUEUE_KEY); } catch { /* noop */ }
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err as SubmitError);
     } finally {
       setSubmitting(false);
     }
@@ -308,6 +471,46 @@ export default function FichaRatingPage() {
               </ToggleSection>
             </div>
           </FormCard>
+
+          {/* Banner de erro visivel — mostra mensagem real do Supabase + botao "Tentar novamente" sem perder dados */}
+          {submitError && (
+            <div
+              className="rounded-xl shadow-sm p-5 space-y-3"
+              style={{ background: '#fff5f5', border: '1px solid #fecaca' }}
+              role="alert"
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: '#b91c1c' }} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm" style={{ color: '#991b1b' }}>
+                    Nao conseguimos enviar sua ficha agora.
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: '#7f1d1d' }}>
+                    Seus dados estao salvos neste navegador. Clique em "Tentar novamente" para reenviar — voce nao precisa preencher de novo.
+                  </p>
+                  <details className="mt-3 text-xs" style={{ color: '#7f1d1d' }}>
+                    <summary className="cursor-pointer font-medium">Detalhes tecnicos (para suporte)</summary>
+                    <div className="mt-2 space-y-1 font-mono break-all">
+                      <div><strong>Mensagem:</strong> {submitError.message}</div>
+                      {submitError.code && <div><strong>Codigo:</strong> {submitError.code}</div>}
+                      {submitError.details && <div><strong>Detalhes:</strong> {submitError.details}</div>}
+                      {submitError.hint && <div><strong>Hint:</strong> {submitError.hint}</div>}
+                    </div>
+                  </details>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={submitting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-white font-semibold text-sm disabled:opacity-60"
+                style={{ background: '#b91c1c' }}
+              >
+                <RefreshCw className={`w-4 h-4 ${submitting ? 'animate-spin' : ''}`} />
+                {submitting ? 'Reenviando...' : 'Tentar novamente'}
+              </button>
+            </div>
+          )}
 
           {/* Submit */}
           <div className="pt-2">

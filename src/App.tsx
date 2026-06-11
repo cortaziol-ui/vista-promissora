@@ -26,6 +26,7 @@ import RatingDocumentsPage from "./pages/RatingDocumentsPage";
 import PainelControlePage from "./pages/PainelControlePage";
 import ListasParceirosPage from "./pages/ListasParceirosPage";
 import ListaPublicaPage from "./pages/ListaPublicaPage";
+import DiagnosticoFormulariosPage from "./pages/DiagnosticoFormulariosPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -131,6 +132,7 @@ function AppRoutes() {
       <Route path="/documentos" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><DocumentosPage /></ProtectedRoute>} />
       <Route path="/documentos/rating" element={<ProtectedRoute roles={['admin', 'manager', 'administrativo', 'financeiro']}><RatingDocumentsPage /></ProtectedRoute>} />
       <Route path="/listas-parceiros" element={<ProtectedRoute roles={['admin', 'manager', 'seller', 'administrativo', 'financeiro']}><ListasParceirosPage /></ProtectedRoute>} />
+      <Route path="/diagnostico-formularios" element={<ProtectedRoute roles={['admin', 'manager']}><DiagnosticoFormulariosPage /></ProtectedRoute>} />
 
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen, ChevronRight, Building2, ChevronDown, LayoutDashboard, ListChecks,
+  BarChart3, Home, Megaphone, SmilePlus, DollarSign, Settings, LogOut, User, ClipboardList, Gift, Sun, Moon, FileText, FolderOpen, ChevronRight, Building2, ChevronDown, LayoutDashboard, ListChecks, AlertCircle,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +35,7 @@ const allNavItems: NavItem[] = [
 ];
 
 const adminItems: NavItem[] = [
+  { title: 'Diagnóstico de Formulários', url: '/diagnostico-formularios', icon: AlertCircle, roles: ['admin', 'manager'] },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, roles: ['admin'] },
 ];
 
