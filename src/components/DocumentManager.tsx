@@ -452,8 +452,10 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
   const filteredFiles = files.filter(f => !search || f.name.toLowerCase().includes(q));
 
   // Na raiz: filtra pastas pelo mês/ano selecionado (via data da venda do cliente)
-  // e ordena da venda mais antiga pra mais nova. Pastas sem data correspondente
-  // ficam ocultas — só aparecem no mês em que a venda foi feita.
+  // e ordena da venda mais antiga pra mais nova. Pastas COM venda correspondente
+  // aparecem só no mês da venda; pastas SEM data correspondente (ex: criadas na
+  // mão, cliente ainda não cadastrado) ficam SEMPRE visíveis — senão "somem"
+  // logo após serem criadas.
   if (path.length === 0) {
     const parseDate = (d: string | undefined): { ts: number; y: number; m: number } | null => {
       if (!d) return null;
@@ -468,7 +470,7 @@ export default function DocumentManager({ config }: { config: DocumentManagerCon
     filteredFolders = filteredFolders
       .filter(f => {
         const parsed = parseDate(clienteDataByName[normalizeForMatch(f.name)]);
-        if (!parsed) return false;
+        if (!parsed) return true; // sem data correspondente → sempre visível
         return parsed.y === year && parsed.m === month;
       })
       .sort((a, b) => {
