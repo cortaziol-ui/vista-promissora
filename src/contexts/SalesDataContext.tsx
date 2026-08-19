@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -207,15 +208,22 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
 
   // Helper to fetch all clientes for the active scope (single account or consolidated)
   const fetchClientes = useCallback(async () => {
-    if (isConsolidatedSeller) {
-      const { data } = await supabase.from('clientes').select('*').in('account_id', accountIds).order('id');
-      if (data) setClientes(data.map(mapRowToCliente));
-      return;
-    }
-    if (!activeAccountId) return;
-    const { data } = await supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id');
-    if (data) {
+    try {
+      if (isConsolidatedSeller) {
+        const data = await fetchAllRows((from, to) =>
+          supabase.from('clientes').select('*').in('account_id', accountIds).order('id').range(from, to));
+        setClientes(data.map(mapRowToCliente));
+        return;
+      }
+      if (!activeAccountId) return;
+      const data = await fetchAllRows((from, to) =>
+        supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id').range(from, to));
       setClientes(data.map(mapRowToCliente));
+    } catch (e) {
+      // Chamado fire-and-forget pelos listeners de realtime: nao pode virar
+      // unhandled rejection, mas tambem nao pode falhar calado.
+      console.error('[SalesDataProvider] fetchClientes falhou:', e);
+      toast.error('Nao foi possivel recarregar as vendas. Recarregue a pagina.');
     }
   }, [activeAccountId, isConsolidatedSeller, accountIdsKey]);
 
@@ -235,7 +243,8 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
           // Consolidated: load from all of the user's accounts and aggregate.
           const [vendRes, cliRes, settRes] = await Promise.all([
             supabase.from('vendedores').select('*').in('account_id', accountIds).order('id'),
-            supabase.from('clientes').select('*').in('account_id', accountIds).order('id'),
+            fetchAllRows((from, to) =>
+              supabase.from('clientes').select('*').in('account_id', accountIds).order('id').range(from, to)),
             supabase.from('company_settings').select('*').in('account_id', accountIds),
           ]);
 
@@ -253,9 +262,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
             })));
           }
 
-          if (cliRes.data) {
-            setClientes(cliRes.data.map(mapRowToCliente));
-          }
+          setClientes(cliRes.map(mapRowToCliente));
 
           // Sum settings across accounts (each account contributes its row per key)
           let mensal = 0, empresa = 0, comercial = 0;
@@ -274,7 +281,8 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
         } else {
           const [vendRes, cliRes, settRes, metaEmpRes, metaComRes] = await Promise.all([
             supabase.from('vendedores').select('*').eq('account_id', activeAccountId).order('id'),
-            supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id'),
+            fetchAllRows((from, to) =>
+              supabase.from('clientes').select('*').eq('account_id', activeAccountId).order('id').range(from, to)),
             supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_mensal').maybeSingle(),
             supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_empresa_vendas').maybeSingle(),
             supabase.from('company_settings').select('*').eq('account_id', activeAccountId).eq('key', 'meta_comercial_vendas').maybeSingle(),
@@ -294,9 +302,7 @@ export function SalesDataProvider({ children }: { children: ReactNode }) {
             })));
           }
 
-          if (cliRes.data) {
-            setClientes(cliRes.data.map(mapRowToCliente));
-          }
+          setClientes(cliRes.map(mapRowToCliente));
 
           setMetaMensalGlobalState(settRes.data ? Number(settRes.data.value) || 450000 : 450000);
           setMetaEmpresaVendasState(metaEmpRes.data ? Number(metaEmpRes.data.value) || 30 : 30);

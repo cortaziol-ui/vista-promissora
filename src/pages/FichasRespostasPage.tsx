@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 import { useTenant } from '@/contexts/TenantContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,13 +94,20 @@ export default function FichasRespostasPage() {
   const fetchFichas = async () => {
     if (!activeAccountId) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('fichas_rating' as any)
-      .select('*')
-      .eq('account_id', activeAccountId)
-      .order('created_at', { ascending: false });
-    if (data) setFichas(data as any);
-    setLoading(false);
+    try {
+      const data = await fetchAllRows((from, to) => supabase
+        .from('fichas_rating' as any)
+        .select('*')
+        .eq('account_id', activeAccountId)
+        .order('created_at', { ascending: false })
+        .range(from, to));
+      setFichas(data as any);
+    } catch (e) {
+      console.error('[FichasRespostas] falha ao carregar fichas:', e);
+      toast.error('Nao foi possivel carregar as fichas de rating.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleStatus = async (ficha: FichaRating) => {

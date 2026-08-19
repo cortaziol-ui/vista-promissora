@@ -4,6 +4,7 @@ import { KpiCard } from '@/components/KpiCard';
 import { SmilePlus, Smile, Meh, Frown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 import { useTenant } from '@/contexts/TenantContext';
 
 interface NPSEntry {
@@ -24,8 +25,13 @@ export default function SatisfactionPage() {
   useEffect(() => {
     if (!activeAccountId) return;
     const fetchNps = async () => {
-      const { data } = await supabase.from('nps_entries').select('*').eq('account_id', activeAccountId);
-      if (data) setNpsEntries(data);
+      try {
+        const data = await fetchAllRows((from, to) =>
+          supabase.from('nps_entries').select('*').eq('account_id', activeAccountId).order('id').range(from, to));
+        setNpsEntries(data);
+      } catch (e) {
+        console.error('[Satisfaction] falha ao carregar NPS:', e);
+      }
     };
     fetchNps();
   }, [activeAccountId]);
