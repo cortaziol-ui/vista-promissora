@@ -32,3 +32,19 @@ export function monthLabel(ym: string): string {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   return `${months[Number(m) - 1]}/${y}`;
 }
+
+/**
+ * Extrai "YYYY-MM" de um timestamp ISO (colunas `created_at` do Postgres).
+ *
+ * Usa o fuso LOCAL de propósito. O banco guarda TIMESTAMPTZ em UTC, mas a tela
+ * mostra a data com `toLocaleDateString('pt-BR')`, que converte pro fuso do
+ * usuário. Agrupar pela string UTC crua jogaria uma ficha enviada dia 31 às 22h
+ * (BRT) para o mês seguinte, e ela apareceria num mês diferente do que está
+ * escrito na coluna "Data" ao lado.
+ */
+export function monthFromTimestamp(iso: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}

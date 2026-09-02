@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 import { useTenant } from '@/contexts/TenantContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getCurrentMonth, monthFromTimestamp, monthLabel } from '@/lib/dateUtils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import { Search, ChevronLeft, ChevronRight, Eye, EyeOff, Copy, Check, Loader2, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Eye, EyeOff, Copy, Check, Loader2, Trash2, ArrowRightLeft, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FichaRating {
@@ -84,6 +86,7 @@ export default function FichasRespostasPage() {
   const [fichas, setFichas] = useState<FichaRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [month, setMonth] = useState<string>(getCurrentMonth());
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<FichaRating | null>(null);
 
@@ -136,7 +139,18 @@ export default function FichasRespostasPage() {
     }
   };
 
+  // Meses que realmente tem ficha, mais o mes corrente pra ele nunca abrir vazio.
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>([getCurrentMonth()]);
+    fichas.forEach(f => {
+      const m = monthFromTimestamp(f.created_at);
+      if (m) set.add(m);
+    });
+    return Array.from(set).sort().reverse();
+  }, [fichas]);
+
   const filtered = fichas.filter(f => {
+    if (month !== 'ALL' && monthFromTimestamp(f.created_at) !== month) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return f.nome?.toLowerCase().includes(q) || f.cpf?.includes(q) || f.email?.toLowerCase().includes(q);
@@ -160,20 +174,37 @@ export default function FichasRespostasPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Fichas Rating — Respostas</h1>
-          <p className="text-muted-foreground text-sm">{filtered.length} fichas recebidas</p>
+          <p className="text-muted-foreground text-sm">
+            {filtered.length} {filtered.length === 1 ? 'ficha recebida' : 'fichas recebidas'}
+            {month !== 'ALL' && ` em ${monthLabel(month)}`}
+          </p>
         </div>
       </div>
 
       {/* Search */}
       <div className="glass-card p-4">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, CPF ou email..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(0); }}
-            className="pl-9 bg-secondary border-border/50"
-          />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, CPF ou email..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(0); }}
+              className="pl-9 bg-secondary border-border/50"
+            />
+          </div>
+          <Select value={month} onValueChange={v => { setMonth(v); setPage(0); }}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-secondary border-border/50">
+              <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Selecionar mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMonths.map(m => (
+                <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>
+              ))}
+              <SelectItem value="ALL">Todos os meses</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

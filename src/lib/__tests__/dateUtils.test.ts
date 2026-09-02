@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMonthFromData, countWeekdays, getCurrentMonth, monthLabel } from '../dateUtils';
+import { parseMonthFromData, countWeekdays, getCurrentMonth, monthLabel, monthFromTimestamp } from '../dateUtils';
 
 describe('parseMonthFromData', () => {
   it('parses DD/MM/YYYY into YYYY-MM', () => {
@@ -61,5 +61,38 @@ describe('monthLabel', () => {
       const month = String(i + 1).padStart(2, '0');
       expect(monthLabel(`2026-${month}`)).toBe(`${label}/2026`);
     });
+  });
+});
+
+describe('monthFromTimestamp', () => {
+  it('extrai YYYY-MM de um timestamp ISO', () => {
+    // construido em horario LOCAL: 15/04/2026 12:00
+    const iso = new Date(2026, 3, 15, 12, 0).toISOString();
+    expect(monthFromTimestamp(iso)).toBe('2026-04');
+  });
+
+  it('usa o fuso local, nao o UTC cru', () => {
+    // 31/07 as 22h no fuso do usuario ainda e julho pra ele, mesmo que em UTC
+    // ja seja 01/08. A coluna "Data" da tela usa toLocaleDateString, entao o
+    // agrupamento por mes precisa concordar com o que ele le na tela.
+    const iso = new Date(2026, 6, 31, 22, 0).toISOString();
+    expect(monthFromTimestamp(iso)).toBe('2026-07');
+  });
+
+  it('acerta o primeiro instante do mes', () => {
+    const iso = new Date(2026, 0, 1, 0, 0).toISOString();
+    expect(monthFromTimestamp(iso)).toBe('2026-01');
+  });
+
+  it('padroniza o mes com dois digitos', () => {
+    const iso = new Date(2026, 8, 9, 10, 0).toISOString();
+    expect(monthFromTimestamp(iso)).toBe('2026-09');
+  });
+
+  it('devolve null pra entrada vazia ou invalida', () => {
+    expect(monthFromTimestamp('')).toBeNull();
+    expect(monthFromTimestamp('nao e data')).toBeNull();
+    expect(monthFromTimestamp(null as any)).toBeNull();
+    expect(monthFromTimestamp(undefined as any)).toBeNull();
   });
 });
