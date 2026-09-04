@@ -4,6 +4,7 @@ import { useMonthlyData } from '@/hooks/useMonthlyData';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { salesCount } from '@/lib/serviceTypes';
 import { useRoletaSpins } from '@/hooks/useRoletaSpins';
 import { isVendorActiveToday } from '@/lib/vendorActive';
 import { supabase } from '@/integrations/supabase/client';
@@ -542,7 +543,7 @@ export default function RoletaPage({ testMode = false }: RoletaPageProps = {}) {
     const today = new Date().toLocaleDateString('pt-BR');
     return clientes
       .filter(c => c.vendedor === vendedorNome && c.data === today)
-      .reduce((s, c) => s + (c.servico === 'LIMPA NOME + RATING' ? 2 : 1), 0);
+      .reduce((s, c) => s + salesCount(c), 0);
   }, [clientes]);
 
   // Available spins for "por_venda"

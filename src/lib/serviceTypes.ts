@@ -16,19 +16,38 @@ export function serviceTypeLabel(t: ServiceType): string {
 
 /**
  * Conta quantas vendas um cliente representa dentro de um recorte de servico.
- * - GERAL: combo (LIMPA NOME + RATING) = 2, qualquer outro = 1.
- * - LIMPA_NOME: LIMPA NOME ou combo = 1, demais = 0.
- * - RATING: RATING ou combo = 1, demais = 0.
+ *
+ * Regra do dono: venda marcada como "LIMPA NOME + RATING" vale 2 vendas em
+ * QUALQUER tela, inclusive nos recortes de Limpa Nome e de Rating. Era assim
+ * antes do filtro de servico existir e e assim que a Outcom conta comissao.
+ *
+ * - GERAL:      combo = 2, qualquer outro = 1
+ * - LIMPA_NOME: combo = 2, LIMPA NOME = 1, demais = 0
+ * - RATING:     combo = 2, RATING = 1, demais = 0
+ *
+ * A comparacao normaliza caixa e espacos porque `clientes.servico` e TEXT livre,
+ * sem CHECK constraint: qualquer variacao gravada faria a venda contar errado.
  */
+function normalizeServico(servico: string | null | undefined): string {
+  return (servico ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+const COMBO = 'LIMPA NOME + RATING';
+
 export function salesCount(c: Pick<Cliente, 'servico'>, serviceType: ServiceType = 'GERAL'): number {
+  const servico = normalizeServico(c.servico);
+  const isCombo = servico === COMBO;
+
   if (serviceType === 'GERAL') {
-    return c.servico === 'LIMPA NOME + RATING' ? 2 : 1;
+    return isCombo ? 2 : 1;
   }
   if (serviceType === 'LIMPA_NOME') {
-    return c.servico === 'LIMPA NOME' || c.servico === 'LIMPA NOME + RATING' ? 1 : 0;
+    if (isCombo) return 2;
+    return servico === 'LIMPA NOME' ? 1 : 0;
   }
   if (serviceType === 'RATING') {
-    return c.servico === 'RATING' || c.servico === 'LIMPA NOME + RATING' ? 1 : 0;
+    if (isCombo) return 2;
+    return servico === 'RATING' ? 1 : 0;
   }
   return 0;
 }
