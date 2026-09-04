@@ -3,6 +3,7 @@ import { useSalesData, Cliente, Contato } from '@/contexts/SalesDataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCurrentMonth } from '@/lib/dateUtils';
 import { isVendorActiveToday } from '@/lib/vendorActive';
+import { totalSalesCount } from '@/lib/serviceTypes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -279,6 +280,10 @@ export default function PlanilhaPage() {
     return data;
   }, [clientes, selectedMonth, search, filterVendedor, filterServico, filterSituacao]);
 
+  // Linha e venda sao coisas diferentes: um combo Limpa Nome + Rating e
+  // 1 registro e 2 vendas. A tela mostra os dois quando eles divergem.
+  const vendasNaLista = useMemo(() => totalSalesCount(filtered), [filtered]);
+
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 
@@ -474,7 +479,10 @@ export default function PlanilhaPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Planilha de Controle</h1>
-          <p className="text-muted-foreground text-sm">{filtered.length} registros</p>
+          <p className="text-muted-foreground text-sm">
+            {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
+            {vendasNaLista !== filtered.length && ` · ${vendasNaLista} vendas`}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Month navigator */}

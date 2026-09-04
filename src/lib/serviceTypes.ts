@@ -52,6 +52,18 @@ export function salesCount(c: Pick<Cliente, 'servico'>, serviceType: ServiceType
   return 0;
 }
 
+/**
+ * Soma quantas VENDAS uma lista de clientes representa, com o combo valendo 2.
+ * Serve pras telas que mostram contagem: numero de linhas e numero de vendas
+ * sao coisas diferentes quando existe combo, e mostrar so o primeiro confunde.
+ */
+export function totalSalesCount(
+  clientes: Pick<Cliente, 'servico'>[],
+  serviceType: ServiceType = 'GERAL',
+): number {
+  return clientes.reduce((sum, c) => sum + salesCount(c, serviceType), 0);
+}
+
 export function isClienteInService(c: Pick<Cliente, 'servico'>, serviceType: ServiceType): boolean {
   return salesCount(c, serviceType) > 0;
 }

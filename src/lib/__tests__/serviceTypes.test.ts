@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { salesCount, isClienteInService } from '../serviceTypes';
+import { salesCount, isClienteInService, totalSalesCount } from '../serviceTypes';
 
 const c = (servico: string) => ({ servico }) as any;
 
@@ -41,5 +41,28 @@ describe('salesCount', () => {
     expect(isClienteInService(c('LIMPA NOME + RATING'), 'LIMPA_NOME')).toBe(true);
     expect(isClienteInService(c('LIMPA NOME + RATING'), 'RATING')).toBe(true);
     expect(isClienteInService(c('RATING'), 'LIMPA_NOME')).toBe(false);
+  });
+});
+
+describe('totalSalesCount', () => {
+  it('soma o combo como 2 e o simples como 1', () => {
+    const lista = [c('LIMPA NOME + RATING'), c('LIMPA NOME'), c('RATING')];
+    expect(totalSalesCount(lista)).toBe(4);
+  });
+
+  it('conta 9 combos como 18 vendas', () => {
+    // caso real da Planilha: 9 registros do Gustavo, todos combo
+    const lista = Array.from({ length: 9 }, () => c('LIMPA NOME + RATING'));
+    expect(totalSalesCount(lista)).toBe(18);
+  });
+
+  it('respeita o recorte de servico', () => {
+    const lista = [c('LIMPA NOME + RATING'), c('RATING'), c('LIMPA NOME')];
+    expect(totalSalesCount(lista, 'LIMPA_NOME')).toBe(3);
+    expect(totalSalesCount(lista, 'RATING')).toBe(3);
+  });
+
+  it('devolve 0 pra lista vazia', () => {
+    expect(totalSalesCount([])).toBe(0);
   });
 });
