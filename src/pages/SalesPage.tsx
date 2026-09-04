@@ -192,13 +192,15 @@ export default function SalesPage() {
 
     // Helper: count sales in day range for a vendor
     const salesInRange = (vendorName: string | null, fromDay: number, toDay: number) => {
-      return filteredClientes.filter(c => {
-        if (vendorName && c.vendedor !== vendorName) return false;
-        const parts = c.data?.split('/');
-        if (!parts || parts.length !== 3) return false;
-        const day = parseInt(parts[0], 10);
-        return day >= fromDay && day <= toDay;
-      }).length;
+      return filteredClientes
+        .filter(c => {
+          if (vendorName && c.vendedor !== vendorName) return false;
+          const parts = c.data?.split('/');
+          if (!parts || parts.length !== 3) return false;
+          const day = parseInt(parts[0], 10);
+          return day >= fromDay && day <= toDay;
+        })
+        .reduce((sum, c) => sum + svcSalesCount(c, serviceFilter), 0);
     };
 
     // Helper: format day as DD/MM
@@ -332,8 +334,10 @@ export default function SalesPage() {
 
   const todaySalesCount = useMemo(() => {
     const todayStr = String(new Date().getDate()).padStart(2, '0');
-    return localClientes.filter(c => c.data?.startsWith(todayStr + '/')).length;
-  }, [localClientes]);
+    return localClientes
+      .filter(c => c.data?.startsWith(todayStr + '/'))
+      .reduce((sum, c) => sum + svcSalesCount(c, serviceFilter), 0);
+  }, [localClientes, serviceFilter]);
 
   const dailySales = useMemo(() => {
     const byDay: Record<string, number> = {};
